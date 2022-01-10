@@ -2,6 +2,7 @@ from pathlib import Path
 
 SCARED_ROOT_PATH = Path('/home/chris/UbelixWorkspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/01_stereo/01_intuitive_scared/')
 
+
 def get_scared_relpath(d_idx:int=1, k_idx:int=1, fname:str=''):
 
     # account for test dataset names
@@ -16,8 +17,10 @@ def get_scared_relpath(d_idx:int=1, k_idx:int=1, fname:str=''):
 
     return data_path / Path('keyframe_' + str(k_idx)) / fname
 
+
 def get_scared_abspath(d_idx:int=1, k_idx:int=1, fname:str=''):
     return Path(SCARED_ROOT_PATH) / get_scared_relpath(d_idx, k_idx, fname)
+
 
 def get_save_path(d_idx:int=1, k_idx:int=1, base_path:str=None):
 
@@ -26,6 +29,7 @@ def get_save_path(d_idx:int=1, k_idx:int=1, base_path:str=None):
     save_path.mkdir(parents=True, exist_ok=True)
 
     return save_path
+
 
 def str2path(path:str=None):
     return Path(path)

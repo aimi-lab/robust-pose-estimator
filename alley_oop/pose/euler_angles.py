@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def euler2mat(theta_x: float = 0, theta_y: float = 0, theta_z: float = 0):
     """
     Creation of a rotation matrix from three angles in radians
@@ -24,6 +25,7 @@ def euler2mat(theta_x: float = 0, theta_y: float = 0, theta_z: float = 0):
     rmat_3 = np.dot(np.dot(rmat_x, rmat_y), rmat_z)
 
     return rmat_3
+
 
 def mat2euler(rmat):
     """

@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def forward_project(obj_pts, cam_mtx, pos_mtx=None):
 
     pos_mtx = np.hstack([np.eye(3), np.zeros([3, 1])]) if pos_mtx is None else pos_mtx
@@ -14,6 +15,7 @@ def forward_project(obj_pts, cam_mtx, pos_mtx=None):
     img_pix = cam_mtx @ img_pts
 
     return img_pix
+
 
 def reverse_project(img_pix, cam_mtx, pos_mtx=None, disp=None, base=float(1)):
 

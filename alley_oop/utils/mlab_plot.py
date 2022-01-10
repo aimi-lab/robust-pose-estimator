@@ -1,6 +1,7 @@
 from mayavi import mlab
 import numpy as np
 
+
 def mlab_plot(arr, colors=None, size=10, show_opt=True, save_opt=False, skip_opt=False, fig=None):
 
     if skip_opt:
@@ -22,6 +23,7 @@ def mlab_plot(arr, colors=None, size=10, show_opt=True, save_opt=False, skip_opt
     pts.mlab_source.dataset.point_data.scalars = colors
     mlab.show() if show_opt else None
     mlab.savefig('./figure.ps') if save_opt else None
+
 
 def mlab_rgbd(arr, colors=None, size=10, show_opt=True, save_opt=False, skip_opt=False, fig=None):
 
