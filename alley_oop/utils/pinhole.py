@@ -27,9 +27,8 @@ def reverse_project(img_pix, cam_mtx, pos_mtx=None, disp=None, base=float(1)):
     # pinhole projection
     obj_pts = np.linalg.pinv(pos_mtx) @ img_pts
 
+    # depth assignment
     if disp is not None:
-        obj_pts[0] *= (cam_mtx[0][0] * base / disp)
-        obj_pts[1] *= (cam_mtx[1][1] * base / disp)
-        obj_pts[2] *= (np.mean([cam_mtx[0][0], cam_mtx[1][1]]) * base / disp)
+        obj_pts = base * np.diag([cam_mtx[0][0], cam_mtx[1][1], np.mean([cam_mtx[0][0], cam_mtx[1][1]])]) @ obj_pts[:3] / disp
 
-    return obj_pts[:3]
+    return obj_pts
