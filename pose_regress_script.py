@@ -9,7 +9,7 @@ from alley_oop.utils.pinhole import reverse_project, forward_project
 from alley_oop.utils.mlab_plot import mlab_rgbd, mlab_plot
 from alley_oop.utils.pfm_handler import load_pfm
 from alley_oop.utils.normals import get_normals, get_ray_surfnorm_angle
-from alley_oop.utils.projected_photo_loss import projected_photo_loss
+from alley_oop.metrics.projected_photo_loss import projected_photo_loss
 from alley_oop.pose.feat_pose_estimation import FeatPoseEstimator
 from alley_oop.pose.topo_pose_estimation import TopoPoseEstimator
 
