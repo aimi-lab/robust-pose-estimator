@@ -4,6 +4,7 @@ import numpy as np
 def forward_project(obj_pts, cam_mtx, pos_mtx=None):
 
     pos_mtx = np.hstack([np.eye(3), np.zeros([3, 1])]) if pos_mtx is None else pos_mtx
+    obj_pts = np.vstack([obj_pts, np.ones(obj_pts.shape[1])]) if obj_pts.shape[0] == 3 else obj_pts
 
     # pinhole projection
     img_pts = pos_mtx @ obj_pts
