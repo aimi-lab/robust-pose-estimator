@@ -8,7 +8,10 @@ from alley_oop.utils.paths import SCARED_ROOT_PATH, get_scared_abspath
 from alley_oop.utils.pinhole import reverse_project, forward_project
 from alley_oop.utils.mlab_plot import mlab_rgbd, mlab_plot
 from alley_oop.utils.pfm_handler import load_pfm
+from alley_oop.utils.normals import get_normals, get_ray_surfnorm_angle
+from alley_oop.utils.projected_photo_loss import projected_photo_loss
 from alley_oop.pose.feat_pose_estimation import FeatPoseEstimator
+from alley_oop.pose.topo_pose_estimation import TopoPoseEstimator
 
 
 def clip_quantile(arr, p=1e-3):
@@ -31,7 +34,8 @@ for k_idx in range(1, 4):
     calib_list += ipair_list[0::3]
     fnimg_list += ipair_list[1::3]
 
-feats_list = sorted((ipair_path / 'data' / 'superglue_results_grow_gap').rglob('*.npz'))
+feats_path = ipair_path / 'data' / 'superglue_results_grow_gap'
+feats_list = sorted((feats_path).rglob('*.npz'))
 fname_pair = str(feats_list[0].name).split('_')[:2]
 frame_jump = int(fname_pair[1][:-1]) - int(fname_pair[0][:-1])
 
@@ -44,10 +48,12 @@ assert len(calib_list) == len(fnimg_list) == len(depth_list) == len(feats_list),
 
 plot_opt = 2
 stats = []
+j = 0
 for i in range(0, len(feats_list)-frame_jump, frame_jump):
 
     # load data
-    j = i+frame_jump
+    i = 0 if not str(feats_path).__contains__('grow_gap') else i
+    j = i+frame_jump if not str(feats_path).__contains__('grow_gap') else j+frame_jump
     dis0, _ = load_pfm(depth_list[i])
     dis1, _ = load_pfm(depth_list[j])
     img0 = imageio.imread(fnimg_list[i])
@@ -90,34 +96,43 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
     qpts = reverse_project(fpt1, cal1['M1'], emat, dis1[feat[1][1], feat[1][0]].flatten(), base=bas1)
 
     divs = (64, 32)#resolution
-    idcs = (ipts[0, ::200]>=resolution[1]//divs[1]) & \
-            (ipts[0, ::200]<=resolution[1]//divs[1]*(divs[1]-1)) & \
-            (ipts[1, ::200]>=resolution[0]//divs[0]) & \
-            (ipts[1, ::200]<=resolution[0]//divs[0]*(divs[0]-1))
-    tpt0 = np.vstack([opt0, np.mean(img0.reshape(-1, 3).T, axis=0)])[:, ::200]#opt0[:, ::200]#
-    tpt1 = np.vstack([opt1, np.mean(img1.reshape(-1, 3).T, axis=0)])[:, ::200][:, idcs]#opt1[:, ::200][:, idcs]#
+    idcs = (ipts[0, ::200] >= resolution[1]//divs[1]) & \
+            (ipts[0, ::200] <= resolution[1]//divs[1]*(divs[1]-1)) & \
+            (ipts[1, ::200] >= resolution[0]//divs[0]) & \
+            (ipts[1, ::200] <= resolution[0]//divs[0]*(divs[0]-1))
+    tpt0 = np.vstack([opt0, np.mean(img0.reshape(-1, 3).T, axis=0)])[:, ::200]
+    tpt1 = np.vstack([opt1, np.mean(img1.reshape(-1, 3).T, axis=0)])[:, ::200][:, idcs]
+
+    import time
+    start = time.time()
+    naxs = get_normals(rpts, leafsize=10, plot_opt=False)
+    print(time.time()-start)
+    angs = get_ray_surfnorm_angle(rpts, naxs)
 
     # pose estimation
     pose = FeatPoseEstimator(rpts, qpts, confidence=feat[-1]**-.5)
+    #pose = TopoPoseEstimator(tpt0, tpt1)
     pose.estimate(dims_fit=False)
     tvec = pose.tvec
     rvec = pose.rvec
     rmat = pose.rmat
     wdim = pose.feat_wdims
+    loss = projected_photo_loss(img0, img1, rmat, tvec, cal0['M1'], disp=dis1)
     print('Frame pair:              %s, %s' % (i, j))
     print('Translation (Eucl.):     %s (%s)' % (tvec.ravel(), sum(tvec.ravel()**2)**-.5))
     print('Rotation:                %s' % rvec.ravel())
     print('Dim-weights:             %s' % wdim.ravel())
     print('Loss per feature:        %s' % str(pose.p_loss/len(pose.residual_fun(pose.p_star))))
+    print('Photometric loss:        %s' % loss)
     print('Iterations:              %s' % len(pose.p_list))
     print('\n')
-    stats.append([pose.p_loss/len(pose.residual_fun(pose.p_star)), len(pose.p_list)])
+    stats.append([pose.p_loss/len(pose.residual_fun(pose.p_star)), len(pose.p_list), loss])
 
     # map query points
     mpts = rmat @ qpts + tvec
     opts = rmat @ opt1 + tvec
-    ppts = forward_project(np.vstack([mpts, np.ones(mpts.shape[1])]), cal0['M1'])
-    wpts = forward_project(np.vstack([qpts, np.ones(qpts.shape[1])]), cal0['M1'])
+    ppts = forward_project(qpts, cal0['M1'], np.hstack([rmat, tvec]))
+    wpts = forward_project(opt1, cal0['M1'], np.hstack([rmat, tvec]))
 
     # 3D plot
     if plot_opt in (1, 2): fig = mlab.figure(bgcolor=(.5, .5, .5))
