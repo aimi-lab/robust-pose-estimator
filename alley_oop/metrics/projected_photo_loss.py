@@ -1,7 +1,8 @@
 import numpy as np
 from scipy.interpolate import NearestNDInterpolator, LinearNDInterpolator, CloughTocher2DInterpolator
 
-from alley_oop.utils.pinhole import reverse_project, forward_project
+from alley_oop.utils.pinhole_transforms import reverse_project, forward_project
+
 
 def dual_projected_photo_loss(img0, img1, dep0, dep1, rmat, tvec, kmat0, kmat1=None):
 
@@ -43,11 +44,11 @@ def synthesize_view(img_ch, dept, rmat, tvec, kmat0, kmat1):
     x_mesh, y_mesh = np.meshgrid(x_coords, y_coords)
     ipts = np.vstack([x_mesh.flatten(), y_mesh.flatten(), np.ones(len(x_mesh.flatten()))])
 
-    # back-project coordinates
+    # back-project coordinates into space
     opts = reverse_project(ipts, kmat1, disp=dept.flatten())
 
     # rotate, translate and forward-project points
-    npts = forward_project(opts, kmat0, np.hstack([rmat, tvec]))
+    npts = forward_project(opts, kmat0, rmat, tvec)
 
     # interpolate RGB values
     interpolator = CloughTocher2DInterpolator(npts[:2].T, img_ch.flatten(), rescale=False)

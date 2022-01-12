@@ -5,7 +5,7 @@ from skimage import transform, util
 from mayavi import mlab
 
 from alley_oop.utils.paths import SCARED_ROOT_PATH, get_scared_abspath
-from alley_oop.utils.pinhole import reverse_project, forward_project
+from alley_oop.utils.pinhole_transforms import reverse_project, forward_project
 from alley_oop.utils.mlab_plot import mlab_rgbd, mlab_plot
 from alley_oop.utils.pfm_handler import load_pfm
 from alley_oop.utils.normals import get_normals, get_ray_surfnorm_angle
@@ -34,7 +34,7 @@ for k_idx in range(1, 4):
     calib_list += ipair_list[0::3]
     fnimg_list += ipair_list[1::3]
 
-feats_path = ipair_path / 'data' / 'superglue_results_grow_gap'
+feats_path = ipair_path / 'data' / 'superglue_results_const_gap'
 feats_list = sorted((feats_path).rglob('*.npz'))
 fname_pair = str(feats_list[0].name).split('_')[:2]
 frame_jump = int(fname_pair[1][:-1]) - int(fname_pair[0][:-1])
@@ -46,14 +46,14 @@ calib_list = calib_list[:len(feats_list)]
 
 assert len(calib_list) == len(fnimg_list) == len(depth_list) == len(feats_list), 'unequal number of image, disparity and calibration files'
 
-plot_opt = 2
+plot_opt = 0
 stats = []
 j = 0
 for i in range(0, len(feats_list)-frame_jump, frame_jump):
 
     # load data
-    i = 0 if not str(feats_path).__contains__('grow_gap') else i
-    j = i+frame_jump if not str(feats_path).__contains__('grow_gap') else j+frame_jump
+    i = i if str(feats_path).__contains__('const_gap') else 0
+    j = i+frame_jump if str(feats_path).__contains__('const_gap') else j+frame_jump
     dis0 = load_pfm(depth_list[i])[0]
     dis1 = load_pfm(depth_list[j])[0]
     img0 = imageio.imread(fnimg_list[i])
@@ -89,11 +89,10 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
     # 2D to 3D projection
     bas0 = abs(cal0['T'][0][0])
     bas1 = abs(cal1['T'][0][0])
-    emat = np.hstack([np.eye(3), np.array([[0, 0, 0]]).T])
-    opt0 = reverse_project(ipts, cal0['M1'], emat, dis0.flatten(), base=bas0)
-    opt1 = reverse_project(ipts, cal1['M1'], emat, dis1.flatten(), base=bas1)
-    rpts = reverse_project(fpt0, cal0['M1'], emat, dis0[feat[0][1], feat[0][0]].flatten(), base=bas0)
-    qpts = reverse_project(fpt1, cal1['M1'], emat, dis1[feat[1][1], feat[1][0]].flatten(), base=bas1)
+    opt0 = reverse_project(ipts, cal0['M1'], disp=dis0.flatten(), base=bas0)
+    opt1 = reverse_project(ipts, cal1['M1'], disp=dis1.flatten(), base=bas1)
+    rpts = reverse_project(fpt0, cal0['M1'], disp=dis0[feat[0][1], feat[0][0]].flatten(), base=bas0)
+    qpts = reverse_project(fpt1, cal1['M1'], disp=dis1[feat[1][1], feat[1][0]].flatten(), base=bas1)
 
     divs = (64, 32)#resolution
     idcs = (ipts[0, ::200] >= resolution[1]//divs[1]) & \
@@ -103,10 +102,7 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
     tpt0 = np.vstack([opt0, np.mean(img0.reshape(-1, 3).T, axis=0)])[:, ::200]
     tpt1 = np.vstack([opt1, np.mean(img1.reshape(-1, 3).T, axis=0)])[:, ::200][:, idcs]
 
-    import time
-    start = time.time()
     naxs = get_normals(rpts, leafsize=10, plot_opt=False)
-    print(time.time()-start)
     angs = get_ray_surfnorm_angle(rpts, naxs)
 
     # pose estimation
@@ -146,19 +142,29 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
     # 2D plot
     if plot_opt in (1, 2):
         wpts = forward_project(qpts, cal0['M1'])
-        ppts = forward_project(qpts, cal0['M1'], np.hstack([rmat, tvec]))
+        ppts = forward_project(qpts, cal0['M1'], rmat, tvec)
         import matplotlib.pyplot as plt
-        fig, axs = plt.subplots(2, 2)
+        from matplotlib import rc
+        rc('text', usetex=True)
+        rc('font', **{'family': 'serif', 'serif': ['Palatino']})
+        fig, axs = plt.subplots(2, 2, figsize=(15, 8))
         axs[0, 0].imshow(img0)
         axs[0, 1].imshow(img1)
-        axs[0, 0].plot(feat[0][0], feat[0][1], 'g.')
-        axs[0, 1].plot(feat[1][0], feat[1][1], 'b.')
-        axs[0, 0].plot(wpts[0], wpts[1], 'rx')
-        axs[0, 0].plot(ppts[0], ppts[1], 'bx')
+        axs[0, 0].plot(feat[0][0], feat[0][1], 'g.', label='$\mathbf{x}^{(i)}_k$')
+        axs[0, 1].plot(feat[1][0], feat[1][1], 'g.', label='$\mathbf{x}^{(i)}_l$')
+        #axs[0, 0].plot(wpts[0], wpts[1], 'rx', label='without pose regression')
+        axs[0, 0].plot(ppts[0], ppts[1], 'bx', label='$\mathbf{\widetilde{x}}^{(i)}_l$')
         axs[1, 0].imshow(dis0, cmap='gray')
         axs[1, 1].imshow(dis1, cmap='gray')
+        axs[0, 0].legend(loc="upper right")
+        axs[0, 1].legend(loc="upper right")
+        axs[0, 0].tick_params(top=False, bottom=False, left=False, right=False, labelleft=False, labelbottom=False)
+        axs[0, 1].tick_params(top=False, bottom=False, left=False, right=False, labelleft=False, labelbottom=False)
+        plt.tight_layout()
+        #plt.savefig('feature_projected_loss.svg')
         plt.show()
 
-avg_loss, avg_iter = np.mean(stats, axis=0).tolist()
-print('avg_loss:    %s' % avg_loss)
-print('avg_iter:    %s' % avg_iter)
+avg_feat_loss, avg_iter, avg_foto_loss = np.mean(stats, axis=0).tolist()
+print('avg_feat_loss:   %s' % avg_feat_loss)
+print('avg_foto_loss:   %s' % avg_foto_loss)
+print('avg_iter:        %s' % avg_iter)
