@@ -3,8 +3,18 @@ from scipy.interpolate import NearestNDInterpolator, LinearNDInterpolator, Cloug
 
 from alley_oop.utils.pinhole import reverse_project, forward_project
 
+def dual_projected_photo_loss(img0, img1, dep0, dep1, rmat, tvec, kmat0, kmat1=None):
 
-def projected_photo_loss(rimg, qimg, rmat, tvec, kmat0, kmat1=None, disp=None, dbg_opt=False):
+    # init values
+    kmat1 = kmat0 if kmat1 is None else kmat1
+
+    loss0 = projected_photo_loss(img0, img1, dep1, rmat, tvec, kmat0, kmat1)
+    loss1 = projected_photo_loss(img1, img0, dep0, np.linalg.pinv(rmat), -tvec, kmat1, kmat0)
+
+    return loss0 + loss1
+
+
+def projected_photo_loss(rimg, qimg, dept, rmat, tvec, kmat0, kmat1=None, dbg_opt=False):
 
     # init values
     kmat1 = kmat0 if kmat1 is None else kmat1
@@ -12,20 +22,20 @@ def projected_photo_loss(rimg, qimg, rmat, tvec, kmat0, kmat1=None, disp=None, d
     # channel-wise new image generation (given perspective and depth)
     nimg = np.zeros_like(qimg)
     for i in range(qimg.shape[-1]):
-        nimg[..., i] = synthesize_view(qimg[..., i], rmat, tvec, kmat0, kmat1, disp).reshape(qimg.shape[:2])
+        nimg[..., i] = synthesize_view(qimg[..., i], dept, rmat, tvec, kmat0, kmat1).reshape(qimg.shape[:2])
 
     # compute loss
     loss = np.sum((rimg - nimg)**2)
 
     if dbg_opt:
         import imageio
-        imageio.imwrite('./photometric_loss_img.png', nimg)
-        imageio.imwrite('./photometric_loss_ref.png', rimg)
+        imageio.imwrite('./photometric_loss_img.png', nimg/nimg.max())
+        imageio.imwrite('./photometric_loss_ref.png', rimg/rimg.max())
 
     return loss
 
 
-def synthesize_view(img_ch, rmat, tvec, kmat0, kmat1, disp):
+def synthesize_view(img_ch, dept, rmat, tvec, kmat0, kmat1):
 
     # create 2-D coordinates
     x_coords = np.arange(0, img_ch.shape[1])
@@ -34,13 +44,13 @@ def synthesize_view(img_ch, rmat, tvec, kmat0, kmat1, disp):
     ipts = np.vstack([x_mesh.flatten(), y_mesh.flatten(), np.ones(len(x_mesh.flatten()))])
 
     # back-project coordinates
-    opts = reverse_project(ipts, kmat1, disp=disp.flatten())
+    opts = reverse_project(ipts, kmat1, disp=dept.flatten())
 
     # rotate, translate and forward-project points
     npts = forward_project(opts, kmat0, np.hstack([rmat, tvec]))
 
     # interpolate RGB values
-    interpolator = CloughTocher2DInterpolator(npts[:2].T, img_ch.flatten(), fill_value=0, rescale=False)
+    interpolator = CloughTocher2DInterpolator(npts[:2].T, img_ch.flatten(), rescale=False)
     imgn = interpolator(ipts[:2].T)
 
     return imgn

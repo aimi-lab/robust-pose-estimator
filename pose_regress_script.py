@@ -9,7 +9,7 @@ from alley_oop.utils.pinhole import reverse_project, forward_project
 from alley_oop.utils.mlab_plot import mlab_rgbd, mlab_plot
 from alley_oop.utils.pfm_handler import load_pfm
 from alley_oop.utils.normals import get_normals, get_ray_surfnorm_angle
-from alley_oop.metrics.projected_photo_loss import projected_photo_loss
+from alley_oop.metrics.projected_photo_loss import dual_projected_photo_loss
 from alley_oop.pose.feat_pose_estimation import FeatPoseEstimator
 from alley_oop.pose.topo_pose_estimation import TopoPoseEstimator
 
@@ -54,8 +54,8 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
     # load data
     i = 0 if not str(feats_path).__contains__('grow_gap') else i
     j = i+frame_jump if not str(feats_path).__contains__('grow_gap') else j+frame_jump
-    dis0, _ = load_pfm(depth_list[i])
-    dis1, _ = load_pfm(depth_list[j])
+    dis0 = load_pfm(depth_list[i])[0]
+    dis1 = load_pfm(depth_list[j])[0]
     img0 = imageio.imread(fnimg_list[i])
     img1 = imageio.imread(fnimg_list[j])
     with open(calib_list[i],'rb') as f: cal0 = pickle.load(f)
@@ -117,7 +117,7 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
     rvec = pose.rvec
     rmat = pose.rmat
     wdim = pose.feat_wdims
-    loss = projected_photo_loss(img0, img1, rmat, tvec, cal0['M1'], disp=dis1)
+    loss = dual_projected_photo_loss(img0, img1, dis0/bas0, dis1/bas1, rmat, tvec, cal0['M1'])
     print('Frame pair:              %s, %s' % (i, j))
     print('Translation (Eucl.):     %s (%s)' % (tvec.ravel(), sum(tvec.ravel()**2)**-.5))
     print('Rotation:                %s' % rvec.ravel())
@@ -128,35 +128,33 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
     print('\n')
     stats.append([pose.p_loss/len(pose.residual_fun(pose.p_star)), len(pose.p_list), loss])
 
-    # map query points
-    mpts = rmat @ qpts + tvec
-    opts = rmat @ opt1 + tvec
-    ppts = forward_project(qpts, cal0['M1'], np.hstack([rmat, tvec]))
-    wpts = forward_project(opt1, cal0['M1'], np.hstack([rmat, tvec]))
-
     # 3D plot
     if plot_opt in (1, 2): fig = mlab.figure(bgcolor=(.5, .5, .5))
     if plot_opt == 1:
         ds = 2
+        opts = rmat @ opt1 + tvec
         mlab_rgbd(opt0[:, ::ds], colors=img0.reshape(-1, 3)[::ds], size=.1, show_opt=False, fig=fig)
         mlab_rgbd(opts[:, ::ds], colors=img1.reshape(-1, 3)[::ds], size=.1, show_opt=False, fig=fig)
         mlab.show()
     if plot_opt == 2:
+        mpts = rmat @ qpts + tvec
         mlab_plot(rpts, colors=np.repeat([(0.5, 0, 0)], repeats=len(rpts.T), axis=0), size=1, show_opt=False, fig=fig)
         mlab_plot(qpts, colors=np.repeat([(1.0, 0, 0)], repeats=len(rpts.T), axis=0), size=1, show_opt=False, fig=fig)
         mlab_plot(mpts, colors=np.repeat([(0.0, 0, 0)], repeats=len(rpts.T), axis=0), size=1, show_opt=False, fig=fig)
         mlab.show()
 
+    # 2D plot
     if plot_opt in (1, 2):
-        # 2D plot
+        wpts = forward_project(qpts, cal0['M1'])
+        ppts = forward_project(qpts, cal0['M1'], np.hstack([rmat, tvec]))
         import matplotlib.pyplot as plt
         fig, axs = plt.subplots(2, 2)
         axs[0, 0].imshow(img0)
         axs[0, 1].imshow(img1)
         axs[0, 0].plot(feat[0][0], feat[0][1], 'g.')
         axs[0, 1].plot(feat[1][0], feat[1][1], 'b.')
-        axs[0, 0].plot(ppts[0], ppts[1], 'bx')
         axs[0, 0].plot(wpts[0], wpts[1], 'rx')
+        axs[0, 0].plot(ppts[0], ppts[1], 'bx')
         axs[1, 0].imshow(dis0, cmap='gray')
         axs[1, 1].imshow(dis1, cmap='gray')
         plt.show()
