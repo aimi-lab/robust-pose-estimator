@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from alley_oop.utils.pinhole_transforms import forward_project, reverse_project, projection_matrix, decompose
+from alley_oop.utils.pinhole_transforms import forward_project, reverse_project, compose_projection_matrix, decompose_projection_matrix
 
 
 class PinholeTransformTester(unittest.TestCase):
@@ -19,9 +19,9 @@ class PinholeTransformTester(unittest.TestCase):
 
     def test_KR_decomposition(self):
 
-        pmat = projection_matrix(self.kmat, self.rmat, self.tvec)
+        pmat = compose_projection_matrix(self.kmat, self.rmat, self.tvec)
 
-        kmat, rmat, tvec = decompose(pmat)
+        kmat, rmat, tvec = decompose_projection_matrix(pmat)
 
         # assertion
         concat_groundt = np.hstack([self.kmat, self.rmat, self.tvec])

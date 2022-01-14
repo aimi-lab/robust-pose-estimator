@@ -9,7 +9,7 @@ def forward_project(opts, kmat, rmat=None, tvec=None):
     opts = np.vstack([opts, np.ones(opts.shape[1])]) if opts.shape[0] == 3 else opts
 
     # compose projection matrix
-    pmat = projection_matrix(kmat, rmat, tvec)
+    pmat = compose_projection_matrix(kmat, rmat, tvec)
 
     # pinhole projection
     ipts = pmat @ opts
@@ -28,7 +28,7 @@ def reverse_project(ipts, kmat, rmat=None, tvec=None, disp=None, base=float(1)):
     ipts = np.vstack([ipts, np.ones(ipts.shape[1])]) if ipts.shape[0] == 2 else ipts
 
     # compose projection matrix
-    pmat = projection_matrix(kmat, rmat, tvec)
+    pmat = compose_projection_matrix(kmat, rmat, tvec)
 
     # pinhole projection
     opts = np.linalg.pinv(pmat) @ ipts
@@ -40,10 +40,11 @@ def reverse_project(ipts, kmat, rmat=None, tvec=None, disp=None, base=float(1)):
     return opts
 
 
-def projection_matrix(kmat, rmat, tvec):
+def compose_projection_matrix(kmat, rmat, tvec):
     return kmat @ np.hstack([rmat, tvec])
 
-def decompose(pmat, scale=False):
+
+def decompose_projection_matrix(pmat, scale=False):
     """
     https://www.robots.ox.ac.uk/~vgg/hzbook/code/vgg_multiview/vgg_KR_from_P.m
     """
