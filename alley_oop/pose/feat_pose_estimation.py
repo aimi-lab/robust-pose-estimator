@@ -58,7 +58,7 @@ class FeatPoseEstimator(object):
         if self.feat_query.shape[0] > 3: mpts = np.vstack([mpts, self.feat_query[3:]])
 
         # squared difference
-        sdif = (self.compute_diff(mpts, self.feat_refer))**2
+        sdif = self.compute_diff(mpts, self.feat_refer)**2
 
         # update weights for dimensions (e.g. x, y, z, ...)
         if dims_fit:
