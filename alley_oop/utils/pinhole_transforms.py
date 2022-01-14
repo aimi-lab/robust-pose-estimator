@@ -42,3 +42,23 @@ def reverse_project(ipts, kmat, rmat=None, tvec=None, disp=None, base=float(1)):
 
 def projection_matrix(kmat, rmat, tvec):
     return kmat @ np.hstack([rmat, tvec])
+
+def decompose(pmat, scale=False):
+    """
+    https://www.robots.ox.ac.uk/~vgg/hzbook/code/vgg_multiview/vgg_KR_from_P.m
+    """
+
+    n = pmat.shape[0] if len(pmat.shape) == 2 else np.sqrt(pmat.size)
+    hmat = pmat.reshape(n, -1)[:, :n]
+    rmat, kmat = np.linalg.qr(hmat, mode='reduced')
+
+    if scale:
+        kmat = kmat / kmat[n-1, n-1]
+        if kmat[0, 0] < 0:
+            D = np.diag([-1, -1, *np.ones(n-2)])
+            kmat = np.dot(D, kmat)
+            rmat = np.dot(rmat, D)
+
+    tvec = np.linalg.lstsq(-pmat[:, :n], pmat[:, -1])[0][:, np.newaxis] if pmat.shape[1] == 4 else np.zeros(n)
+
+    return rmat, kmat, tvec
