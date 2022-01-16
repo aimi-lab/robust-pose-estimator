@@ -37,7 +37,7 @@ class FeatPoseEstimator(object):
         if dims_fit: p_init += self.feat_wdims.flatten().tolist()
 
         # compute 6-DOF solution using least squares solver
-        self.p_star = least_squares(self.residual_fun, p_init, jac='2-point', args=(dims_fit,), method='lm').x
+        self.p_star = least_squares(self.residual_fun, p_init, jac='2-point', args=(dims_fit,), method='lm', max_nfev=int(1e5)).x
         self.p_loss = self.residual_fun(p=self.p_star).sum()
 
         # assign solution to output vectors
@@ -54,11 +54,11 @@ class FeatPoseEstimator(object):
         rmat = euler2mat(*p[3:6])
 
         # map points from query position
-        mpts = rmat @ self.feat_query[:3] + tvec
-        if self.feat_query.shape[0] > 3: mpts = np.vstack([mpts, self.feat_query[3:]])
+        mpts = rmat @ self.feat_refer[:3] + tvec
+        if self.feat_refer.shape[0] > 3: mpts = np.vstack([mpts, self.feat_refer[3:]])
 
         # squared difference
-        sdif = self.compute_diff(mpts, self.feat_refer)**2
+        sdif = self.compute_diff(mpts, self.feat_query)**2
 
         # update weights for dimensions (e.g. x, y, z, ...)
         if dims_fit:
@@ -76,7 +76,7 @@ class FeatPoseEstimator(object):
         
         return residuals
 
-    def compute_diff(self, qpts, rpts):
+    def compute_diff(self, rpts, qpts):
         return rpts - qpts
 
     @staticmethod

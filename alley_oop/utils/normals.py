@@ -3,7 +3,7 @@ from sklearn.decomposition import PCA
 import numpy as np
 
 
-def get_normals(opts, distance:float=10, leafsize:int=10, plot_opt=False):
+def normals_from_pca(opts, distance:float=10, leafsize:int=10, plot_opt=False):
     """
     compute normal for each point in a pointcloud using PCA on its KD-tree neighbours
     """

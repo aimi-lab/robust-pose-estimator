@@ -27,20 +27,20 @@ class TopoPoseEstimator(FeatPoseEstimator):
 
         interpolators = []
         for i in range(self.dimensions):
-            tri = spatial.Delaunay(self.feat_refer[:2].copy().T)
+            tri = spatial.Delaunay(self.feat_query[:2].copy().T)
             InterpolatorClass = CloughTocher2DInterpolator if self.method.lower() == 'cubic' else LinearNDInterpolator
             interpolators.append(InterpolatorClass(points=tri,
-                                                   values=self.feat_refer[i+2].copy(),
+                                                   values=self.feat_query[i+2].copy(),
                                                    rescale=False,
                                                    fill_value=self.fill_value,
                                                    ))
             
         return interpolators
 
-    def compute_diff(self, qpts, rpts=None):
+    def compute_diff(self, rpts, qpts=None):
         
-        diff_arr = np.zeros([qpts.shape[0]-2, qpts.shape[1]])
+        diff_arr = np.zeros([rpts.shape[0]-2, rpts.shape[1]])
         for i, interpolator in enumerate(self.interpolators):
-            diff_arr[i] = interpolator(qpts[0], qpts[1]) - qpts[i+2]
+            diff_arr[i] = interpolator(rpts[0], rpts[1]) - rpts[i+2]
 
         return diff_arr

@@ -63,3 +63,13 @@ def decompose_projection_matrix(pmat, scale=False):
     tvec = np.linalg.lstsq(-pmat[:, :n], pmat[:, -1])[0][:, np.newaxis] if pmat.shape[1] == 4 else np.zeros(n)
 
     return rmat, kmat, tvec
+
+
+def create_img_coords(resolution):
+    
+    x_coords = np.arange(0, resolution[1])
+    y_coords = np.arange(0, resolution[0])
+    x_mesh, y_mesh = np.meshgrid(x_coords, y_coords)
+    ipts = np.vstack([x_mesh.flatten(), y_mesh.flatten(), np.ones(len(x_mesh.flatten()))])
+
+    return ipts
