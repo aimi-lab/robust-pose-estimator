@@ -184,11 +184,11 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
     if save_opt:
 
         # write each pose as 4x4 matrix
-        pose_fname = Path('.') / 'tests' / 'test_data' / str(feats_list[i].name).replace('matches', 'pose_es')
-        pose_esmat = np.vstack([np.array(pose_list[-1])[1], np.array([0, 0, 0, 1])])
-        pose_gtmat = np.vstack([np.array(pose_list[-1])[0], np.array([0, 0, 0, 1])])
-        with open(str(pose_fname)+'.json', 'w') as f: json.dump(pose_esmat.tolist(), f)
-        with open(str(pose_fname).replace('pose_es', 'pose_gt')+'.json', 'w') as f: json.dump(pose_gtmat.tolist(), f)
+        pose_fname = Path('.') / 'tests' / 'test_data' / str(feats_list[i].name).replace('matches.npz', 'pose_es.json')
+        pose_esmat = {'camera-pose': np.vstack([np.array(pose_list[-1])[1], np.array([0, 0, 0, 1])]).tolist()}
+        pose_gtmat = {'camera-pose': np.vstack([np.array(pose_list[-1])[0], np.array([0, 0, 0, 1])]).tolist()}
+        with open(str(pose_fname), 'w') as f: json.dump(pose_esmat, f, indent=4)
+        with open(str(pose_fname).replace('pose_es', 'pose_gt'), 'w') as f: json.dump(pose_gtmat, f, indent=4)
 
     # write rgbd point clouds
     if save_map:
