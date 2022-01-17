@@ -73,7 +73,7 @@ gtpos_list = sorted((ipair_path / 'data' / 'frame_data').rglob('*.json'))
 with open(gtpos_list[i],'rb') as f: pose = np.array(json.load(f)['camera-pose'])
 tvec = pose[:3, -1][np.newaxis].T
 rmat = pose[:3, :3]
-pclg = pclg + tvec
+#pclg = np.linalg.pinv(rmat) @ pclg - tvec
 orgn = np.zeros([3, 1])
 
 # image coordinates
@@ -81,7 +81,8 @@ ipts = create_img_coords(resolution)
 
 # 2D to 3D projection
 bas0 = abs(cal0['T'][0][0])
-opts = reverse_project(ipts, cal0['M1'], disp=dis0.flatten(), base=bas0)
+opts = reverse_project(ipts, cal0['M1'], disp=dis0.flatten()*.9, base=bas0)
+#opts = rmat @ opts + tvec
 
 # select points where ground-truth reference is available (exclude NaNs)
 pcln = pclg[:, ~np.isnan(pclg.sum(0))]
