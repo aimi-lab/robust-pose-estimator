@@ -26,7 +26,7 @@ def projected_photo_loss(rimg, qimg, dept, rmat, tvec, kmat0, kmat1=None, dbg_op
         nimg[..., i] = synthesize_view(qimg[..., i], dept, rmat, tvec, kmat0, kmat1).reshape(qimg.shape[:2])
 
     # compute loss
-    loss = np.sum((rimg - nimg)**2)**.5
+    loss = np.mean((rimg - nimg)**2)**.5
 
     if dbg_opt:
         import imageio
