@@ -60,8 +60,9 @@ calib_list = calib_list[:len(feats_list)]
 assert len(calib_list) == len(fnimg_list) == len(depth_list) == len(feats_list), 'unequal number of image, disparity and calibration files'
 
 # plot & save settings
-save_opt = 0
-plot_opt = 1
+save_opt = 1
+save_map = 0
+plot_opt = 0
 if plot_opt == 1: fig = mlab.figure(bgcolor=(.5, .5, .5))
 
 # var init
@@ -88,7 +89,7 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
         pose_list.append([pos0[:3, :], pos0[:3, :]])
 
     # prepare data
-    us = 1
+    us = .5
     ds = int(2/us)
     resolution = (512*us, 640*us)
     cal0['M1'] = rescale_intrinsics(cal0['M1'], origin_size=img0.shape[:2], target_size=resolution)
@@ -143,7 +144,7 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
 
     # pose estimation
     #rpts, qpts = fcl0, fcl1
-    estp = FeatPoseEstimator(rpts, qpts, confidence=feat[-1]**-.5)
+    estp = FeatPoseEstimator(rpts, qpts, confidence=feat[-1]**.5)
     #estp = TopoPoseEstimator(tpt0, tpt1)
     estp.estimate()
     tvec = estp.tvec
@@ -156,13 +157,13 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
     feat_loss = estp.p_loss/len(estp.residual_fun(estp.p_star))
     foto_loss = dual_projected_photo_loss(img0, img1, dis0/bas0, dis1/bas1, rmat, tvec, cal0['M1'])
     if str(feats_path).__contains__('const_gap'):
-        tvec_loss = np.mean((pos1[:3, -1] - pose_list[-1][1][:, -1]+tvec)**2)**-.5
-        rmat_loss = np.mean((pos1[:3, :3] - pose_list[-1][1][:, :-1]+rmat)**2)**-.5
+        tvec_loss = np.mean((pos1[:3, -1] - pose_list[-1][1][:, -1]+tvec)**2)**.5
+        rmat_loss = np.mean((pos1[:3, :3] - pose_list[-1][1][:, :-1]+rmat)**2)**.5
     else:
-        tvec_loss = np.mean((pos1[:3, -1] - tvec)**2)**-.5
-        rmat_loss = np.mean((pos1[:3, :3] - rmat)**2)**-.5
+        tvec_loss = np.mean((pos1[:3, -1] - tvec)**2)**.5
+        rmat_loss = np.mean((pos1[:3, :3] - rmat)**2)**.5
     print('Frame pair:              %s, %s' % (i, j))
-    print('Translation (Eucl.):     %s (%s)' % (tvec.ravel(), sum(tvec.ravel()**2)**-.5))
+    print('Translation (Eucl.):     %s (%s)' % (tvec.ravel(), sum(tvec.ravel()**2)**.5))
     print('Rotation:                %s' % rvec.ravel())
     print('Dim-weights:             %s' % wdim.ravel())
     print('Loss per feature:        %s' % str(feat_loss))
@@ -181,7 +182,16 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
 
     # write intermediate results to drive
     if save_opt:
-        # write rgbd point clouds
+
+        # write each pose as 4x4 matrix
+        pose_fname = Path('.') / 'tests' / 'test_data' / str(feats_list[i].name).replace('matches', 'pose_es')
+        pose_esmat = np.vstack([np.array(pose_list[-1])[1], np.array([0, 0, 0, 1])])
+        pose_gtmat = np.vstack([np.array(pose_list[-1])[0], np.array([0, 0, 0, 1])])
+        with open(str(pose_fname)+'.json', 'w') as f: json.dump(pose_esmat.tolist(), f)
+        with open(str(pose_fname).replace('pose_es', 'pose_gt')+'.json', 'w') as f: json.dump(pose_gtmat.tolist(), f)
+
+    # write rgbd point clouds
+    if save_map:
         rgbd_fname = Path('.') / 'tests' / 'test_data' / str(feats_list[i].name).replace('matches', 'rgbd')
         rgbd0 = np.dstack([opt0.reshape(*resolution, 3), img0])
         rgbd1 = np.dstack([opt1.reshape(*resolution, 3), img1])
@@ -235,10 +245,5 @@ avg_feat_loss, avg_iter, avg_foto_loss = np.mean(stats, axis=0).tolist()
 print('avg_feat_loss:   %s' % avg_feat_loss)
 print('avg_foto_loss:   %s' % avg_foto_loss)
 print('avg_iter:        %s' % avg_iter)
-
-if save_opt:
-    # write pose ground-truth and estimation
-    pose_fname = Path('.') / 'tests' / 'test_data' / 'pose_gt+pose_est'#_from_scenepoints
-    np.savez_compressed(pose_fname, pose_gt=np.array(pose_list)[:, 0], pose_est=np.array(pose_list)[:, 1])
 
 if plot_opt == 1: mlab.show()
