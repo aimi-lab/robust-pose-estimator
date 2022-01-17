@@ -37,7 +37,7 @@ class FeatPoseEstimator(object):
         if dims_fit: p_init += self.feat_wdims.flatten().tolist()
 
         # compute 6-DOF solution using least squares solver
-        self.p_star = least_squares(self.residual_fun, p_init, jac='2-point', args=(dims_fit,), method='lm', max_nfev=int(1e5)).x
+        self.p_star = least_squares(self.residual_fun, p_init, jac='2-point', args=(dims_fit,), method='lm', max_nfev=int(1e4)).x
         self.p_loss = self.residual_fun(p=self.p_star).sum()
 
         # assign solution to output vectors
