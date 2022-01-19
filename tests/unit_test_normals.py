@@ -22,7 +22,7 @@ class NormalsTester(unittest.TestCase):
         # create plane
         from alley_oop.utils.pinhole_transforms import create_img_coords
         ipts = create_img_coords(480, 640)[:2]
-        self.wall_init = np.vstack([ipts, np.repeat(np.arange(640), 480)-1000])
+        self.wall_init = np.vstack([ipts, np.repeat(np.arange(480), 640)-1000])
         self.wall_init = self.wall_init.T.reshape(480, 640, 3)
         self.wall_init /= 100
 
@@ -33,10 +33,10 @@ class NormalsTester(unittest.TestCase):
 
         narr = normals_from_regular_grid(oarr)
 
-        naxs = narr.reshape(-1, 3).T
-        opts = oarr[:-1, :-1, :].reshape(-1, 3).T
+        naxs = narr[1:, 1:, :].reshape(-1, 3).T
+        opts = oarr[1:-1, 1:-1, :].reshape(-1, 3).T
 
-        if plot_opt: self.plot_normals(naxs[:, ::5000], opts[:, ::5000])
+        if plot_opt: self.plot_normals(naxs[:, ::1000], opts[:, ::1000])
 
     def test_normals_from_pca(self, plot_opt=False):
         
