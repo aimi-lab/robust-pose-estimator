@@ -65,10 +65,10 @@ def decompose_projection_matrix(pmat, scale=False):
     return rmat, kmat, tvec
 
 
-def create_img_coords(resolution):
+def create_img_coords(y:int=720, x:int=1280):
     
-    x_coords = np.arange(0, resolution[1])
-    y_coords = np.arange(0, resolution[0])
+    x_coords = np.arange(0, x)
+    y_coords = np.arange(0, y)
     x_mesh, y_mesh = np.meshgrid(x_coords, y_coords)
     ipts = np.vstack([x_mesh.flatten(), y_mesh.flatten(), np.ones(len(x_mesh.flatten()))])
 

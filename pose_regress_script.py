@@ -45,7 +45,7 @@ for k_idx in range(1, 4):
     calib_list += ipair_list[0::3]
     fnimg_list += ipair_list[1::3]
 
-feats_path = ipair_path / 'data' / 'superglue_results_const_gap_640x512'
+feats_path = ipair_path / 'data' / 'superglue_results_grow_gap_640x512'
 feats_list = sorted((feats_path).rglob('*.npz'))
 fname_pair = str(feats_list[0].name).split('_')[:2]
 frame_jump = int(fname_pair[1][:-1]) - int(fname_pair[0][:-1])
@@ -60,9 +60,9 @@ calib_list = calib_list[:len(feats_list)]
 assert len(calib_list) == len(fnimg_list) == len(depth_list) == len(feats_list), 'unequal number of image, disparity and calibration files'
 
 # plot & save settings
-save_opt = 1
+save_opt = 0
 save_map = 0
-plot_opt = 0
+plot_opt = 1
 if plot_opt == 1: fig = mlab.figure(bgcolor=(.5, .5, .5))
 
 # var init
@@ -89,7 +89,7 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
         pose_list.append([pos0[:3, :], pos0[:3, :]])
 
     # prepare data
-    us = .5
+    us = 1
     ds = int(2/us)
     resolution = (512*us, 640*us)
     cal0['M1'] = rescale_intrinsics(cal0['M1'], origin_size=img0.shape[:2], target_size=resolution)
@@ -119,9 +119,9 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
     fcl1 = fcl1[:, ~np.isnan(fcl1.sum(0))]
 
     # image coordinates
-    ipts = create_img_coords(resolution)
+    ipts = create_img_coords(*resolution)
 
-    # 2D to 3D projection
+    # 2D to 3D projectionus
     bas0 = abs(cal0['T'][0][0])
     bas1 = abs(cal1['T'][0][0])
     opt0 = reverse_project(ipts, cal0['M1'], disp=dis0.flatten(), base=bas0)
@@ -139,7 +139,7 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
     tpt1 = np.vstack([opt1, np.mean(img1.reshape(-1, 3).T, axis=0)])[:, ::200][:, idcs]
 
     # surface normal computation
-    naxs = normals_from_pca(rpts, leafsize=10, plot_opt=False)
+    naxs = normals_from_pca(rpts, distance=10, leafsize=10)
     angs = get_ray_surfnorm_angle(rpts, naxs)
 
     # pose estimation
@@ -193,12 +193,12 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
     # write rgbd point clouds
     if save_map:
         rgbd_fname = Path('.') / 'tests' / 'test_data' / str(feats_list[i].name).replace('matches', 'rgbd')
-        rgbd0 = np.dstack([opt0.reshape(*resolution, 3), img0])
-        rgbd1 = np.dstack([opt1.reshape(*resolution, 3), img1])
+        rgbd0 = np.dstack([opt0.T.reshape(*resolution, 3), img0])
+        rgbd1 = np.dstack([opt1.T.reshape(*resolution, 3), img1])
         np.savez_compressed(rgbd_fname, rgbd0=rgbd0, rgbd1=rgbd1)
 
     # 3D plot
-    if plot_opt == 1 and feat_loss < 0.05:
+    if plot_opt == 1 and feat_loss:
         ds = 10
         mlab_rgbd(opt1[:, ::ds], colors=img0.reshape(-1, 3)[::ds], size=.1, show_opt=False, fig=fig)
         mlab_rgbd(opts[:, ::ds], colors=img1.reshape(-1, 3)[::ds], size=.1, show_opt=False, fig=fig)

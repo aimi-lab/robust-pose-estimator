@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from alley_oop.utils.pinhole_transforms import forward_project, reverse_project, compose_projection_matrix, decompose_projection_matrix
+from alley_oop.utils.pinhole_transforms import forward_project, reverse_project, compose_projection_matrix, decompose_projection_matrix, create_img_coords
 
 
 class PinholeTransformTester(unittest.TestCase):
@@ -15,7 +15,21 @@ class PinholeTransformTester(unittest.TestCase):
         self.rmat = np.eye(3)
         self.tvec = np.zeros([3, 1])
 
-        pass
+        self.resolution = (32, 64)
+        self.ipts = create_img_coords(self.resolution)
+        self.zpts = 0.1 * np.random.randn(np.multiply(*self.resolution))[np.newaxis] + 1
+
+    def test_plane_projection(self):
+        
+        for plane_dist in range(1, int(1e5), 10):
+
+            zpts = plane_dist * np.ones(np.multiply(*self.resolution))[np.newaxis]
+
+            opts = reverse_project(self.ipts, self.kmat, self.rmat, self.tvec, disp=zpts)
+
+            npts = forward_project(opts, self.kmat, self.rmat, self.tvec)
+
+            self.assertTrue(np.allclose(self.ipts, npts))
 
     def test_KR_decomposition(self):
 

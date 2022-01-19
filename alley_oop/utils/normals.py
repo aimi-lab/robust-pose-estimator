@@ -3,7 +3,24 @@ from sklearn.decomposition import PCA
 import numpy as np
 
 
-def normals_from_pca(opts, distance:float=10, leafsize:int=10, plot_opt=False):
+def normals_from_regular_grid(oarr):
+
+    assert len(oarr.shape) == 3, 'normal computation from regular grid requires 3 (x, y, z) dimensions'
+
+    # compute difference in vertical and horizontal direction
+    vdif = (oarr[:-1, :, :]-oarr[1:, :, :])[:, :-1, :]
+    hdif = (oarr[:, :-1, :]-oarr[:, 1:, :])[:-1, :, :]
+
+    # compute normals
+    narr = np.cross(hdif, vdif)
+
+    # normalize vector length
+    narr /= np.linalg.norm(narr, axis=-1)[..., np.newaxis]
+
+    return narr
+
+
+def normals_from_pca(opts, distance:float=10, leafsize:int=10):
     """
     compute normal for each point in a pointcloud using PCA on its KD-tree neighbours
     """
@@ -29,17 +46,6 @@ def normals_from_pca(opts, distance:float=10, leafsize:int=10, plot_opt=False):
     angs = get_ray_surfnorm_angle(opts, naxs)
     aidx = angs/np.pi < 0.5
     naxs[:, aidx] *= -1
-
-    if plot_opt:
-        import matplotlib.pyplot as plt
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-
-        # plot all norms and points
-        ax.scatter(*opts, c='k')
-        ax.quiver(opts[0], opts[1], opts[2], naxs[0], naxs[1], naxs[2], length=distance/2, normalize=True, color='r')
-        ax.scatter(0, 0, 0, 'kx')
-        plt.show()
 
     return naxs
 

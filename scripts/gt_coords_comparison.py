@@ -51,7 +51,7 @@ i = 0
 dis0 = load_pfm(depth_list[i])[0]
 img0 = imageio.imread(fnimg_list[i])
 with open(calib_list[i],'rb') as f: cal0 = pickle.load(f)
-pclg = load_tiff_pcl()[:1024, ...]#fname=scene_list[i]
+pclg = load_tiff_pcl(fname=scene_list[i])[:1024, ...]
 
 # prepare data
 resolution = (1024, 1280)
@@ -68,20 +68,23 @@ gtpos_list = sorted((ipair_path / 'data' / 'frame_data').rglob('*.json'))
 with open(gtpos_list[i],'rb') as f: pose = np.array(json.load(f)['camera-pose'])
 tvec = pose[:3, -1][np.newaxis].T
 rmat = pose[:3, :3]
-#pclg = np.linalg.pinv(rmat) @ pclg - tvec
 orgn = np.zeros([3, 1])
 
 # image coordinates
-ipts = create_img_coords(resolution)
+ipts = create_img_coords(*resolution)
 
 # 2D to 3D projection
 bas0 = abs(cal0['T'][0][0])
 opts = reverse_project(ipts, cal0['M1'], disp=dis0.flatten(), base=bas0)
-#opts = rmat @ opts + tvec
 
 # select points where ground-truth reference is available (exclude NaNs)
-pcln = pclg[:, (~np.isnan(pclg.sum(0)))]
-epts = opts[:, (~np.isnan(pclg.sum(0)))]
+vidx = (~np.isnan(pclg.sum(0))) & (pclg.sum(0) != 0)
+pcln = pclg[:, vidx]
+epts = opts[:, vidx]
+
+# coordinate reference transformation
+#pclg = np.linalg.pinv(rmat) @ pclg - tvec
+#opts = rmat @ opts + tvec
 
 # numerical displacement errors
 abs_dev_x = np.mean((epts[0] - pcln[0])**2)**.5
