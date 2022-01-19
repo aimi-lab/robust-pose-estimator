@@ -19,7 +19,7 @@ class NormalsTester(unittest.TestCase):
         npz_obj = np.load(self.name_list[0])
         self.rgbd_init = npz_obj[npz_obj.files[0]]
 
-        # create plane
+        # create tilted plane
         from alley_oop.utils.pinhole_transforms import create_img_coords
         ipts = create_img_coords(480, 640)[:2]
         self.wall_init = np.vstack([ipts, np.repeat(np.arange(480), 640)-1000])
@@ -27,25 +27,33 @@ class NormalsTester(unittest.TestCase):
         self.wall_init /= 100
 
     def test_normals_from_regular_grid(self, plot_opt=False):
-
+        
+        # set input points
         oarr = self.rgbd_init[..., :3]
         oarr = self.wall_init
 
+        # compute normals from regular grid
         narr = normals_from_regular_grid(oarr)
+        
+        # rearrange arrays for plotting
+        naxs = narr.reshape(-1, 3).T
+        opts = oarr[:-1, :-1, :].reshape(-1, 3).T
 
-        naxs = narr[1:, 1:, :].reshape(-1, 3).T
-        opts = oarr[1:-1, 1:-1, :].reshape(-1, 3).T
-
+        # plottings
         if plot_opt: self.plot_normals(naxs[:, ::1000], opts[:, ::1000])
 
+        # compute angles
         degs = get_ray_surfnorm_angle(opts, naxs)/np.pi*180
 
+        # check if normals are perpendicular
         self.assertTrue(np.allclose(degs, np.ones(len(degs))*90, atol=0.1))
 
     def test_normals_from_pca(self, plot_opt=False):
         
-        # var init
+        # set input points
         opts = self.rgbd_init[..., :3].reshape(-1, 3)[::1000, :].T
+        
+        # var init
         distance = 10
         leafsize = 10
 
@@ -59,7 +67,6 @@ class NormalsTester(unittest.TestCase):
     def plot_normals(naxs, opts):
             
             import matplotlib.pyplot as plt
-            fig = plt.figure()
             ax = plt.axes(projection='3d')
 
             # plot all norms and points
