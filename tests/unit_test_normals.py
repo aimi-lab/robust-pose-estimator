@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 import numpy as np
 
-from alley_oop.utils.normals import normals_from_pca, normals_from_regular_grid
+from alley_oop.utils.normals import normals_from_pca, normals_from_regular_grid, get_ray_surfnorm_angle
 
 
 class NormalsTester(unittest.TestCase):
@@ -26,7 +26,7 @@ class NormalsTester(unittest.TestCase):
         self.wall_init = self.wall_init.T.reshape(480, 640, 3)
         self.wall_init /= 100
 
-    def test_normals_from_regular_grid(self, plot_opt=True):
+    def test_normals_from_regular_grid(self, plot_opt=False):
 
         oarr = self.rgbd_init[..., :3]
         oarr = self.wall_init
@@ -37,6 +37,10 @@ class NormalsTester(unittest.TestCase):
         opts = oarr[1:-1, 1:-1, :].reshape(-1, 3).T
 
         if plot_opt: self.plot_normals(naxs[:, ::1000], opts[:, ::1000])
+
+        degs = get_ray_surfnorm_angle(opts, naxs)/np.pi*180
+
+        self.assertTrue(np.allclose(degs, np.ones(len(degs))*90, atol=0.1))
 
     def test_normals_from_pca(self, plot_opt=False):
         
