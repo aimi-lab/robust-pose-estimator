@@ -35,16 +35,20 @@ def read_trajectory(filename):
             metastr = f.readline()
     return traj
 
-default_opt = True
+default_opt = False
 
+meth='orbslam2_stereo_results'
+
+d_idx, k_idx = (1, 1)
 depth_path = SCARED_ROOT_PATH.parent / 'generated_depth_log_1642502310'
 depth_list = sorted(depth_path.rglob('*d_*.pfm'))
-ipair_path = get_scared_abspath(d_idx=1, k_idx=1)
+ipair_path = get_scared_abspath(d_idx=d_idx, k_idx=k_idx)
 ipair_list = sorted((ipair_path / 'data' / 'video_frames').rglob('*.*'))
 calib_list = ipair_list[0::3]
 fnimg_list = ipair_list[1::3]
 scene_list = sorted((ipair_path / 'data' / 'scene_points').rglob('*.tiff'))
-camera_poses = read_trajectory("../other_repos/Open3D/examples/test_data/RGBD/odometry.log") if default_opt else load_scared_pose(meth='orbslam2_stereo_results')[:5]#
+pname_list = sorted((get_scared_abspath(d_idx, k_idx) / 'data' / meth).rglob('*.json'))
+camera_poses = read_trajectory("../other_repos/Open3D/examples/test_data/RGBD/odometry.log") if default_opt else load_scared_pose(pname_list)[:5]#
 s = 1
 
 volume = o3d.pipelines.integration.ScalableTSDFVolume(
