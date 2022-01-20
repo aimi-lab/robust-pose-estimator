@@ -6,9 +6,9 @@ from alley_oop.utils.paths import get_scared_abspath
 from alley_oop.pose.trajectory_analyzer import TrajectoryAnalyzer
 
 
-def load_scared_pose(k_idx:int=1, meth='frame_data') -> np.ndarray:
+def load_scared_pose(d_idx:int=1, k_idx:int=1, meth='frame_data') -> np.ndarray:
 
-    name_list = sorted((get_scared_abspath(1, k_idx) / 'data' / meth).rglob('*.json'))
+    name_list = sorted((get_scared_abspath(d_idx, k_idx) / 'data' / meth).rglob('*.json'))
     # if kinematics data collect all files
     if str(name_list[0]).lower().__contains__('frame_data'):
         pose_list = []
@@ -59,7 +59,7 @@ if __name__ == '__main__':
     for k_idx in range(1, 4):
         pose_plotter = TrajectoryAnalyzer(title='dataset_'+str(d_idx)+', keyframe_'+str(k_idx))
         for k, meth in enumerate(meth_dirs):
-            pose_arrs = load_scared_pose(k_idx, meth)
+            pose_arrs = load_scared_pose(k_idx=k_idx, meth=meth)
             if swap_tvec:
                 rmat_arrs = pose_arrs[:3, 1:4]
                 tvec_arrs = pose_arrs[:3, 0]
