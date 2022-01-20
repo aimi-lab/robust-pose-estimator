@@ -53,7 +53,7 @@ if __name__ == '__main__':
         data_path = Path(args.base_path) / args.pred_folder / args.base_path
         meth_dirs = [str(data_path / 'frame_data')]
     except:
-        meth_dirs = ['frame_data']
+        meth_dirs = ['orbslam2_stereo_results', 'frame_data'] #, 'orbslam2_rgbd_results'
     
     swap_tvec = False
     colors = ['b', 'g', 'r', 'k', 'm', 'y']
