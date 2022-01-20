@@ -24,7 +24,7 @@ def load_scared_pose(d_idx:int=1, k_idx:int=1, meth='frame_data') -> np.ndarray:
         with open(str(fname), 'r') as f: pose_list = json.load(f)
         pose_list = [pose_list[i]['camera-pose'] for i in range(len(pose_list))]
     
-    pose_arrs = np.array(pose_list)[:, :3, :4]
+    pose_arrs = np.array(pose_list)[:, :4, :4]
 
     return pose_arrs
 
@@ -67,6 +67,6 @@ if __name__ == '__main__':
             color = colors[k%len(colors)]
             pose_plotter.add_pose_trajectory(pose_arrs, label=meth, color=color)
         pose_plotter.legend()
-        pose_plotter.get_rmse_by_idx(idx_a=-1, idx_b=-2, plot_opt=True)
+        pose_plotter.get_rmse_by_idx(idx_a=-1, idx_b=-2, plot_opt=True) if len(meth_dirs) > 1 else None
         pose_plotter.write_file()
         pose_plotter.show()

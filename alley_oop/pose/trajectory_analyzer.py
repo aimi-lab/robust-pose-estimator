@@ -42,7 +42,7 @@ class TrajectoryAnalyzer(object):
                 rmat_es = pose[i, :3, :3]
                 u_es, v_es, w_es = rmat_es.dot(base_vec)
                 x_es, y_es, z_es = pose[i, :3, 3]
-                self.ax.quiver(x_es, y_es, z_es, u_es, v_es, w_es, length=2, normalize=True, color=color)
+                self.ax.quiver(x_es, y_es, z_es, u_es, v_es, w_es, length=1, normalize=True, color=color)
 
                 # plot correspondences given alternative pose trajectory
                 if len(self.pose_list) > 1: self.plot_pose_correspondence(self.pose_list[-1][i], self.pose_list[-2][i])
