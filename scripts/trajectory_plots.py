@@ -2,7 +2,6 @@ from pathlib import Path
 import numpy as np
 import json
 import argparse
-parser = argparse.ArgumentParser(description='ORB SLAM example')
 
 from alley_oop.utils.paths import get_scared_abspath
 from alley_oop.pose.trajectory_analyzer import TrajectoryAnalyzer
@@ -31,6 +30,8 @@ def load_scared_pose(d_idx:int=1, k_idx:int=1, meth='frame_data') -> np.ndarray:
 
 
 if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(description='ORB SLAM example')
 
     parser.add_argument(
         'base_path',
