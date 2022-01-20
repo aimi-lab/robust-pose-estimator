@@ -34,7 +34,7 @@ def rescale_intrinsics(kmat, origin_size=None, target_size=None):
 
     return kmat
 
-depth_path = SCARED_ROOT_PATH.parent / 'generated_depth_log_1641508997'
+depth_path = SCARED_ROOT_PATH.parent / 'generated_depth_log_1642501697'
 depth_list = sorted(depth_path.rglob('*d_*.pfm'))
 
 calib_list = []
@@ -89,7 +89,7 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
         pose_list.append([pos0[:3, :], pos0[:3, :]])
 
     # prepare data
-    us = 1
+    us = .5
     ds = int(2/us)
     resolution = (512*us, 640*us)
     cal0['M1'] = rescale_intrinsics(cal0['M1'], origin_size=img0.shape[:2], target_size=resolution)
