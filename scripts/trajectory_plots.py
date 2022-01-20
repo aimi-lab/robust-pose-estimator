@@ -17,6 +17,7 @@ def load_scared_pose(d_idx:int=1, k_idx:int=1, meth='frame_data') -> np.ndarray:
             with open(str(fname), 'r') as f: pose_elem = json.load(f)
             pose = np.array(pose_elem['camera-pose'])
             pose[0:3, 3] = -pose[0:3, 3] # neg. translation as Intuitive's coordinate system is inverted wrt. OpenCV
+            pose[0:3, 0:3] = pose[0:3, 0:3].T # invert rotation as Intuitive's coordinate system is inverted wrt. OpenCV
             pose_list.append(pose)
     # all other pose estimation methods
     else:
