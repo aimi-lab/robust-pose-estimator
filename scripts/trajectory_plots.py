@@ -58,10 +58,10 @@ if __name__ == '__main__':
     d_idx = 1
 
     # iterate through keyframes
-    for k_idx in range(1, 4):
+    for k_idx in range(3, 4):
         pose_plotter = TrajectoryAnalyzer(title='dataset_'+str(d_idx)+', keyframe_'+str(k_idx))
         for k, meth in enumerate(meth_dirs):
-            pose_arrs = load_scared_pose(k_idx=k_idx, meth=meth)
+            pose_arrs = load_scared_pose(d_idx=d_idx, k_idx=k_idx, meth=meth)
             if swap_tvec:
                 rmat_arrs = pose_arrs[:3, 1:4]
                 tvec_arrs = pose_arrs[:3, 0]
