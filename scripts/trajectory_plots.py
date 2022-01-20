@@ -14,7 +14,10 @@ def load_scared_pose(k_idx:int=1, meth='frame_data') -> np.ndarray:
         pose_list = []
         for fname in name_list:
             with open(str(fname), 'r') as f: pose_elem = json.load(f)
-            pose_list.append(pose_elem['camera-pose'])
+            # we need to take negative translation values because the coordination system of intuitive is inverted from the one of openCV
+            pose = np.array(pose_elem['camera-pose'])
+            pose[0:3,3] = -pose[0:3,3]
+            pose_list.append(pose)
     # all other pose estimation methods
     else:
         fname = name_list[0]
@@ -27,9 +30,27 @@ def load_scared_pose(k_idx:int=1, meth='frame_data') -> np.ndarray:
 
 
 if __name__ == '__main__':
+    import argparse
+    import os
+    parser = argparse.ArgumentParser(description='ORB SLAM example')
 
-    data_path = Path.cwd() / 'tests' / 'test_data'
-    meth_dirs = ['orbslam2_rgbd_results', 'frame_data']#'orbslam2_stereo_results', 'defslam_results'
+    parser.add_argument(
+        'base_path',
+        type=str,
+        help='Path to scared dataset.'
+    )
+    parser.add_argument(
+        '--pred_folder',
+        type=str,
+        default='orbslam2_rgbd_results',
+        help='Folder containing predictions.'
+    )
+
+    args = parser.parse_args()
+    assert os.path.isdir(os.path.join(args.base_path, 'frame_data'))
+    assert os.path.isdir(os.path.join(args.base_path, args.pred_folder))
+
+    meth_dirs = [os.path.join(args.base_path, args.pred_folder), os.path.join(args.base_path, 'frame_data')]
     swap_tvec = False
     colors = ['b', 'g', 'r', 'k', 'm', 'y']
     d_idx = 1

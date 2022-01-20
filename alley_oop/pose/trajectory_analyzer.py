@@ -28,13 +28,15 @@ class TrajectoryAnalyzer(object):
 
         # plot valid trajectory of translation vectors
         self.ax.plot(pose[val_list, 0, 3], pose[val_list, 1, 3], pose[val_list, 2, 3], '-', color=color, linewidth=0.5, markersize=3, label=label)
-
+        self.ax.set_xlabel('x')
+        self.ax.set_ylabel('y')
+        self.ax.set_zlabel('z')
         # plot trajectory outliers (if validation provided)
         if sum(val_list) != len(val_list) and plot_outliers:
             self.ax.plot(pose[~val_list, 0, 3], pose[~val_list, 1, 3], pose[~val_list, 2, 3], 'x', color='b', label=str(label)+' outliers')
 
         # plot camera orientation as arrows
-        base_vec = np.array((0, 0, -1))
+        base_vec = np.array((0, 0, 1))
         for i in range(pose.shape[0]):
             if val_list[i] or plot_outliers:
                 rmat_es = pose[i, :3, :3]
