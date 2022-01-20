@@ -55,7 +55,6 @@ if __name__ == '__main__':
     except:
         meth_dirs = ['orbslam2_stereo_results', 'frame_data'] #, 'orbslam2_rgbd_results'
     
-    swap_tvec = False
     colors = ['b', 'g', 'r', 'k', 'm', 'y']
     d_idx = 1
 
@@ -64,10 +63,6 @@ if __name__ == '__main__':
         pose_plotter = TrajectoryAnalyzer(title='dataset_'+str(d_idx)+', keyframe_'+str(k_idx))
         for k, meth in enumerate(meth_dirs):
             pose_arrs = load_scared_pose(d_idx=d_idx, k_idx=k_idx, meth=meth)
-            if swap_tvec:
-                rmat_arrs = pose_arrs[:3, 1:4]
-                tvec_arrs = pose_arrs[:3, 0]
-                pose_arrs = np.concatenate([pose_arrs[:, :3, 1:4], pose_arrs[:, :3, 0, np.newaxis]], axis=-1)
             color = colors[k%len(colors)]
             pose_plotter.add_pose_trajectory(pose_arrs, label=meth, color=color)
         pose_plotter.legend()
