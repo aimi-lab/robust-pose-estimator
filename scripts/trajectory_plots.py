@@ -14,9 +14,10 @@ def load_scared_pose(k_idx:int=1, meth='frame_data') -> np.ndarray:
         pose_list = []
         for fname in name_list:
             with open(str(fname), 'r') as f: pose_elem = json.load(f)
-            # we need to take negative translation values because the coordination system of intuitive is inverted from the one of openCV
+            # we need adapt coordination system of intuitive because it is inverted from the one of openCV
             pose = np.array(pose_elem['camera-pose'])
             pose[0:3,3] = -pose[0:3,3]
+            pose[0:3,0:3] = pose[0:3,0:3].T
             pose_list.append(pose)
     # all other pose estimation methods
     else:

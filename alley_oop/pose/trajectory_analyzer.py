@@ -47,6 +47,16 @@ class TrajectoryAnalyzer(object):
                 # plot correspondences given alternative pose trajectory
                 if len(self.pose_list) > 1: self.plot_pose_correspondence(self.pose_list[-1][i], self.pose_list[-2][i])
 
+        # plot coordinate frame of first view
+        for cc, base_vec in zip(('blue', 'red', 'green'),(np.array((1, 0, 0)),np.array((0, 1, 0)),np.array((0, 0, 1)))):
+            rmat_es = pose[50, :3, :3]
+            u_es, v_es, w_es = rmat_es.dot(base_vec)
+            x_es, y_es, z_es = pose[50, :3, 3]
+            self.ax.quiver(x_es, y_es, z_es, u_es, v_es, w_es, length=2, normalize=True, color=cc)
+
+            # plot correspondences given alternative pose trajectory
+            if len(self.pose_list) > 1: self.plot_pose_correspondence(self.pose_list[-1][i], self.pose_list[-2][i])
+
     def plot_pose_correspondence(self, pose_a, pose_b):
 
         assert pose_a.shape == pose_b.shape, 'number of pose dimensions unequal'
