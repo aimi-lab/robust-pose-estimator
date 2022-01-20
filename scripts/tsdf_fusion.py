@@ -35,7 +35,7 @@ def read_trajectory(filename):
             metastr = f.readline()
     return traj
 
-default_opt = False
+default_opt = True
 
 depth_path = SCARED_ROOT_PATH.parent / 'generated_depth_log_1642502310'
 depth_list = sorted(depth_path.rglob('*d_*.pfm'))
