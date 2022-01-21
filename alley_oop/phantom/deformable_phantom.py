@@ -43,7 +43,9 @@ class DeformablePhantom(object):
         return plane_pts_deformed
 
     def add_noise(self, noise_level, update=True):
-        pass
+        raise NotImplementedError
+
+        #query + noise_level * np.random.randn(*query.shape)
 
     def plot(self, ax=None):
         if ax is None:
@@ -57,6 +59,14 @@ class DeformablePhantom(object):
         ax.scatter(plane_pts[0,:],plane_pts[1,:], plane_pts[2,:])
 
         return ax
+
+    def pts(self, original=False):
+        if original:
+            return self.plane_pts
+        else:
+            plane_pts = self.deform(update=False)
+            plane_pts = self.transform_affine(pts=plane_pts, update=False)
+            return plane_pts
 
 # plane = DeformablePhantom()
 # plane2 = DeformablePhantom()

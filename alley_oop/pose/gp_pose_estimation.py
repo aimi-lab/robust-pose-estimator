@@ -67,26 +67,27 @@ class GpPoseEstimator(FeatPoseEstimator):
         feat_refer_deformed = self.rigid_transform(feat_refer_deformed)
         return feat_refer_deformed
 
-
-reference = np.array([[0,0,0], [100,0,0], [0,0,1], [1,1,1], [1,1,0], [1,0,1], [0,1,1], [10, 4,1], [100, 100, 100]]).T
+from alley_oop.phantom.deformable_phantom import DeformablePhantom
 from scipy.spatial.transform import Rotation as R
 R_true = R.from_euler('x', 90, degrees=True).as_matrix()
 t_true = np.array([1,1,1])[:,None]
 
-query = R_true @ reference + t_true
-noise_level = 0.001
-query_noisy = query + noise_level*np.random.randn(*query.shape)
+plane = DeformablePhantom()
+plane_orig = DeformablePhantom()
+plane.transform_affine(rmat=R_true, tvec=t_true)
+#plane.deform(deformation_param=100.0)
 
-estimator = FeatPoseEstimator(feat_query=query_noisy, feat_refer=reference)
+estimator = FeatPoseEstimator(feat_query=plane.pts(), feat_refer=plane_orig.pts())
 estimator.estimate()
-reference_deformed = estimator.rmat @ reference[:3] + estimator.tvec
-print('residuals: ', np.sum((reference_deformed- query)**2))
 
-estimator = GpPoseEstimator(feat_query=query_noisy, feat_refer=reference, length_scale=10, noise_level=noise_level**2)
-estimator.estimate()
-print(estimator.rmat-R_true, estimator.tvec-t_true)
-reference_deformed = estimator.deform(reference)
-print('residuals: ', np.sum((reference_deformed- query)**2))
+reference_deformed = plane_orig.transform_affine(plane.pts(original=True), estimator.rmat, estimator.tvec)
+print('residuals: ', np.sum((reference_deformed- plane.pts(original=True))**2))
+#
+# estimator = GpPoseEstimator(feat_query=query_noisy, feat_refer=reference, length_scale=10, noise_level=noise_level**2)
+# estimator.estimate()
+# print(estimator.rmat-R_true, estimator.tvec-t_true)
+# reference_deformed = estimator.deform(reference)
+# print('residuals: ', np.sum((reference_deformed- query)**2))
 from alley_oop.utils.absolute_pose_quarternion import align
 
 #print(align(reference, query))
