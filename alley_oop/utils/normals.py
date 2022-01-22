@@ -55,14 +55,16 @@ def get_ray_surfnorm_angle(opts, naxs, tvec=None):
     # get ray vectors from camera pose if provided
     rays = tvec-opts if tvec is not None else -opts
 
-    # unit length
-    rays = rays / np.linalg.norm(rays)
-    opts = opts / np.linalg.norm(opts)
-
     # matrix contraction
-    avec = np.einsum('ij,ji->i', opts.T, naxs)
+    avec = np.einsum('ij,ji->i', rays.T, naxs)
 
-    # compute angles in radian (omit normalization term for unit vectors)
-    angs = np.arccos(avec)
+    # normalization term
+    dnom = np.linalg.norm(rays, axis=0) * np.linalg.norm(naxs, axis=0)
+
+    # nan-safe normalization
+    anit = np.divide(avec.astype('float'), dnom.astype('float'), out=np.zeros_like(avec, dtype='float'), where=dnom!=0)
+
+    # compute angles in radian
+    angs = np.arccos(anit)
 
     return angs
