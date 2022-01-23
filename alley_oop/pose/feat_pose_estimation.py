@@ -21,8 +21,8 @@ class FeatPoseEstimator(object):
         self.tvec = np.zeros([3, 1])
         self.rvec = np.zeros([3, 1])
         self.p_list = []
-        self.p_star = float('NaN')
-        self.p_loss = float('NaN')
+        self.p_star = float('nan')
+        self.p_loss = float('inf')
 
     def estimate(self, p_init=None, feat_refer=None, feat_query=None, confidence=None, dims_fit: bool=False):
 
@@ -78,6 +78,58 @@ class FeatPoseEstimator(object):
 
     def compute_diff(self, rpts, qpts):
         return rpts - qpts
+
+    def random_sample_consesus(self, max_iter=100, min_num=None):
+
+        orig_refer = self.feat_refer
+        orig_query = self.feat_query
+
+        sample_num = int(.4*self.feat_refer.shape[-1]) if min_num is None else min_num
+        required_inlier = int(.7*self.feat_refer.shape[-1])
+
+        # initial guess
+        self.tvec = np.mean(self.feat_refer[:3], axis=-1) - np.mean(self.feat_query[:3], axis=-1)
+        p_init = self.tvec.flatten().tolist() + self.rvec.flatten().tolist()
+
+        for _ in range(max_iter):
+            # re-assign all features
+            self.feat_refer = orig_refer
+            self.feat_query = orig_query
+            # inlier selection
+            inlier_idx = np.random.uniform(low=0, high=self.feat_refer.shape[-1]-1, size=sample_num).astype('int')
+            mask = np.zeros(self.feat_refer.shape[-1])
+            mask[inlier_idx] = 1
+            self.feat_refer = self.feat_refer*mask
+            self.feat_query = self.feat_query*mask
+            # model fit
+            p = least_squares(self.residual_fun, p_init, jac='2-point', args=(), method='lm', max_nfev=int(1e3)).x
+            # also inlier test
+            residuals = self.residual_fun(p)
+            inlier_idx = np.where(residuals < .6*np.mean(residuals))[0]# np.concatenate([inlier_idx, np.where(residuals < np.mean(residuals))[0]])
+            if len(inlier_idx) > required_inlier:
+                # re-assign all features
+                self.feat_refer = orig_refer
+                self.feat_query = orig_query
+                # inlier selection
+                mask = np.zeros(self.feat_refer.shape[-1])
+                mask[inlier_idx] = 1
+                self.feat_refer = self.feat_refer*mask
+                self.feat_query = self.feat_query*mask
+                # compare fit of all features with previous ones
+                p = least_squares(self.residual_fun, p, jac='2-point', args=(), method='lm', max_nfev=int(1e2)).x
+                loss = np.sum(self.residual_fun(p))
+                if loss < self.p_loss:
+                    self.p_star = p
+                    self.p_loss = loss
+
+        # re-assign all features
+        self.feat_refer = orig_refer
+        self.feat_query = orig_query
+
+        # assign solution to output vectors
+        self.tvec = self.p_star[0:3][np.newaxis].T
+        self.rvec = self.p_star[3:6]
+
 
     @staticmethod
     def huber_loss(a, delta: float=1.):
