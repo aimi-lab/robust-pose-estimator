@@ -11,7 +11,7 @@ from alley_oop.pose.trajectory_analyzer import TrajectoryAnalyzer
 def load_scared_pose(fnames:List=None) -> np.ndarray:
 
     # if kinematics data collect all files
-    if str(fnames[0]).lower().__contains__('frame_data'):
+    if str(fnames[0]).lower().__contains__('frame_data') or str(fnames[0]).lower().__contains__('superglue'):
         pose_list = []
         for fname in fnames:
             with open(str(fname), 'r') as f: pose_elem = json.load(f)
@@ -53,7 +53,7 @@ if __name__ == '__main__':
         data_path = Path(args.base_path) / args.pred_folder / args.base_path
         meth_dirs = [str(data_path / 'frame_data')]
     except:
-        meth_dirs = ['orbslam2_stereo_results', 'frame_data'] #, 'orbslam2_rgbd_results'
+        meth_dirs = ['frame_data', 'orbslam2_stereo_results', 'orbslam2_rgbd_results', 'defslam_results']
     
     colors = ['b', 'g', 'r', 'k', 'm', 'y']
     d_idx = 1
@@ -63,7 +63,8 @@ if __name__ == '__main__':
         pose_plotter = TrajectoryAnalyzer(title='dataset_'+str(d_idx)+', keyframe_'+str(k_idx))
         for k, meth in enumerate(meth_dirs):
             fnames = sorted((get_scared_abspath(d_idx, k_idx) / 'data' / meth).rglob('*.json'))
-            pose_arrs = load_scared_pose(fnames)
+            pose_arrs = load_scared_pose(fnames)[:195]
+            pose_arrs[:, :3, -1] = np.cumsum(pose_arrs[:, :3, -1], axis=0)/-5 if meth.lower().__contains__('defslam') else pose_arrs[:, :3, -1]
             color = colors[k%len(colors)]
             pose_plotter.add_pose_trajectory(pose_arrs, label=meth, color=color)
         pose_plotter.legend()
