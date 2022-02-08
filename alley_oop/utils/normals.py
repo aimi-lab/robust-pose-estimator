@@ -54,7 +54,7 @@ def normals_from_pca(opts: np.ndarray, distance: float=10, leafsize: int = 10) -
     return naxs
 
 
-def get_ray_surfnorm_angle(opts: np.ndarray, naxs: np.ndarray, tvec = None: np.ndarray) -> np.ndarray:
+def get_ray_surfnorm_angle(opts: np.ndarray, naxs: np.ndarray, tvec: np.ndarray = None) -> np.ndarray:
     """
     compute radian angles between surface normals and rays
     """
