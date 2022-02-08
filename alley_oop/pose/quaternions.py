@@ -21,6 +21,7 @@ def quat2euler(qs, deg_opt:bool=False):
 
     return rvec
 
+
 def quat2rmat(qs):
 
     rot = Rotation.from_quat(qs)

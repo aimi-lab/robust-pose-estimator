@@ -149,7 +149,7 @@ class FeatPoseEstimator(object):
 
         # assign solution to output vectors
         self.tvec = self.p_star[0:3][np.newaxis].T
-        self.rvec = self.p_star[3:6]
+        self.rvec = self.p_star[3:7] if self.quat_opt else self.p_star[3:6]
 
     @staticmethod
     def huber_loss(a, delta: float=1.):
