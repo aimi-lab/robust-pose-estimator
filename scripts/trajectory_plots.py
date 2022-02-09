@@ -53,7 +53,7 @@ if __name__ == '__main__':
         data_path = Path(args.base_path) / args.pred_folder / args.base_path
         meth_dirs = [str(data_path / 'frame_data')]
     except:
-        meth_dirs = ['frame_data', 'orbslam2_stereo_results', 'orbslam2_rgbd_results', 'defslam_results']
+        meth_dirs = ['frame_data', 'orbslam2_stereo_results', 'orbslam2_rgbd_results', 'defslam_results', 'superglue_newr']#
     
     colors = ['b', 'g', 'r', 'k', 'm', 'y']
     d_idx = 1
@@ -65,6 +65,8 @@ if __name__ == '__main__':
             fnames = sorted((get_scared_abspath(d_idx, k_idx) / 'data' / meth).rglob('*.json'))
             pose_arrs = load_scared_pose(fnames)[:195]
             pose_arrs[:, :3, -1] = np.cumsum(pose_arrs[:, :3, -1], axis=0)/-5 if meth.lower().__contains__('defslam') else pose_arrs[:, :3, -1]
+            pose_arrs[:, :3, -1] = np.cumsum(pose_arrs[:, :3, -1]*np.array([-1, 1, -1]), axis=0) if meth.lower().__contains__('superglue') else pose_arrs[:, :3, -1]
+            pose_arrs[:, :2, -1] = pose_arrs[:, :2, -1][:, ::-1] if meth.lower().__contains__('superglue') else pose_arrs[:, :2, -1]
             color = colors[k%len(colors)]
             pose_plotter.add_pose_trajectory(pose_arrs, label=meth, color=color)
         pose_plotter.legend()

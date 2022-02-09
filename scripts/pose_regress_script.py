@@ -27,12 +27,14 @@ def clip_quantile(arr, p=1e-3):
 
     return arr
 
+
 def rescale_intrinsics(kmat, origin_size=None, target_size=None):
 
     kmat[0, ...] *= (target_size[1]/origin_size[1])
     kmat[1, ...] *= (target_size[0]/origin_size[0])
 
     return kmat
+
 
 depth_path = SCARED_ROOT_PATH.parent / 'generated_depth_log_1642501697'
 depth_list = sorted(depth_path.rglob('*d_*.pfm'))
@@ -45,7 +47,7 @@ for k_idx in range(1, 4):
     calib_list += ipair_list[0::3]
     fnimg_list += ipair_list[1::3]
 
-feats_path = ipair_path / 'data' / 'superglue_results_grow_gap_640x512'
+feats_path = ipair_path / 'data' / 'superglue_results_const_gap_640x512_framegap1'
 feats_list = sorted((feats_path).rglob('*.npz'))
 fname_pair = str(feats_list[0].name).split('_')[:2]
 frame_jump = int(fname_pair[1][:-1]) - int(fname_pair[0][:-1])
@@ -60,9 +62,9 @@ calib_list = calib_list[:len(feats_list)]
 assert len(calib_list) == len(fnimg_list) == len(depth_list) == len(feats_list), 'unequal number of image, disparity and calibration files'
 
 # plot & save settings
-save_opt = 0
+save_opt = 1
 save_map = 0
-plot_opt = 1
+plot_opt = 0
 if plot_opt == 1: fig = mlab.figure(bgcolor=(.5, .5, .5))
 
 # var init
@@ -117,6 +119,7 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
     fcl1 = pcl1[feat[1][1], feat[1][0], :].reshape(-1, 3).T
     fcl0 = fcl0[:, ~np.isnan(fcl0.sum(0))]
     fcl1 = fcl1[:, ~np.isnan(fcl1.sum(0))]
+    conf = feat[-1]**.5
 
     # image coordinates
     ipts = create_img_coords(*resolution)
@@ -138,15 +141,22 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
     tpt0 = np.vstack([opt0, np.mean(img0.reshape(-1, 3).T, axis=0)])[:, ::200]
     tpt1 = np.vstack([opt1, np.mean(img1.reshape(-1, 3).T, axis=0)])[:, ::200][:, idcs]
 
-    # surface normal computation
+    # surface normal computation to exclude points facing away from camera
     naxs = normals_from_pca(rpts, distance=10, leafsize=10)
     angs = get_ray_surfnorm_angle(rpts, naxs)
+    angs = np.abs(angs*180/np.pi)
+    conf[angs>55] = 0
+    if plot_opt == 3:
+        from tests.unit_test_normals import NormalsTester
+        NormalsTester.plot_normals(naxs, rpts)
+        plt.show()
 
     # pose estimation
     #rpts, qpts = fcl0, fcl1
-    estp = FeatPoseEstimator(rpts, qpts, confidence=feat[-1]**.5)
+    estp = FeatPoseEstimator(rpts, qpts, confidence=conf)
     #estp = TopoPoseEstimator(tpt0, tpt1)
-    estp.estimate()
+    #estp.estimate()
+    estp.random_sample_consesus()
     tvec = estp.tvec
     rvec = estp.rvec
     rmat = estp.rmat
@@ -158,7 +168,7 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
     foto_loss = dual_projected_photo_loss(img0, img1, dis0/bas0, dis1/bas1, rmat, tvec, cal0['M1'])
     if str(feats_path).__contains__('const_gap'):
         tvec_loss = np.mean((pos1[:3, -1] - pose_list[-1][1][:, -1]+tvec)**2)**.5
-        rmat_loss = np.mean((pos1[:3, :3] - pose_list[-1][1][:, :-1]+rmat)**2)**.5
+        rmat_loss = np.mean((pos1[:3, :3] - rmat)**2)**.5   #pose_list[-1][1][:, :-1]+
     else:
         tvec_loss = np.mean((pos1[:3, -1] - tvec)**2)**.5
         rmat_loss = np.mean((pos1[:3, :3] - rmat)**2)**.5
@@ -175,20 +185,17 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
 
     # store stats
     stats.append([estp.p_loss/len(estp.residual_fun(estp.p_star)), len(estp.p_list), foto_loss])
-    if str(feats_path).__contains__('const_gap'):
-        pose_list.append([pos1[:3, :], pose_list[-1][1]+np.hstack([rmat, tvec])])
-    elif str(feats_path).__contains__('grow_gap'):
-        pose_list.append([pos1[:3, :], np.hstack([rmat, tvec])])
+    pose_list.append([pos1[:3, :], np.hstack([rmat, tvec])])
 
     # write intermediate results to drive
     if save_opt:
-
         # write each pose as 4x4 matrix
         pose_fname = Path('.') / 'tests' / 'test_data' / str(feats_list[i].name).replace('matches.npz', 'pose_es.json')
+        if not pose_fname.parent.exists(): pose_fname.parent.mkdir()
         pose_esmat = {'camera-pose': np.vstack([np.array(pose_list[-1])[1], np.array([0, 0, 0, 1])]).tolist()}
         pose_gtmat = {'camera-pose': np.vstack([np.array(pose_list[-1])[0], np.array([0, 0, 0, 1])]).tolist()}
         with open(str(pose_fname), 'w') as f: json.dump(pose_esmat, f, indent=4)
-        with open(str(pose_fname).replace('pose_es', 'pose_gt'), 'w') as f: json.dump(pose_gtmat, f, indent=4)
+        #with open(str(pose_fname).replace('pose_es', 'pose_km'), 'w') as f: json.dump(pose_gtmat, f, indent=4)
 
     # write rgbd point clouds
     if save_map:
