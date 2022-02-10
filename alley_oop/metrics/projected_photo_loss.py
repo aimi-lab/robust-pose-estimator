@@ -22,8 +22,8 @@ def projected_photo_loss(rimg, qimg, dept, rmat, tvec, kmat0, kmat1=None, dbg_op
     kmat1 = kmat0 if kmat1 is None else kmat1
 
     try:
-        synth_view_torch(qimg, dept, rmat, tvec, kmat0, kmat1)
-    except Exception:
+        nimg = synth_view_torch(qimg, dept, rmat, tvec, kmat0, kmat1)
+    except TypeError:
         # channel-wise new image generation (given perspective and depth)
         nimg = synth_view_scipy(qimg, dept, rmat, tvec, kmat0, kmat1)
 
