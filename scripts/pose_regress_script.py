@@ -82,10 +82,10 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
     fnpz = np.load(feats_list[i])
     pcl0 = tifffile.imread(scene_list[i])[:1024, :]
     pcl1 = tifffile.imread(scene_list[j])[:1024, :]
-    with open(calib_list[i],'rb') as f: cal0 = pickle.load(f)
-    with open(calib_list[j],'rb') as f: cal1 = pickle.load(f)
-    with open(gtpos_list[i],'rb') as f: pos0 = np.array(json.load(f)['camera-pose'])
-    with open(gtpos_list[j],'rb') as f: pos1 = np.array(json.load(f)['camera-pose'])
+    with open(calib_list[i], 'rb') as f: cal0 = pickle.load(f)
+    with open(calib_list[j], 'rb') as f: cal1 = pickle.load(f)
+    with open(gtpos_list[i], 'rb') as f: pos0 = np.array(json.load(f)['camera-pose'])
+    with open(gtpos_list[j], 'rb') as f: pos1 = np.array(json.load(f)['camera-pose'])
     if len(pose_list) == 0:
         pose_list.append([pos0[:3, :], pos0[:3, :]])
 
@@ -123,7 +123,7 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
     # image coordinates
     ipts = create_img_coords(*resolution)
 
-    # 2D to 3D projectionus
+    # 2D to 3D projections
     bas0 = abs(cal0['T'][0][0])
     bas1 = abs(cal1['T'][0][0])
     opt0 = reverse_project(ipts, cal0['M1'], disp=dis0.flatten(), base=bas0)
