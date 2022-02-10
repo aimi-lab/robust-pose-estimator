@@ -2,7 +2,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 
 
-def euler2quat(x, y, z, deg_opt:bool=False):
+def euler2quat(x, y, z, deg_opt: bool = False):
 
     # Create a rotation object from Euler angles specifying axes of rotation
     rot = Rotation.from_euler('xyz', [x, y, z], degrees=deg_opt)
@@ -13,7 +13,7 @@ def euler2quat(x, y, z, deg_opt:bool=False):
     return qs
 
 
-def quat2euler(qs, deg_opt:bool=False):
+def quat2euler(qs, deg_opt: bool = False):
 
     rot = Rotation.from_quat(qs)
 
