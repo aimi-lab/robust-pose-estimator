@@ -16,7 +16,7 @@ class PinholeTransformTester(unittest.TestCase):
         self.tvec = np.zeros([3, 1])
 
         self.resolution = (32, 64)
-        self.ipts = create_img_coords(self.resolution)
+        self.ipts = create_img_coords(*self.resolution)
         self.zpts = 0.1 * np.random.randn(np.multiply(*self.resolution))[np.newaxis] + 1
 
     def test_plane_projection(self):

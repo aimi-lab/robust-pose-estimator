@@ -9,7 +9,7 @@ import json
 from tifffile import tifffile
 
 from alley_oop.utils.paths import SCARED_ROOT_PATH, get_scared_abspath
-from alley_oop.pinhole.pinhole_transforms import reverse_project, forward_project, create_img_coords
+from alley_oop.utils.pinhole_transforms import reverse_project, forward_project, create_img_coords
 from alley_oop.utils.mlab_plot import mlab_rgbd, mlab_plot
 from alley_oop.utils.pfm_handler import load_pfm
 from alley_oop.utils.normals import normals_from_pca, get_ray_surfnorm_angle
