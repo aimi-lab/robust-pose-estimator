@@ -9,13 +9,12 @@ import json
 from tifffile import tifffile
 
 from alley_oop.utils.paths import SCARED_ROOT_PATH, get_scared_abspath
-from alley_oop.utils.pinhole_transforms import reverse_project, forward_project, create_img_coords
+from alley_oop.pinhole.pinhole_transforms import reverse_project, forward_project, create_img_coords
 from alley_oop.utils.mlab_plot import mlab_rgbd, mlab_plot
 from alley_oop.utils.pfm_handler import load_pfm
 from alley_oop.utils.normals import normals_from_pca, get_ray_surfnorm_angle
 from alley_oop.metrics.projected_photo_loss import dual_projected_photo_loss
 from alley_oop.pose.feat_pose_estimation import FeatPoseEstimator
-from alley_oop.pose.topo_pose_estimation import TopoPoseEstimator
 
 
 def clip_quantile(arr, p=1e-3):
@@ -190,7 +189,7 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
     # write intermediate results to drive
     if save_opt:
         # write each pose as 4x4 matrix
-        pose_fname = Path('.') / 'tests' / 'test_data' / str(feats_list[i].name).replace('matches.npz', 'pose_es.json')
+        pose_fname = Path('.').parent / 'tests' / 'test_data' / str(feats_list[i].name).replace('matches.npz', 'pose_es.json')
         if not pose_fname.parent.exists(): pose_fname.parent.mkdir()
         pose_esmat = {'camera-pose': np.vstack([np.array(pose_list[-1])[1], np.array([0, 0, 0, 1])]).tolist()}
         pose_gtmat = {'camera-pose': np.vstack([np.array(pose_list[-1])[0], np.array([0, 0, 0, 1])]).tolist()}
@@ -199,7 +198,7 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
 
     # write rgbd point clouds
     if save_map:
-        rgbd_fname = Path('.') / 'tests' / 'test_data' / str(feats_list[i].name).replace('matches', 'rgbd')
+        rgbd_fname = Path('.').parent / 'tests' / 'test_data' / str(feats_list[i].name).replace('matches', 'rgbd')
         rgbd0 = np.dstack([opt0.T.reshape(*resolution, 3), img0])
         rgbd1 = np.dstack([opt1.T.reshape(*resolution, 3), img1])
         np.savez_compressed(rgbd_fname, rgbd0=rgbd0, rgbd1=rgbd1)
