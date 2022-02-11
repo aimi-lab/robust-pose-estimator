@@ -2,7 +2,7 @@ import unittest
 import numpy
 import torch
 
-from alley_oop.metrics.projected_photo_loss import synth_view_scipy, synth_view_torch
+from alley_oop.metrics.projected_photo_metrics import synth_view_scipy, synth_view_torch
 
 
 class PhotoLossTest(unittest.TestCase):

@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from scipy.interpolate import NearestNDInterpolator, LinearNDInterpolator, CloughTocher2DInterpolator
 
-from alley_oop.utils.pinhole_transforms import reverse_project, forward_project
+from alley_oop.geometry.pinhole_transforms import reverse_project, forward_project
 
 
 def dual_projected_photo_loss(img0, img1, dep0, dep1, rmat, tvec, kmat0, kmat1=None):
