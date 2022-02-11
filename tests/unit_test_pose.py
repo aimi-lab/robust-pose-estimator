@@ -34,21 +34,29 @@ class PoseTester(unittest.TestCase):
             # estimate translation and rotation
             estimator = FeatPoseEstimator(feat_refer=refer, feat_query=query, quat_opt=False)
             estimator.estimate()
-            solve = estimator.rmat @ refer + estimator.tvec
+            query_solve = estimator.rmat @ refer + estimator.tvec
+            refer_solve = estimator.rmat.T @ (query - estimator.tvec)
 
             if self.plt_opt:
                 fig = plt.figure(figsize=(12, 12))
                 ax = fig.add_subplot(projection='3d')
-                ax.scatter(refer[0], refer[1], refer[2], 'bx')
-                ax.scatter(query[0], query[1], query[2], 'r.')
-                ax.scatter(solve[0], solve[1], solve[2], 'go')
+                ax.scatter(refer[0], refer[1], refer[2], color='b', marker='x', label='refer')
+                ax.scatter(query[0], query[1], query[2], color='r', marker='x', label='query')
+                ax.scatter(query_solve[0], query_solve[1], query_solve[2], color='k', marker='.', label='refer2query mapping')
+                ax.scatter(refer_solve[0], refer_solve[1], refer_solve[2], color='g', marker='.', label='query2refer mapping')
+                plt.legend()
                 plt.show()
 
             # assert output estimates
-            t_bool = np.allclose(np.round(t_true, 3), np.round(estimator.tvec, 3), atol=1e-3)
-            r_bool = np.allclose(np.round(r_true, 2), np.round(estimator.rmat, 2), atol=1e-3)
-            self.assertTrue(t_bool, msg='failed for angle %s' % a)
-            self.assertTrue(r_bool, msg='failed for angle %s' % a)
+            tvec_bool = np.allclose(np.round(t_true, 3), np.round(estimator.tvec, 3), atol=1e-3)
+            rmat_bool = np.allclose(np.round(r_true, 2), np.round(estimator.rmat, 2), atol=1e-3)
+            self.assertTrue(tvec_bool, msg='failed for angle %s' % a)
+            self.assertTrue(rmat_bool, msg='failed for angle %s' % a)
+
+            refer_mse = np.mean((refer_solve - refer)**2)
+            query_mse = np.mean((query_solve - query)**2)
+            self.assertTrue(refer_mse < 1, msg='failed for angle %s' % a)
+            self.assertTrue(query_mse < 1, msg='failed for angle %s' % a)
 
     def test_all(self):
 
