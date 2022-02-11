@@ -1,9 +1,9 @@
 import numpy as np
 from scipy.optimize import least_squares
 
-from alley_oop.pose.euler_angles import euler2mat
-from alley_oop.pose.quaternions import quat2rmat
-from alley_oop.utils.normals import normals_from_pca, get_ray_surfnorm_angle
+from alley_oop.geometry.euler_angles import euler2mat
+from alley_oop.geometry.quaternions import quat2rmat
+from alley_oop.geometry.normals import normals_from_pca, get_ray_surfnorm_angle
 
 
 class FeatPoseEstimator(object):
