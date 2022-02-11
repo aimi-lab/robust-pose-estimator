@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from alley_oop.utils.pinhole_transforms import forward_project, reverse_project, compose_projection_matrix, decompose_projection_matrix, create_img_coords
+from alley_oop.geometry.pinhole_transforms import forward_project, reverse_project, compose_projection_matrix, decompose_projection_matrix, create_img_coords
 
 
 class PinholeTransformTester(unittest.TestCase):
