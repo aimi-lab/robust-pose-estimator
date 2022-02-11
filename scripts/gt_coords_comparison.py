@@ -6,7 +6,7 @@ import json
 from tifffile import tifffile
 
 from alley_oop.utils.paths import SCARED_ROOT_PATH, get_scared_abspath
-from alley_oop.utils.pinhole_transforms import reverse_project, create_img_coords
+from alley_oop.geometry.pinhole_transforms import reverse_project, create_img_coords
 from alley_oop.utils.pfm_handler import load_pfm
 
 

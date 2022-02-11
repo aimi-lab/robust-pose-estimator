@@ -13,7 +13,7 @@ from alley_oop.utils.pinhole_transforms import reverse_project, forward_project,
 from alley_oop.utils.mlab_plot import mlab_rgbd, mlab_plot
 from alley_oop.utils.pfm_handler import load_pfm
 from alley_oop.utils.normals import normals_from_pca, get_ray_surfnorm_angle
-from alley_oop.metrics.projected_photo_loss import dual_projected_photo_loss
+from alley_oop.metrics.projected_photo_metrics import dual_projected_photo_loss
 from alley_oop.pose.feat_pose_estimation import FeatPoseEstimator
 
 
@@ -140,11 +140,11 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
     tpt0 = np.vstack([opt0, np.mean(img0.reshape(-1, 3).T, axis=0)])[:, ::200]
     tpt1 = np.vstack([opt1, np.mean(img1.reshape(-1, 3).T, axis=0)])[:, ::200][:, idcs]
 
-    # surface normal computation to exclude points facing away from camera
+    # surface normal computation to exclude points not facing towards camera
     naxs = normals_from_pca(rpts, distance=10, leafsize=10)
     angs = get_ray_surfnorm_angle(rpts, naxs)
     angs = np.abs(angs*180/np.pi)
-    conf[angs>55] = 0
+    conf[angs>55] = 0   # set low confidence
     if plot_opt == 3:
         from tests.unit_test_normals import NormalsTester
         NormalsTester.plot_normals(naxs, rpts)
