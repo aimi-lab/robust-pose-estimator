@@ -44,7 +44,7 @@ def reverse_project(ipts, kmat, rmat=None, tvec=None, disp=None, base=float(1)):
     if disp is not None:
         flen = [kmat[0][0], kmat[1][1], (kmat[0][0]+kmat[1][1])/2]
         fmat = lib.diag(flen) if isinstance(kmat, np.ndarray) else lib.diag(lib.Tensor(flen))
-        opts = base * fmat @ opts[:3] / disp
+        opts = base * fmat @ opts[:3] / disp.flatten()
 
     return opts
 
