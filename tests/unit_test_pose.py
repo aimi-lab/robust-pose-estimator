@@ -3,7 +3,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from alley_oop.pose.feat_pose_estimation import FeatPoseEstimator
-from alley_oop.geometry.quaternions import quat2rmat, euler2quat
 
 
 class PoseTester(unittest.TestCase):
