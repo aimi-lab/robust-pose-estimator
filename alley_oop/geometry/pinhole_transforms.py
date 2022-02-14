@@ -78,7 +78,7 @@ def decompose_projection_matrix(pmat, scale=False):
 
     tvec = lib.linalg.lstsq(-pmat[:, :n], pmat[:, -1])[0][:, None] if pmat.shape[1] == 4 else lib.zeros(n)
 
-    return rmat, kmat, tvec
+    return kmat, rmat, tvec
 
 
 def create_img_coords_t(y: int = 720, x: int = 1280, b: int = 1, lib_type: type = np.ndarray):
