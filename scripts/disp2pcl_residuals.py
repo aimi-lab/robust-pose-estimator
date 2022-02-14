@@ -17,7 +17,7 @@ from alley_oop.geometry.surf_interpol_scipy import surf_interpol
 SCARED_UBLX_PATH = 'artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/02_segmentation/intuitive_segmentation'
 MY_WORKSPACE_PATH = '/home/chris/UbelixWorkspaces/'# '/storage/workspaces'#
 
-PLOT_OPT = True
+PLOT_OPT = False
 
 if __name__ == '__main__':
 
