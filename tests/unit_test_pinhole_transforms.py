@@ -4,6 +4,7 @@ import imageio
 
 from alley_oop.geometry.pinhole_transforms import forward_project, reverse_project, compose_projection_matrix, decompose_projection_matrix, create_img_coords_np
 from alley_oop.geometry.quaternions import quat2rmat, euler2quat
+from alley_oop.metrics.projected_photo_metrics import img_map_scipy
 
 
 class PinholeTransformTester(unittest.TestCase):
@@ -13,19 +14,21 @@ class PinholeTransformTester(unittest.TestCase):
 
     def setUp(self):
 
+        # settings
+        self.plot_opt = True
+
         # intrinsics
         self.resolution = (180, 180)
-        self.kmat = np.diag([48, 48, 1])
+        self.kmat = np.diag([150, 150, 1])
         self.kmat[0, -1] = self.resolution[1]//2
         self.kmat[1, -1] = self.resolution[0]//2
-        self.ball = imageio.imread('./bball.jpeg')
+        self.ipts = create_img_coords_np(*self.resolution)
 
         # extrinsics
         self.rmat = np.eye(3)
         self.tvec = np.zeros([3, 1])
-
-        self.ipts = create_img_coords_np(*self.resolution)
         self.zpts = 0.1 * np.random.randn(np.multiply(*self.resolution))[np.newaxis] + 1
+        self.ball = imageio.imread('./test_data/bball.jpeg')
 
     def test_ortho_plane_projection(self):
 
@@ -74,7 +77,15 @@ class PinholeTransformTester(unittest.TestCase):
         dept = dist * np.ones(np.multiply(*self.resolution))[np.newaxis]
         opts = reverse_project(self.ipts, self.kmat, rmat=np.eye(3), tvec=np.zeros([3, 1]), dept=dept)
 
-        npts = forward_project(opts, kmat=self.kmat, rmat=rmat.T, tvec=npos)
+        npts = forward_project(opts, kmat=self.kmat, rmat=rmat.T, tvec=npos[:, None])
+
+        nimg = img_map_scipy(self.ball, ipts=self.ipts, npts=npts)
+
+        if self.plot_opt:
+            import matplotlib.pyplot as plt
+            plt.figure()
+            plt.imshow(nimg)
+            plt.show()
 
     def test_KR_decomposition(self):
 
