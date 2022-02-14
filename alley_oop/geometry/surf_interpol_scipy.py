@@ -5,13 +5,13 @@ from scipy import spatial
 
 def surf_interpol(rpts, qpts, method: str = 'bilinear', fill_value: float = 0):
 
-    interpol_funs = create_interpolator(rpts, method=method, fill_value=fill_value)
-    interpol_arrs = interpol_pts(qpts, interpol_funs)
+    interpol_funs = create_surf_interpolator(rpts, method=method, fill_value=fill_value)
+    interpol_arrs = surf_interpol_pts(qpts, interpol_funs)
 
     return interpol_arrs
 
 
-def interpol_pts(qpts, interpol_funs):
+def surf_interpol_pts(qpts, interpol_funs):
     
     interpol_arrs = np.zeros([qpts.shape[0]-2, qpts.shape[1]])
     for i, interpol_fun in enumerate(interpol_funs):
@@ -20,7 +20,7 @@ def interpol_pts(qpts, interpol_funs):
     return interpol_arrs
 
 
-def create_interpolator(rpts, method: str = 'bilinear', fill_value: float = 0):
+def create_surf_interpolator(rpts, method: str = 'bilinear', fill_value: float = 0):
     """ create interpolator (linear or cubic) from reference points """
 
     interpolators = []
