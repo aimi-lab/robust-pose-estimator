@@ -17,7 +17,7 @@ from alley_oop.geometry.surf_interpol_scipy import surf_interpol
 SCARED_UBLX_PATH = 'artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/02_segmentation/intuitive_segmentation'
 MY_WORKSPACE_PATH = '/home/chris/UbelixWorkspaces/'# '/storage/workspaces'#
 
-PLOT_OPT = False
+PLOT_OPT = True
 
 if __name__ == '__main__':
 
@@ -91,13 +91,14 @@ if __name__ == '__main__':
 
         # plots for debug purposes
         if PLOT_OPT and np.sum(residuals) != 0:
-            # plot point clouds
-            fig = plt.figure()
-            ax = fig.add_subplot(projection='3d')
-            ax.scatter(*pcld, 'bs', label='reference point cloud')
-            ax.scatter(*opts, 'r.', label='projected disparity')
-            plt.legend()
-            plt.show()
+
+            # plot ideally overlapping point clouds
+            from alley_oop.utils.mlab_plot import mlab_plot
+            from mayavi import mlab
+            fig = mlab.figure(bgcolor=(1, 1, 1))
+            mlab_plot(pcld, size=.01, fig=fig, colors=.25*np.ones(pcld.shape[1]), show_opt=False)
+            mlab_plot(opts, size=.01, fig=fig, colors=.75*np.ones(opts.shape[1]))
+
             # plot residuals map
             plt.figure()
             plt.imshow(residuals)
