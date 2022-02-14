@@ -93,7 +93,7 @@ def decompose_projection_matrix(
             kmat = lib.dot(D, kmat)
             rmat = lib.dot(rmat, D)
 
-    tvec = -lib.linalg.lstsq(-pmat[:, :n], pmat[:, -1])[0][:, None] if pmat.shape[1] == 4 else lib.zeros(n)
+    tvec = -lib.linalg.lstsq(-pmat[:, :n], pmat[:, -1], rcond=None)[0][:, None] if pmat.shape[1] == 4 else lib.zeros(n)
 
     return kmat, rmat, tvec
 
