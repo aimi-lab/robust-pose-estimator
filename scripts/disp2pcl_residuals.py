@@ -10,7 +10,7 @@ import os, sys
 sys.path.insert(0, os.getcwd()) 
 
 from alley_oop.utils.pfm_handler import load_pfm, save_pfm
-from alley_oop.geometry.pinhole_transforms import reverse_project, create_img_coords
+from alley_oop.geometry.pinhole_transforms import reverse_project, create_img_coords_np
 from alley_oop.geometry.quaternions import quat2rmat
 from alley_oop.geometry.surf_interpol_scipy import surf_interpol
 
@@ -72,7 +72,7 @@ if __name__ == '__main__':
             disp = disp[rgap:-rgap, :]
 
             # forward project
-            ipts = create_img_coords(*disp.shape)
+            ipts = create_img_coords_np(*disp.shape)
             opts = reverse_project(ipts, kmat, rmat, tvec, disp=disp, base=4.3590497970581055)
             opts = opts / 1000 # mm to meters
             opts = opts * 15

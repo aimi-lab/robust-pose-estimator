@@ -9,7 +9,7 @@ import json
 from tifffile import tifffile
 
 from alley_oop.utils.paths import SCARED_ROOT_PATH, get_scared_abspath
-from alley_oop.geometry.pinhole_transforms import reverse_project, forward_project, create_img_coords
+from alley_oop.geometry.pinhole_transforms import reverse_project, forward_project, create_img_coords_np
 from alley_oop.utils.mlab_plot import mlab_rgbd, mlab_plot
 from alley_oop.utils.pfm_handler import load_pfm
 from alley_oop.geometry.normals import normals_from_pca, get_ray_surfnorm_angle
@@ -121,7 +121,7 @@ for i in range(0, len(feats_list)-frame_jump, frame_jump):
     conf = feat[-1]**.5
 
     # image coordinates
-    ipts = create_img_coords(*resolution)
+    ipts = create_img_coords_np(*resolution)
 
     # 2D to 3D projections
     bas0 = abs(cal0['T'][0][0])

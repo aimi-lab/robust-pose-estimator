@@ -6,7 +6,7 @@ import json
 from tifffile import tifffile
 
 from alley_oop.utils.paths import SCARED_ROOT_PATH, get_scared_abspath
-from alley_oop.geometry.pinhole_transforms import reverse_project, create_img_coords
+from alley_oop.geometry.pinhole_transforms import reverse_project, create_img_coords_np
 from alley_oop.utils.pfm_handler import load_pfm
 
 
@@ -71,7 +71,7 @@ rmat = pose[:3, :3]
 orgn = np.zeros([3, 1])
 
 # image coordinates
-ipts = create_img_coords(*resolution)
+ipts = create_img_coords_np(*resolution)
 
 # 2D to 3D projection
 bas0 = abs(cal0['T'][0][0])

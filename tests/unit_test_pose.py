@@ -47,8 +47,8 @@ class PoseTester(unittest.TestCase):
                 plt.show()
 
             # assert output estimates
-            tvec_bool = np.allclose(np.round(t_true, 3), np.round(estimator.tvec, 3), atol=1e-3)
-            rmat_bool = np.allclose(np.round(r_true, 2), np.round(estimator.rmat, 2), atol=1e-3)
+            tvec_bool = np.allclose(np.round(t_true, 3), np.round(estimator.tvec, 3), atol=1e-6)
+            rmat_bool = np.allclose(np.round(r_true, 2), np.round(estimator.rmat, 2), atol=1e-6)
             self.assertTrue(tvec_bool, msg='failed for angle %s' % a)
             self.assertTrue(rmat_bool, msg='failed for angle %s' % a)
 

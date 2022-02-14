@@ -3,6 +3,7 @@ import torch
 from scipy.interpolate import NearestNDInterpolator, LinearNDInterpolator, CloughTocher2DInterpolator
 
 from alley_oop.geometry.pinhole_transforms import reverse_project, forward_project
+from alley_oop.geometry.pinhole_transforms import create_img_coords_t, create_img_coords_np
 
 
 def dual_projected_photo_loss(img0, img1, dep0, dep1, rmat, tvec, kmat0, kmat1=None):
@@ -21,11 +22,8 @@ def projected_photo_loss(rimg, qimg, dept, rmat, tvec, kmat0, kmat1=None, dbg_op
     # init values
     kmat1 = kmat0 if kmat1 is None else kmat1
 
-    try:
-        nimg = synth_view_torch(qimg, dept, rmat, tvec, kmat0, kmat1)
-    except TypeError:
-        # channel-wise new image generation (given perspective and depth)
-        nimg = synth_view_scipy(qimg, dept, rmat, tvec, kmat0, kmat1)
+    # generate view at perspective
+    nimg = synth_view(qimg, dept, rmat, tvec, kmat0, kmat1)
 
     # compute loss
     rmse = np.mean((rimg - nimg)**2)**.5
@@ -38,22 +36,37 @@ def projected_photo_loss(rimg, qimg, dept, rmat, tvec, kmat0, kmat1=None, dbg_op
     return rmse
 
 
-def synth_view_scipy(img, dept, rmat, tvec, kmat0, kmat1=None, mode='bilinear'):
+def synth_view(img, dept, rmat, tvec, kmat0, kmat1=None, mode='bilinear'):
+
+    # determine library given input type
+    lib = np if isinstance(img, np.ndarray) else torch
 
     # init values
     kmat1 = kmat0 if kmat1 is None else kmat1
 
     # create 2-D coordinates
-    x_coords = np.arange(0, img.shape[1])
-    y_coords = np.arange(0, img.shape[0])
-    x_mesh, y_mesh = np.meshgrid(x_coords, y_coords)
-    ipts = np.vstack([x_mesh.flatten(), y_mesh.flatten(), np.ones(x_mesh.flatten().shape[0])])
+    if lib == np:
+        b, _, y, x = dept[:, None, ...].shape if len(dept.shape) == 3 else dept.size()
+        ipts = create_img_coords_np(y, x)
+    else:
+        b, _, y, x = dept.unsqueeze(1).size() if len(dept.shape) == 3 else dept.size()
+        ipts = create_img_coords_t(y, x, b, ref_type=img)
 
     # back-project coordinates into space
-    opts = reverse_project(ipts, kmat1, disp=dept.flatten())
+    opts = reverse_project(ipts, kmat=kmat1, dept=dept.flatten())
 
     # rotate, translate and forward-project points
-    npts = forward_project(opts, kmat0, rmat, tvec)
+    npts = forward_project(opts, kmat=kmat0, rmat=rmat, tvec=tvec)
+
+    if lib == np:
+        nimg = img_map_scipy(img=img, ipts=ipts, npts=npts, mode=mode)
+    else:
+        nimg = img_map_torch(img=img, npts=npts, mode=mode)
+
+    return nimg
+
+
+def img_map_scipy(img, ipts, npts, mode='bilinear'):
 
     # interpolator settings
     if mode == 'bilinear':
@@ -71,24 +84,10 @@ def synth_view_scipy(img, dept, rmat, tvec, kmat0, kmat1=None, mode='bilinear'):
     return nimg
 
 
-def synth_view_torch(img, dept, rmat, tvec, kmat0, kmat1=None, mode='bilinear'):
-
-    # init values
-    kmat1 = kmat0 if kmat1 is None else kmat1
-    b, _, y, x = dept.unsqueeze(1).size() if len(dept.shape) == 3 else dept.size()
-
-    # create 2-D coordinates
-    x_mesh = torch.linspace(0, x-1, x).repeat(b, y, 1).type_as(img) + .5
-    y_mesh = torch.linspace(0, y-1, y).repeat(b, x, 1).transpose(1, 2).type_as(img) + .5
-    ipts = torch.vstack([x_mesh.flatten(), y_mesh.flatten(), torch.ones(x_mesh.flatten().shape[0])])
-
-    # back-project coordinates into space
-    opts = reverse_project(ipts, kmat1, disp=dept.flatten())
-
-    # rotate, translate and forward-project points
-    npts = forward_project(opts, kmat0, rmat, tvec)
+def img_map_torch(img, npts, mode='bilinear'):
 
     # create new sample grid
+    y, x = img.shape[-2:]
     grid = torch.swapaxes(npts[:2].reshape([2, *img.shape[-2:]]).transpose(1, 2), 0, -1) / torch.Tensor([x, y]) * 2 - 1
 
     # interpolate new image
