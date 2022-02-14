@@ -56,7 +56,7 @@ if __name__ == '__main__':
         verx = plyd['vertex']
         pcld = np.array([verx[t] for t in ('x', 'y', 'z')])
 
-        if pcld.size > 1:
+        if pcld.shape[1] > 3:
 
             # load disparity
             disp = load_pfm(dname)[0]
