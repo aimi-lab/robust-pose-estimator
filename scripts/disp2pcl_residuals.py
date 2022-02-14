@@ -35,7 +35,7 @@ if __name__ == '__main__':
     dnames = sorted((data_dir / 'disparity_frames_10.0fps').rglob('*.pfm'))
 
     # get pointcloud from ply file
-    pnames = sorted(plys_dir.rglob('*.ply'))
+    pnames = sorted(plys_dir.rglob('*.ply'), key=lambda s: int(str(s.name).split('.')[1][3:]))
 
     # intrinsics
     kmat = np.diag([525.8345947265625, 525.7257690429688, 1])
