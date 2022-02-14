@@ -17,7 +17,8 @@ from alley_oop.geometry.surf_interpol_scipy import surf_interpol
 SCARED_UBLX_PATH = 'artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/02_segmentation/intuitive_segmentation'
 MY_WORKSPACE_PATH = '/home/chris/UbelixWorkspaces/'# '/storage/workspaces'#
 
-PLOT_OPT = False
+PLOT_OPT = True
+SAVE_OPT = False
 
 if __name__ == '__main__':
 
@@ -41,6 +42,12 @@ if __name__ == '__main__':
     kmat = np.diag([525.8345947265625, 525.7257690429688, 1])
     kmat[0, -1] = 320
     kmat[1, -1] = 240
+
+    # move future point clouds to present in an attempt to have the current depth represented inside
+    gap = 1
+    freiburg_list = freiburg_list[:-gap]
+    dnames = dnames[:-gap]
+    pnames = pnames[gap:]
 
     assert len(freiburg_list) == len(dnames[1:]) == len(pnames), 'length mismatch'
 
@@ -71,8 +78,6 @@ if __name__ == '__main__':
             opts = opts * 15
 
             # compute residuals in z dimension (point-wise comparison too expensive)
-            #dist = scipy.spatial.distance.cdist(pcld.T, opts.T, metric='euclidean')
-            #residuals = np.min(dist, axis=0)
             residuals = surf_interpol(pcld, opts, method='bilinear', fill_value=float('NaN'))
 
             # convert residuals to writable uint8 image
@@ -80,17 +85,18 @@ if __name__ == '__main__':
             residuals = residuals.reshape(disp.shape)
         else:
             residuals = np.zeros([int(kmat[1, -1]*2), int(kmat[0, -1]*2)], dtype=np.uint8)
-        
-        # save folating point residuals in 2-D map
-        fname = str(outp_dir / (dname.name.split('_')[0]+'.pfm'))
-        save_pfm(residuals, fname)
 
-        # save residual depth as 2-D image
-        resid_img = np.round(residuals/np.max(residuals)*255, 0).astype(np.uint8) if np.max(residuals) > 0 else residuals.astype(np.uint8)
-        imageio.imwrite(fname.replace('pfm', 'png'), resid_img)
+        if SAVE_OPT:
+            # save folating point residuals in 2-D map
+            fname = str(outp_dir / (dname.name.split('_')[0]+'.pfm'))
+            save_pfm(residuals, fname)
+
+            # save residual depth as 2-D image
+            resid_img = np.round(residuals/np.max(residuals)*255, 0).astype(np.uint8) if np.max(residuals) > 0 else residuals.astype(np.uint8)
+            imageio.imwrite(fname.replace('pfm', 'png'), resid_img)
 
         # plots for debug purposes
-        if PLOT_OPT and np.sum(residuals) != 0:
+        if PLOT_OPT and i == 4*50:
 
             # plot ideally overlapping point clouds
             from alley_oop.utils.mlab_plot import mlab_plot
