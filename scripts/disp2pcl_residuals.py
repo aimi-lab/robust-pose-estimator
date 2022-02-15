@@ -93,12 +93,12 @@ if __name__ == '__main__':
 
         if SAVE_OPT:
             # save folating point residuals in 2-D map
-            fname = str(outp_dir / (dname.name.split('_')[0]+'.pfm'))
+            fname = str(outp_dir / (dname.name.split('.')[0]+'.pfm'))
             save_pfm(residuals, fname)
 
             # save residual depth as 2-D image
             resid_img = np.round(residuals/np.max(residuals)*255, 0).astype(np.uint8) if np.max(residuals) > 0 else residuals.astype(np.uint8)
-            imageio.imwrite(fname.replace('pfm', 'png'), resid_img)
+            imageio.imwrite(fname.replace(dname.suffix, '.png'), resid_img)
 
         # plots for debug purposes
         if PLOT_OPT and residuals.sum() > 0 and i == 3*50:
