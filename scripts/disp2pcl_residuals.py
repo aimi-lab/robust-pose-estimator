@@ -65,29 +65,30 @@ if __name__ == '__main__':
         pcld = np.array([verx[t] for t in ('x', 'y', 'z')])
 
         if pcld.shape[1] > 3:
-
-            # load disparity
+            
+            # create image coordinates
+            ipts = create_img_coords_np(y=kmat[1, -1]*2, x=kmat[0, -1]*2)   
             if str(dname).lower().endswith('pfm'):
+                # load disparity
                 disp = load_pfm(dname)[0]
+                disp = disp[::2, ::2] / 2
+                rgap = (512-480) // 2
+                disp = disp[rgap:-rgap, :]
+                # forward project
+                opts = reverse_project(ipts, kmat, rmat, tvec, disp=disp, base=4.3590497970581055)
+                opts = opts / 1000 # mm to meters
+                opts = opts * 15
             elif str(dname).lower().endswith('exr'):
                 fexr = load_exr(str(dname))
-                disp = exr2gry(fexr)
-            disp = disp[::2, ::2] / 2
-            rgap = (512-480) // 2
-            disp = disp[rgap:-rgap, :]
-
-            # forward project
-            ipts = create_img_coords_np(*disp.shape)
-            opts = reverse_project(ipts, kmat, rmat, tvec, disp=disp, base=4.3590497970581055)
-            opts = opts / 1000 # mm to meters
-            opts = opts * 15
+                dept = exr2gry(fexr)
+                opts = reverse_project(ipts, kmat, rmat, tvec, dept=dept)
 
             # compute residuals in z dimension (point-wise comparison too expensive)
             residuals = surf_interpol(pcld, opts, method='bilinear', fill_val=float('NaN'))
 
             # convert residuals to writable uint8 image
             residuals[np.isnan(residuals)] = np.nanmax(residuals)
-            residuals = residuals.reshape(disp.shape)
+            residuals = residuals.reshape(int(kmat[1, -1]*2), int(kmat[0, -1]*2))
         else:
             residuals = np.zeros([int(kmat[1, -1]*2), int(kmat[0, -1]*2)], dtype=np.uint8)
 

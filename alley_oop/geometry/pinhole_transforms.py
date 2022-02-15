@@ -51,7 +51,7 @@ def reverse_project(
     dept = lib.ones(ipts.shape[1]) if dept is None else dept
 
     # pinhole projection
-    opts = dept * (lib.linalg.inv(kmat) @ ipts)
+    opts = dept.flatten() * (lib.linalg.inv(kmat) @ ipts)
 
     # from camera to world coordinates
     opts = rmat @ opts + tvec
