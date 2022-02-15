@@ -99,10 +99,10 @@ if __name__ == '__main__':
 
             # save residual depth as 2-D image
             resid_img = np.round(residuals/np.max(residuals)*255, 0).astype(np.uint8) if np.max(residuals) > 0 else residuals.astype(np.uint8)
-            imageio.imwrite(fname.replace(dname.suffix, '.png'), resid_img)
+            imageio.imwrite(fname.replace('.pfm', '.png'), resid_img)
 
         # plots for debug purposes
-        if PLOT_OPT and residuals.sum() > 0 and i == 3*50:
+        if PLOT_OPT and residuals.sum() > 0 and i == 4*50:
 
             # plot ideally overlapping point clouds
             from alley_oop.utils.mlab_plot import mlab_plot
