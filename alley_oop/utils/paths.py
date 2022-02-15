@@ -1,9 +1,11 @@
 from pathlib import Path
 
 from alley_oop.utils.const_custom import MY_WORKSPACE_PATH
-from alley_oop.utils.const_global import SCARED_UBLX_PATH
+from alley_oop.utils.const_global import SCARED_UBLX_PATH, SEGMEN_UBLX_PATH
 
 SCARED_ROOT_PATH = Path(MY_WORKSPACE_PATH) / SCARED_UBLX_PATH
+SEGMEN_ROOT_PATH = Path(MY_WORKSPACE_PATH) / SEGMEN_UBLX_PATH
+
 
 def get_scared_relpath(d_idx:int=1, k_idx:int=1, fname:str=''):
 

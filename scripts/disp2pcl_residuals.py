@@ -9,13 +9,11 @@ import imageio
 import os, sys
 sys.path.insert(0, os.getcwd()) 
 
+from alley_oop.utils.paths import SEGMEN_ROOT_PATH
 from alley_oop.utils.pfm_handler import load_pfm, save_pfm
 from alley_oop.geometry.pinhole_transforms import reverse_project, create_img_coords_np
 from alley_oop.geometry.quaternions import quat2rmat
 from alley_oop.geometry.surf_interpol_scipy import surf_interpol
-
-SCARED_UBLX_PATH = 'artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/02_segmentation/intuitive_segmentation'
-MY_WORKSPACE_PATH = '/home/chris/UbelixWorkspaces/'# '/storage/workspaces'#
 
 PLOT_OPT = True
 SAVE_OPT = False
@@ -23,7 +21,7 @@ SAVE_OPT = False
 if __name__ == '__main__':
 
     # path handling
-    data_dir = Path(MY_WORKSPACE_PATH) / SCARED_UBLX_PATH / 'porcine_video' / '20180731_porcine_kidney_part0019'
+    data_dir = Path(SEGMEN_ROOT_PATH) / 'porcine_video' / '20180731_porcine_kidney_part0019'
     plys_dir = data_dir / (str(data_dir.name).split('_')[-1] + '_s15_plys')
     outp_dir = data_dir / 'disparity_residuals_10.0fps'
     outp_dir.mkdir(exist_ok=True)
@@ -78,7 +76,7 @@ if __name__ == '__main__':
             opts = opts * 15
 
             # compute residuals in z dimension (point-wise comparison too expensive)
-            residuals = surf_interpol(pcld, opts, method='bilinear', fill_value=float('NaN'))
+            residuals = surf_interpol(pcld, opts, method='bilinear', fill_val=float('NaN'))
 
             # convert residuals to writable uint8 image
             residuals[np.isnan(residuals)] = np.nanmax(residuals)
@@ -96,7 +94,7 @@ if __name__ == '__main__':
             imageio.imwrite(fname.replace('pfm', 'png'), resid_img)
 
         # plots for debug purposes
-        if PLOT_OPT and i == 4*50:
+        if PLOT_OPT and residuals.sum() > 0 and i == 5*50:
 
             # plot ideally overlapping point clouds
             from alley_oop.utils.mlab_plot import mlab_plot
