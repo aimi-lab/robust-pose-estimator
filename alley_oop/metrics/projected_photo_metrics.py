@@ -1,9 +1,9 @@
 import numpy as np
 import torch
-from scipy.interpolate import NearestNDInterpolator, LinearNDInterpolator, CloughTocher2DInterpolator
 
 from alley_oop.geometry.pinhole_transforms import reverse_project, forward_project
 from alley_oop.geometry.pinhole_transforms import create_img_coords_t, create_img_coords_np
+from alley_oop.interpol.img_mappings import img_map_scipy, img_map_torch
 
 
 def dual_projected_photo_loss(img0, img1, dep0, dep1, rmat, tvec, kmat0, kmat1=None):
@@ -62,35 +62,5 @@ def synth_view(img, dept, rmat, tvec, kmat0, kmat1=None, mode='bilinear'):
         nimg = img_map_scipy(img=img, ipts=ipts, npts=npts, mode=mode)
     else:
         nimg = img_map_torch(img=img, npts=npts, mode=mode)
-
-    return nimg
-
-
-def img_map_scipy(img, ipts, npts, mode='bilinear'):
-
-    # interpolator settings
-    if mode == 'bilinear':
-        InterpolClass = LinearNDInterpolator 
-    elif mode == 'clough':
-        InterpolClass = CloughTocher2DInterpolator
-    else:
-        InterpolClass = NearestNDInterpolator
-
-    nimg = np.zeros_like(img)
-    for i in range(img.shape[-1]):
-        interpolator = InterpolClass(ipts[:2].T, img[..., i].flatten(), rescale=False)
-        nimg[..., i] = interpolator(npts[:2].T).reshape(img.shape[:2])
-
-    return nimg
-
-
-def img_map_torch(img, npts, mode='bilinear'):
-
-    # create new sample grid
-    y, x = img.shape[-2:]
-    grid = torch.swapaxes(npts[:2].reshape([2, *img.shape[-2:]]).transpose(1, 2), 0, -1) / torch.Tensor([x, y]) * 2 - 1
-
-    # interpolate new image
-    nimg = torch.nn.functional.grid_sample(img, grid[None, :], mode=mode, padding_mode='zeros', align_corners=False)
 
     return nimg

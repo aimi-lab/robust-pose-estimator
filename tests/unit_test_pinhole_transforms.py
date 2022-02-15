@@ -4,7 +4,7 @@ import imageio
 
 from alley_oop.geometry.pinhole_transforms import forward_project, reverse_project, compose_projection_matrix, decompose_projection_matrix, create_img_coords_np
 from alley_oop.geometry.quaternions import quat2rmat, euler2quat
-from alley_oop.metrics.projected_photo_metrics import img_map_scipy
+from alley_oop.interpol.img_mappings import img_map_scipy
 
 
 class PinholeTransformTester(unittest.TestCase):
@@ -94,7 +94,7 @@ class PinholeTransformTester(unittest.TestCase):
         self.kmat[0, -1] = 320
         self.kmat[1, -1] = 240
         self.tvec = np.array([[1], [2], [.5]])
-        self.rmat = quat2rmat([0, 0, 0, 1])
+        self.rmat = quat2rmat(euler2quat(np.pi/4, 0, 0))
 
         pmat = compose_projection_matrix(self.kmat, self.rmat, self.tvec)
 

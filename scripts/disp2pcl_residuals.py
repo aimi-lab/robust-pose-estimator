@@ -13,7 +13,7 @@ from alley_oop.utils.paths import SEGMEN_ROOT_PATH
 from alley_oop.utils.pfm_handler import load_pfm, save_pfm
 from alley_oop.geometry.pinhole_transforms import reverse_project, create_img_coords_np
 from alley_oop.geometry.quaternions import quat2rmat
-from alley_oop.geometry.surf_interpol_scipy import surf_interpol
+from alley_oop.interpol.surf_mappings import surf_interpol
 
 PLOT_OPT = True
 SAVE_OPT = False
