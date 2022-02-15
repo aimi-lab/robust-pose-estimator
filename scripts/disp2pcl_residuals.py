@@ -14,6 +14,7 @@ from alley_oop.utils.pfm_handler import load_pfm, save_pfm
 from alley_oop.geometry.pinhole_transforms import reverse_project, create_img_coords_np
 from alley_oop.geometry.quaternions import quat2rmat
 from alley_oop.interpol.surf_mappings import surf_interpol
+from alley_oop.utils.exr_handler import load_exr, exr2gry
 
 PLOT_OPT = True
 SAVE_OPT = False
@@ -22,7 +23,8 @@ if __name__ == '__main__':
 
     # path handling
     data_dir = Path(SEGMEN_ROOT_PATH) / 'porcine_video' / '20180731_porcine_kidney_part0019'
-    plys_dir = data_dir / (str(data_dir.name).split('_')[-1] + '_s15_plys')
+    part_dir = str(data_dir.name).split('_')[-1]
+    plys_dir = data_dir / (part_dir + '_s15_plys')
     outp_dir = data_dir / 'disparity_residuals_10.0fps'
     outp_dir.mkdir(exist_ok=True)
 
@@ -30,8 +32,9 @@ if __name__ == '__main__':
     fnames = sorted(data_dir.rglob('*.freiburg'))
     with open(fnames[0], 'r') as f: freiburg_list = [line for line in f]
 
-    # get left disparity map
+    # get left disparity maps w/o tools
     dnames = sorted((data_dir / 'disparity_frames_10.0fps').rglob('*.pfm'))
+    dnames = sorted((Path('/home/chris/Documents') / ('rgbd_'+part_dir+'_s15') / 'dept').rglob('*.exr'))
 
     # get pointcloud from ply file
     pnames = sorted(plys_dir.rglob('*.ply'), key=lambda s: int(str(s.name).split('.')[1][3:]))
@@ -42,7 +45,7 @@ if __name__ == '__main__':
     kmat[1, -1] = 240
 
     # move future point clouds to present in an attempt to have the current depth represented inside
-    gap = 1
+    gap = 10
     freiburg_list = freiburg_list[:-gap]
     dnames = dnames[:-gap]
     pnames = pnames[gap:]
@@ -64,7 +67,11 @@ if __name__ == '__main__':
         if pcld.shape[1] > 3:
 
             # load disparity
-            disp = load_pfm(dname)[0]
+            if str(dname).lower().endswith('pfm'):
+                disp = load_pfm(dname)[0]
+            elif str(dname).lower().endswith('exr'):
+                fexr = load_exr(str(dname))
+                disp = exr2gry(fexr)
             disp = disp[::2, ::2] / 2
             rgap = (512-480) // 2
             disp = disp[rgap:-rgap, :]
@@ -94,7 +101,7 @@ if __name__ == '__main__':
             imageio.imwrite(fname.replace('pfm', 'png'), resid_img)
 
         # plots for debug purposes
-        if PLOT_OPT and residuals.sum() > 0 and i == 5*50:
+        if PLOT_OPT and residuals.sum() > 0 and i == 3*50:
 
             # plot ideally overlapping point clouds
             from alley_oop.utils.mlab_plot import mlab_plot
