@@ -25,7 +25,7 @@ if __name__ == '__main__':
     data_dir = Path(SEGMEN_ROOT_PATH) / 'porcine_video' / '20180731_porcine_kidney_part0019'
     part_dir = str(data_dir.name).split('_')[-1]
     plys_dir = data_dir / (part_dir + '_s15_plys')
-    outp_dir = data_dir / 'disparity_residuals_10.0fps'
+    outp_dir = data_dir / 'disparity_residuals_10.0fps_'
     outp_dir.mkdir(exist_ok=True)
 
     # get camera pose from freiburg file
@@ -84,7 +84,8 @@ if __name__ == '__main__':
                 opts = reverse_project(ipts, kmat, rmat, tvec, dept=dept)
 
             # compute residuals in z dimension (point-wise comparison too expensive)
-            residuals = surf_interpol(pcld, opts, method='bilinear', fill_val=float('NaN'))
+            zpts = surf_interpol(pcld, opts, method='bilinear', fill_val=float('NaN'))
+            residuals = np.abs(zpts-opts[2])
 
             # convert residuals to writable uint8 image
             residuals[np.isnan(residuals)] = np.nanmax(residuals)
