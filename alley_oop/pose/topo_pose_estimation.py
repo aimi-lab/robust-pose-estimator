@@ -25,10 +25,11 @@ class TopoPoseEstimator(FeatPoseEstimator):
     def create_interpolator(self):
         """ create interpolator (linear or cubic) from reference points """
 
+        tri = spatial.Delaunay(self.feat_query[:2].copy().T)
+        InterpolatorClass = CloughTocher2DInterpolator if self.method.lower() == 'cubic' else LinearNDInterpolator
+
         interpolators = []
         for i in range(self.dimensions):
-            tri = spatial.Delaunay(self.feat_query[:2].copy().T)
-            InterpolatorClass = CloughTocher2DInterpolator if self.method.lower() == 'cubic' else LinearNDInterpolator
             interpolators.append(InterpolatorClass(points=tri,
                                                    values=self.feat_query[i+2].copy(),
                                                    rescale=False,

@@ -3,7 +3,7 @@ from scipy.optimize import least_squares
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel
 
-from alley_oop.pose.euler_angles import mat2euler
+from alley_oop.geometry.euler_angles import mat2euler
 from alley_oop.pose.feat_pose_estimation import FeatPoseEstimator
 
 

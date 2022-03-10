@@ -3,7 +3,10 @@ from sklearn.decomposition import PCA
 import numpy as np
 
 
-def normals_from_regular_grid(oarr):
+def normals_from_regular_grid(oarr: np.ndarray) -> np.ndarray:
+    """
+    compute normal for each point in a regular grid
+    """
 
     assert len(oarr.shape) == 3, 'normal computation from regular grid requires 3 (x, y, z) dimensions'
 
@@ -20,7 +23,7 @@ def normals_from_regular_grid(oarr):
     return narr
 
 
-def normals_from_pca(opts, distance:float=10, leafsize:int=10):
+def normals_from_pca(opts: np.ndarray, distance: float=10, leafsize: int = 10) -> np.ndarray:
     """
     compute normal for each point in a pointcloud using PCA on its KD-tree neighbours
     """
@@ -44,25 +47,31 @@ def normals_from_pca(opts, distance:float=10, leafsize:int=10):
 
     naxs = np.array(naxs).T
     angs = get_ray_surfnorm_angle(opts, naxs)
-    aidx = angs/np.pi < 0.5
-    naxs[:, aidx] *= -1
+
+    # flip normals not facing to camera
+    naxs[:, angs/np.pi > .5] *= -1
 
     return naxs
 
 
-def get_ray_surfnorm_angle(opts, naxs, tvec=None):
+def get_ray_surfnorm_angle(opts: np.ndarray, naxs: np.ndarray, tvec: np.ndarray = None) -> np.ndarray:
+    """
+    compute radian angles between surface normals and rays
+    """
 
     # get ray vectors from camera pose if provided
     rays = tvec-opts if tvec is not None else -opts
 
-    # unit length
-    rays = rays / np.linalg.norm(rays)
-    opts = opts / np.linalg.norm(opts)
-
     # matrix contraction
-    avec = np.einsum('ij,ji->i', opts.T, naxs)
+    avec = np.einsum('ji,ji->i', rays, naxs)
 
-    # compute angles in radian (omit normalization term for unit vectors)
-    angs = np.arccos(avec)
+    # normalization term
+    dnom = np.linalg.norm(rays, axis=0) * np.linalg.norm(naxs, axis=0)
+
+    # nan-safe normalization
+    anit = np.divide(avec.astype('float'), dnom.astype('float'), out=np.zeros_like(avec, dtype='float'), where=dnom!=0)
+
+    # compute angles in radian
+    angs = np.arccos(anit)
 
     return angs

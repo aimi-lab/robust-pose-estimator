@@ -1,7 +1,10 @@
 import unittest
 import numpy as np
+import imageio
 
-from alley_oop.utils.pinhole_transforms import forward_project, reverse_project, compose_projection_matrix, decompose_projection_matrix, create_img_coords
+from alley_oop.geometry.pinhole_transforms import forward_project, reverse_project, compose_projection_matrix, decompose_projection_matrix, create_img_coords_np
+from alley_oop.geometry.quaternions import quat2rmat, euler2quat
+from alley_oop.interpol.img_mappings import img_map_scipy
 
 
 class PinholeTransformTester(unittest.TestCase):
@@ -11,16 +14,26 @@ class PinholeTransformTester(unittest.TestCase):
 
     def setUp(self):
 
-        self.kmat = np.eye(3)
+        # settings
+        self.plot_opt = True
+
+        # intrinsics
+        self.resolution = (180, 180)
+        self.kmat = np.diag([150, 150, 1])
+        self.kmat[0, -1] = self.resolution[1]//2
+        self.kmat[1, -1] = self.resolution[0]//2
+        self.ipts = create_img_coords_np(*self.resolution)
+
+        # extrinsics
         self.rmat = np.eye(3)
         self.tvec = np.zeros([3, 1])
-
-        self.resolution = (32, 64)
-        self.ipts = create_img_coords(self.resolution)
         self.zpts = 0.1 * np.random.randn(np.multiply(*self.resolution))[np.newaxis] + 1
+        self.ball = imageio.imread('./test_data/bball.jpeg')
 
-    def test_plane_projection(self):
-        
+    def test_ortho_plane_projection(self):
+
+        self.setUp()
+
         for plane_dist in range(1, int(1e5), 10):
 
             zpts = plane_dist * np.ones(np.multiply(*self.resolution))[np.newaxis]
@@ -31,7 +44,57 @@ class PinholeTransformTester(unittest.TestCase):
 
             self.assertTrue(np.allclose(self.ipts, npts))
 
+    def test_translated_projection(self):
+
+        self.setUp()
+
+        dist = 100
+        dept = dist * np.ones(np.multiply(*self.resolution))[np.newaxis]
+
+        dofs = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 0, 100]])
+
+        for dof in dofs:
+
+            self.tvec = dof[:3][:, None]
+
+            opts = reverse_project(self.ipts, self.kmat, rmat=np.eye(3), tvec=np.zeros([3, 1]), dept=dept)
+
+            npts = forward_project(opts, kmat=self.kmat, rmat=self.rmat, tvec=self.tvec)
+
+            disp = self.tvec * self.kmat[0, 0] / dist
+            ret_val = np.allclose(self.ipts+disp, npts)
+            self.assertTrue(ret_val)
+
+    def test_rotated_projection(self):
+
+        self.setUp()
+
+        dist = 100
+        anch = np.array([0, 0, dist])
+        rmat = quat2rmat(euler2quat(0, np.pi/4, 0))
+        npos = np.abs(anch - rmat @ anch)
+
+        dept = dist * np.ones(np.multiply(*self.resolution))[np.newaxis]
+        opts = reverse_project(self.ipts, self.kmat, rmat=np.eye(3), tvec=np.zeros([3, 1]), dept=dept)
+
+        npts = forward_project(opts, kmat=self.kmat, rmat=rmat.T, tvec=npos[:, None])
+
+        nimg = img_map_scipy(self.ball, ipts=self.ipts, npts=npts)
+
+        if self.plot_opt:
+            import matplotlib.pyplot as plt
+            plt.figure()
+            plt.imshow(nimg)
+            plt.show()
+
     def test_KR_decomposition(self):
+
+        # intrinsics
+        self.kmat = np.diag([525.8345947265625, 525.7257690429688, 1])
+        self.kmat[0, -1] = 320
+        self.kmat[1, -1] = 240
+        self.tvec = np.array([[1], [2], [.5]])
+        self.rmat = quat2rmat(euler2quat(np.pi/4, 0, 0))
 
         pmat = compose_projection_matrix(self.kmat, self.rmat, self.tvec)
 
@@ -40,7 +103,8 @@ class PinholeTransformTester(unittest.TestCase):
         # assertion
         concat_groundt = np.hstack([self.kmat, self.rmat, self.tvec])
         concat_results = np.hstack([kmat, rmat, tvec])
-        self.assertTrue(np.allclose(concat_groundt, concat_results))
+        ret_val = np.allclose(concat_groundt, concat_results)
+        self.assertTrue(ret_val)
 
     def test_all(self):
 

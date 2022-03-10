@@ -1,6 +1,10 @@
 from pathlib import Path
 
-SCARED_ROOT_PATH = Path('/home/chris/UbelixWorkspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/01_stereo/01_intuitive_scared/')
+from alley_oop.utils.const_custom import MY_WORKSPACE_PATH
+from alley_oop.utils.const_global import SCARED_UBLX_PATH, SEGMEN_UBLX_PATH
+
+SCARED_ROOT_PATH = Path(MY_WORKSPACE_PATH) / SCARED_UBLX_PATH
+SEGMEN_ROOT_PATH = Path(MY_WORKSPACE_PATH) / SEGMEN_UBLX_PATH
 
 
 def get_scared_relpath(d_idx:int=1, k_idx:int=1, fname:str=''):

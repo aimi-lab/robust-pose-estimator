@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 import numpy as np
 
-from alley_oop.utils.normals import normals_from_pca, normals_from_regular_grid, get_ray_surfnorm_angle
+from alley_oop.geometry.normals import normals_from_pca, normals_from_regular_grid, get_ray_surfnorm_angle
 
 
 class NormalsTester(unittest.TestCase):
@@ -15,12 +15,9 @@ class NormalsTester(unittest.TestCase):
         self.data_path = Path.cwd() / 'tests' / 'test_data'
         self.name_list = sorted((self.data_path).rglob('*rgbd.npz'))
 
-        npz_obj = np.load(self.name_list[0])
-        self.rgbd_init = npz_obj[npz_obj.files[0]]
-
         # create tilted plane
-        from alley_oop.utils.pinhole_transforms import create_img_coords
-        ipts = create_img_coords(480, 640)[:2]
+        from alley_oop.geometry.pinhole_transforms import create_img_coords_np
+        ipts = create_img_coords_np(480, 640)[:2]
         self.wall_init = np.vstack([ipts, np.repeat(np.arange(480), 640)-1000])
         self.wall_init = self.wall_init.T.reshape(480, 640, 3)
         self.wall_init /= 100
@@ -28,7 +25,6 @@ class NormalsTester(unittest.TestCase):
     def test_normals_from_regular_grid(self, plot_opt=False):
         
         # set input points
-        oarr = self.rgbd_init[..., :3]
         oarr = self.wall_init
 
         # compute normals from regular grid
@@ -39,18 +35,21 @@ class NormalsTester(unittest.TestCase):
         opts = oarr[:-1, :-1, :].reshape(-1, 3).T
 
         # plottings
-        if plot_opt: self.plot_normals(naxs[:, ::1000], opts[:, ::1000])
+        if plot_opt: self.plot_normals(naxs[:, ::5000], opts[:, ::5000])
 
-        # compute angles
-        degs = get_ray_surfnorm_angle(opts, naxs)/np.pi*180
-
-        # check if normals are perpendicular
+        # compute surface normal angles and check if they are perpendicular
+        degs = get_ray_surfnorm_angle(np.zeros_like(narr).reshape(-1, 3), narr.reshape(-1, 3)) / np.pi * 180
         self.assertTrue(np.allclose(degs, np.ones(len(degs))*90, atol=0.1))
+
+        # compute ray vs surface normal angles and check if they are non-zero
+        degs = get_ray_surfnorm_angle(opts, naxs) / np.pi * 180
+        self.assertFalse(np.allclose(degs, np.zeros(len(degs))))
+
 
     def test_normals_from_pca(self, plot_opt=False):
         
         # set input points
-        opts = self.rgbd_init[..., :3].reshape(-1, 3)[::1000, :].T
+        opts = self.wall_init[..., :3].reshape(-1, 3)[::1000, :].T
         
         # var init
         distance = 10
@@ -59,9 +58,24 @@ class NormalsTester(unittest.TestCase):
         # normals computation based on PCA
         naxs = normals_from_pca(opts, distance=distance, leafsize=leafsize)
         
-        # plot
+        # plottings
         if plot_opt: self.plot_normals(naxs, opts)
-    
+
+        # compute surface normal angles and check if they are perpendicular
+        degs = get_ray_surfnorm_angle(np.zeros_like(naxs).reshape(-1, 3), naxs.reshape(-1, 3)) / np.pi * 180
+        self.assertTrue(np.allclose(degs, np.ones(len(degs))*90, atol=0.1))
+
+    def test_ray_surfnorm_angle(self):
+
+        opts = np.array([[0, 0, 1], [0, 0, 1], [0, 1, 1]]).T
+        naxs = np.array([[0, 0, -1], [1, 0, 0], [0, 0, -1]]).T
+
+        angles = get_ray_surfnorm_angle(opts, naxs, tvec=None) / np.pi * 180
+
+        ret = np.allclose(angles, np.array([0, 90, 45]))
+
+        self.assertTrue(ret)
+
     @staticmethod
     def plot_normals(naxs, opts):
             
@@ -97,7 +111,9 @@ class NormalsTester(unittest.TestCase):
 
     def test_all(self):
 
+        self.test_normals_from_regular_grid()
         self.test_normals_from_pca()
+        self.test_ray_surfnorm_angle()
 
 
 if __name__ == '__main__':

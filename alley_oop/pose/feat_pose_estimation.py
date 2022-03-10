@@ -1,12 +1,14 @@
 import numpy as np
 from scipy.optimize import least_squares
 
-from alley_oop.pose.euler_angles import euler2mat
+from alley_oop.geometry.euler_angles import euler2mat
+from alley_oop.geometry.quaternions import quat2rmat
+from alley_oop.geometry.normals import normals_from_pca, get_ray_surfnorm_angle
 
 
 class FeatPoseEstimator(object):
     """ pose regression based on feature points and non-linear least squares solver """
-    def __init__(self, feat_refer=None, feat_query=None, confidence=None, dims_wghts=None, loss_param=None):
+    def __init__(self, feat_refer=None, feat_query=None, confidence=None, dims_wghts=None, loss_param=None, quat_opt=True):
         super().__init__()
 
         # inputs
@@ -16,13 +18,16 @@ class FeatPoseEstimator(object):
         self.dimensions = self.feat_refer.shape[0]
         self.feat_wdims = np.ones([self.dimensions])/self.dimensions if dims_wghts is None else dims_wghts
         self.loss_param = float(1) if loss_param is None else loss_param
+        self.angl_thres = float(60)
 
         # outputs
         self.tvec = np.zeros([3, 1])
-        self.rvec = np.zeros([3, 1])
+        self.rvec = np.zeros([4, 1])
+        self.rvec[-1] = 1.
         self.p_list = []
-        self.p_star = float('NaN')
-        self.p_loss = float('NaN')
+        self.p_star = float('nan')
+        self.p_loss = float('inf')
+        self.quat_opt = quat_opt
 
     def estimate(self, p_init=None, feat_refer=None, feat_query=None, confidence=None, dims_fit: bool=False):
 
@@ -42,16 +47,16 @@ class FeatPoseEstimator(object):
 
         # assign solution to output vectors
         self.tvec = self.p_star[0:3][np.newaxis].T
-        self.rvec = self.p_star[3:6]
+        self.rvec = self.p_star[3:7] if self.quat_opt else self.p_star[3:6]
 
         return self.tvec, self.rvec
 
-    def residual_fun(self, p, dims_fit: bool=False):
+    def residual_fun(self, p, dims_fit: bool=False, normal_reject: bool=False):
 
         # assign current estimate
         self.p_list.append(p)
         tvec = p[0:3][np.newaxis].T
-        rmat = euler2mat(*p[3:6])
+        rmat = quat2rmat(p[3:7]) if self.quat_opt else euler2mat(*p[3:6])
 
         # map points from query position
         mpts = rmat @ self.feat_refer[:3] + tvec
@@ -68,16 +73,83 @@ class FeatPoseEstimator(object):
         # reduce space dimensions using weights
         wsqr = self.feat_wdims @ sdif
 
-        # compute loss (huber less sensitive to outliers)
+        # compute loss (huber less sensitive to outliers).astype('int')
         residuals = self.huber_loss(wsqr, delta=self.loss_param)
 
         if self.confidence is not None:
             residuals *= self.confidence
+
+        # mask points with normals turned away from current camera position
+        residuals *= self.reject_averted_surface_points(tvec=tvec) if normal_reject else 1
         
         return residuals
 
     def compute_diff(self, rpts, qpts):
         return rpts - qpts
+
+    def reject_averted_surface_points(self, tvec=None):
+        """
+        compute mask with zeros for points whose normals and rays make angles larger than a certain threshold
+        """
+
+        naxs = normals_from_pca(self.feat_query, distance=10, leafsize=10)
+        angs = get_ray_surfnorm_angle(self.feat_query, naxs, tvec=tvec)
+        angs = np.abs(angs*180/np.pi)
+        mask = np.ones(self.feat_query.shape[1])
+        mask[angs>self.angl_thres] = 0
+
+        return mask
+
+    def random_sample_consesus(self, max_iter=100, min_num=None):
+
+        orig_refer = self.feat_refer
+        orig_query = self.feat_query
+
+        sample_num = int(.4*self.feat_refer.shape[-1]) if min_num is None else min_num
+        required_inlier = int(.7*self.feat_refer.shape[-1])
+
+        # initial guess
+        self.tvec = np.mean(self.feat_refer[:3], axis=-1) - np.mean(self.feat_query[:3], axis=-1)
+        p_init = self.tvec.flatten().tolist() + self.rvec.flatten().tolist()
+
+        for _ in range(max_iter):
+            # re-assign all features
+            self.feat_refer = orig_refer
+            self.feat_query = orig_query
+            # inlier selection
+            inlier_idx = np.random.randint(low=0, high=self.feat_refer.shape[-1]-1, size=sample_num)
+            mask = np.zeros(self.feat_refer.shape[-1])
+            mask[inlier_idx] = 1
+            self.feat_refer = self.feat_refer*mask
+            self.feat_query = self.feat_query*mask
+            # model fit
+            p = least_squares(self.residual_fun, p_init, jac='2-point', args=(), method='lm', max_nfev=int(1e3)).x
+            # also inlier test
+            residuals = self.residual_fun(p)
+            inlier_idx = np.where(residuals < .6*np.mean(residuals))[0]# np.concatenate([inlier_idx, np.where(residuals < np.mean(residuals))[0]])
+            if len(inlier_idx) > required_inlier:
+                # re-assign all features
+                self.feat_refer = orig_refer
+                self.feat_query = orig_query
+                # inlier selection
+                mask = np.zeros(self.feat_refer.shape[-1])
+                mask[inlier_idx] = 1
+                self.feat_refer = self.feat_refer*mask
+                self.feat_query = self.feat_query*mask
+                # compare fit of all features with previous ones
+                p = least_squares(self.residual_fun, p, jac='2-point', args=(), method='lm', max_nfev=int(1e2)).x
+                loss = np.sum(self.residual_fun(p))
+                if loss < self.p_loss:
+                    self.p_star = p
+                    self.p_loss = loss
+
+        # re-assign all features
+        self.feat_refer = orig_refer
+        self.feat_query = orig_query
+
+        # assign solution to output vectors
+        self.tvec = self.p_star[0:3][np.newaxis].T
+        self.rvec = self.p_star[3:7] if self.quat_opt else self.p_star[3:6]
 
     @staticmethod
     def huber_loss(a, delta: float=1.):
@@ -91,4 +163,4 @@ class FeatPoseEstimator(object):
 
     @property
     def rmat(self):
-        return euler2mat(*self.rvec)
+        return quat2rmat(self.rvec) if self.quat_opt else euler2mat(*self.rvec)
