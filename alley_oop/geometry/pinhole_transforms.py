@@ -35,7 +35,7 @@ def reverse_project(
         kmat: Union[np.ndarray, torch.Tensor],
         rmat: Union[np.ndarray, torch.Tensor] = None,
         tvec: Union[np.ndarray, torch.Tensor] = None,
-        dept: Union[np.ndarray, torch.Tensor] = None,
+        depth: Union[np.ndarray, torch.Tensor] = None,
         disp: Union[np.ndarray, torch.Tensor] = None,
         base: Union[float, int] = 1.,
                     ):
@@ -47,11 +47,11 @@ def reverse_project(
     rmat = lib.eye(3) if rmat is None else rmat
     tvec = lib.zeros([3, 1]) if tvec is None else tvec
     ipts = lib.vstack([ipts, lib.ones(ipts.shape[1])]) if ipts.shape[0] == 2 else ipts
-    dept = disp2depth(disp=disp, kmat=kmat, base=base) if disp is not None else dept
-    dept = lib.ones(ipts.shape[1]) if dept is None else dept
+    depth = disp2depth(disp=disp, kmat=kmat, base=base) if disp is not None else depth
+    depth = lib.ones(ipts.shape[1]) if depth is None else depth
 
     # pinhole projection
-    opts = dept.flatten() * (lib.linalg.inv(kmat) @ ipts)
+    opts = depth.flatten() * (lib.linalg.inv(kmat) @ ipts)
 
     # from camera to world coordinates
     opts = rmat @ opts + tvec

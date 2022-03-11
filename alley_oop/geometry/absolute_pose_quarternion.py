@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def align(reference, query, estimate_scale=False):
+def align(reference, query, estimate_scale=False, ret_homogenous=False):
     """Align two trajectories using the method of Horn (closed-form).
     B. K. P. Horn, “Closed-form solution of absolute orientation using unit quaternions,”
     Journal of the Optical Society of America A , vol. 4, no. 4, pp. 629–642, 1987
@@ -45,5 +45,10 @@ def align(reference, query, estimate_scale=False):
     alignment_error = model_aligned - query
 
     residuals = np.sqrt(np.sum(np.multiply(alignment_error, alignment_error), 0)).A[0]
-
-    return rot, trans, residuals, scale
+    if not ret_homogenous:
+        return rot, trans, residuals, scale
+    else:
+        pose = np.eye(4)
+        pose[:3,:3] = rot
+        pose[:3,3] = trans.squeeze()
+        return pose, residuals, scale
