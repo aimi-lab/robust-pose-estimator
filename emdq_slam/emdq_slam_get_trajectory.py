@@ -1,6 +1,8 @@
 from alley_oop.geometry.camera import PinholeCamera
 from dataset.camera_utils import readCalibJson
-from dataset.dataset_utils import RGBDDataset, ResizeRGBD
+from dataset.semantic_dataset import RGBDDataset
+from dataset.scared_dataset import ScaredDataset
+from dataset.transforms import ResizeRGBD
 from emdq_slam.emdq_slam_pipeline import EmdqSLAM
 import os
 import json
@@ -11,7 +13,10 @@ def main(input_path, output_path):
 
     width, height, bf, intrinsics = readCalibJson(os.path.join(input_path, 'slam_config_640x480.yaml'))
     transform = ResizeRGBD((width, height))
-    dataset = RGBDDataset(input_path, bf, transform=transform)
+    try:
+        dataset = RGBDDataset(input_path, bf, transform=transform)
+    except AssertionError:
+        dataset = ScaredDataset(input_path, bf, transform=transform)
 
     camera = PinholeCamera(intrinsics)
     slam = EmdqSLAM(camera)
