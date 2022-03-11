@@ -40,20 +40,14 @@ if __name__ == '__main__':
         help='Path to scared dataset.'
     )
     parser.add_argument(
-        '--pred_folder',
+        '--pred_folders',
         type=str,
+        nargs='+',
         default='orbslam2_rgbd_results',
         help='Folder containing predictions.'
     )
-
-    try:
-        args = parser.parse_args()
-        assert (Path(args.base_path) / 'frame_data').exists()
-        assert (Path(args.base_path) / args.pred_folder).exists()
-        data_path = Path(args.base_path) / args.pred_folder / args.base_path
-        meth_dirs = [str(data_path / 'frame_data')]
-    except:
-        meth_dirs = ['frame_data', 'orbslam2_stereo_results', 'orbslam2_rgbd_results', 'defslam_results', 'superglue_newr']#
+    args = parser.parse_args()
+    meth_dirs = [str(Path(args.base_path) / f) for f in args.pred_folders]
     
     colors = ['b', 'g', 'r', 'k', 'm', 'y']
     d_idx = 1
