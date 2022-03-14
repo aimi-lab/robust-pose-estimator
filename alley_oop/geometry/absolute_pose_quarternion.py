@@ -46,9 +46,9 @@ def align(reference, query, estimate_scale=False, ret_homogenous=False):
 
     residuals = np.sqrt(np.sum(np.multiply(alignment_error, alignment_error), 0)).A[0]
     if not ret_homogenous:
-        return rot, trans, residuals, scale
+        return rot, trans, residuals, scale, alignment_error
     else:
         pose = np.eye(4)
         pose[:3,:3] = rot
         pose[:3,3] = trans.squeeze()
-        return pose, residuals, scale
+        return pose, residuals, scale, alignment_error
