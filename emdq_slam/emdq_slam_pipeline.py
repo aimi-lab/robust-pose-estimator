@@ -4,6 +4,8 @@ from alley_oop.geometry.absolute_pose_quarternion import align
 from alley_oop.geometry.pinhole_transforms import create_img_coords_t, create_img_coords_np
 from alley_oop.geometry.opencv_utils import kpts2npy
 from emdq import pyEMDQ
+from scipy.spatial.distance import cdist, pdist
+from scipy.spatial import cKDTree
 
 
 class EmdqSLAM(object):
@@ -13,22 +15,27 @@ class EmdqSLAM(object):
         self.last_descriptors = None
         self.camera = camera
         self.lowes_ratio = config['lowes_ratio']
+        self.spacing = config['node_spacing']
+
+
         self.emdq = pyEMDQ(1.0)
         self.last_pose = np.eye(4)
         self.matches = []
         self.img_kps = []
         self.displacements = []
         self.nodes = None
+        self.dist_tree = None  # cached k-dtree for efficient control node query
 
     def __call__(self, img, depth, mask=None):
         if self.nodes is None: self.init_nodes(depth)
         return self.track(img, depth, mask)
 
-    def init_nodes(self, depth, spacing=10): #ToDo dynamically add nodes
-        ipts = create_img_coords_np(depth.shape[0]/spacing, depth.shape[1]/spacing)
-        node_depth = depth[::spacing, ::spacing].reshape(2, -1)
+    def init_nodes(self, depth):
+        ipts = create_img_coords_np(depth.shape[0]/self.spacing, depth.shape[1]/self.spacing) #ToDo would be better using spatial sampling based on 3d point distances
+        node_depth = depth[::self.spacing, ::self.spacing].reshape(2, -1)
         self.nodes = self.camera.project3d(ipts, node_depth).T
         self.displacements = np.zeros_like(self.nodes)
+        self.node_spacing = np.mean(pdist(self.nodes))
 
     def track(self, img, depth, mask=None):
         # extract key-points and descriptors
@@ -52,20 +59,19 @@ class EmdqSLAM(object):
             # run EMDQ
             inliers = self.emdq.fit(self.last_descriptors[0], kps3d,  filt_matches)
             if inliers > 0:
-                nodes_last_frame = self.warp()
+                nodes_last_frame = self.warp_canonical_model()
                 deformationfield = self.emdq.predict(nodes_last_frame)
                 deformed_kps3d = deformationfield[:,:3]
-                sigma_error = deformationfield[:, 4]
-                emdq_matches = []
-                for m in filt_matches:
-                    if sigma_error[m[0]] < 20**2: emdq_matches.append(m)
+                #sigma_error = deformationfield[:, 4]
                 # factor rigid, non-rigid components
                 diff_pose, residuals, _ , displacements = align(reference=deformed_kps3d.T, query=nodes_last_frame.T, ret_homogenous=True)
-                # apply deformation
+                # apply deformation by updating node displacements
+                # (nodes = canonical model, displacements are the warping to current frame)
                 self.displacements += (self.last_pose[:3, :3].T @ displacements).T
                 # chain poses
                 pose = diff_pose@self.last_pose
                 self.last_pose = pose
+                self.add_node(depth)
 
                 # run ARAP
         self.matches = emdq_matches
@@ -79,8 +85,29 @@ class EmdqSLAM(object):
     def get_matching_res(self):
         return self.img_kps, self.matches
 
-    def warp(self):
-        return self.nodes@self.last_pose[:3, :3].T + self.last_pose[:3, 3] + self.displacements
+    def warp_canonical_model(self):
+        return self.warp_rigid(self.nodes) + self.displacements
 
+    def warp_rigid(self, points3d, inverse=False):
+        if inverse:
+            return (points3d - self.last_pose[:3, 3]) @ self.last_pose[:3, :3]
+        else:
+            return points3d @ self.last_pose[:3, :3].T + self.last_pose[:3, 3]
 
+    def add_node(self, depth):
+        # project image points to 3d
+        ipts = create_img_coords_np(depth.shape[0], depth.shape[1], step=self.spacing)
+        node_depth = depth[::self.spacing, ::self.spacing].reshape(2, -1)
+        candidate_nodes = self.warp_rigid(self.camera.project3d(ipts, node_depth).T, inverse=True)
+        # check if new nodes need to be added. We add a control point when there is no point in the neighbourhood
+        if self.dist_tree is None:
+            self.dist_tree = cKDTree(self.nodes)
+        dists = self.dist_tree.query(candidate_nodes, distance_upper_bound=self.node_spacing, k=1)[0]
+        candidate_nodes = candidate_nodes[dists > self.node_spacing]
+        # add to canonical model
+        if len(candidate_nodes) > 0:
+            self.nodes = np.row_stack((self.nodes, self.warp_rigid(candidate_nodes, inverse=True)))
+            self.displacements = np.row_stack((self.displacements, np.zeros((candidate_nodes.shape[0], 3))))
+            self.dist_tree = cKDTree(self.nodes)
+        print(f'nodes: {len(self.nodes)}')
 

@@ -119,10 +119,10 @@ def create_img_coords_t(
 def create_img_coords_np(
         y: int = 720,
         x: int = 1280,
-                     ):
+        step: int = 1):
 
-    x_coords = np.arange(0, x) + .5
-    y_coords = np.arange(0, y) + .5
+    x_coords = np.arange(0, x, step) + .5
+    y_coords = np.arange(0, y, step) + .5
     x_mesh, y_mesh = np.meshgrid(x_coords, y_coords)
     ipts = np.vstack([x_mesh.flatten(), y_mesh.flatten(), np.ones(len(x_mesh.flatten()))])
 
