@@ -23,6 +23,7 @@ class EmdqSLAM(object):
         self.matches = []
         self.img_kps = []
         self.displacements = []
+        self.node_spacing = np.inf
         self.nodes = None
         self.dist_tree = None  # cached k-dtree for efficient control node query
 
@@ -35,7 +36,7 @@ class EmdqSLAM(object):
         node_depth = depth[::self.spacing, ::self.spacing].reshape(2, -1)
         self.nodes = self.camera.project3d(ipts, node_depth).T
         self.displacements = np.zeros_like(self.nodes)
-        self.node_spacing = np.mean(pdist(self.nodes))
+        self.node_spacing = 2*np.mean(pdist(self.nodes))
 
     def track(self, img, depth, mask=None):
         # extract key-points and descriptors
