@@ -11,10 +11,9 @@ from dataset.transforms import RGBDTransform
 class ScaredDataset(Dataset):
     def __init__(self, input_folder:str, baseline:float, transform:RGBDTransform=None, ret_disparity=False):
         super().__init__()
-        self.imgs = sorted(glob.glob(os.path.join(input_folder, 'video_frames', '*l.png')))
-        self.disparity = sorted(glob.glob(os.path.join(input_folder, 'disparity_frames', '*.pfm')))
+        self.imgs = sorted(glob.glob(os.path.join(input_folder, 'data','video_frames', '*l.png')))
+        self.disparity = sorted(glob.glob(os.path.join(input_folder, 'data','disparity_frames', '*.pfm')))
         assert len(self.imgs) == len(self.disparity)
-        assert len(self.imgs) == len(self.semantics)
         assert len(self.imgs) > 0
 
         self.transform = transform
@@ -31,11 +30,11 @@ class ScaredDataset(Dataset):
             img, disparity, *_ = self.transform(img, disparity)
 
         if self.ret_disparity:
-            return img, disparity
+            return img, disparity, None, img_number
         else:
             # get depth from disparity (fc * baseline) / disparity
             depth = self.baseline / disparity
-            return img, depth
+            return img, depth, None, img_number
 
     def __len__(self):
         return len(self.imgs)
