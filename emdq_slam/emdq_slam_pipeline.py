@@ -6,23 +6,26 @@ from emdq import pyEMDQ
 
 class EmdqSLAM(object):
     def __init__(self, camera):
-        self.detector_descriptor = cv2.xfeatures2d.SURF_create(nOctaves=1)
+        self.detector_descriptor = cv2.xfeatures2d.SURF_create(nOctaves=1, hessianThreshold=300)
         self.matcher = cv2.BFMatcher_create(cv2.NORM_L2, crossCheck=False)
         self.last_descriptors = None
         self.camera = camera
-        self.lowes_ratio = 1.0
+        self.lowes_ratio = 0.7
         self.emdq = pyEMDQ(1.0)
         self.last_scale = 1.0
         self.last_pose = np.eye(4)
+        self.matches = []
+        self.img_kps = []
 
     def __call__(self, img, depth, mask=None):
         # extract key-points and descriptors
-        kps, features = self.detector_descriptor.detectAndCompute(img, mask)
+        img_kps, features = self.detector_descriptor.detectAndCompute(img, mask)
         # project key-points to 3d
-        kps_depth = np.asarray([depth[int(kp.pt[1]), int(kp.pt[0])] for kp in kps])
-        kps3d = self.camera.project3d(kpts2npy(kps).T, kps_depth).T
+        kps_depth = np.asarray([depth[int(kp.pt[1]), int(kp.pt[0])] for kp in img_kps])
+        kps3d = self.camera.project3d(kpts2npy(img_kps).T, kps_depth).T
         pose = np.eye(4)
         inliers = -1
+        filt_matches = []
 
         if self.last_descriptors is not None:
             # perform brute-force matching
@@ -49,8 +52,12 @@ class EmdqSLAM(object):
                 pose = self.last_pose@diff_pose
                 self.last_pose = pose
                 # run ARAP
-
+        self.matches = filt_matches
+        self.img_kps = img_kps
         self.last_descriptors = (kps3d, features)
         return pose, inliers
+
+    def get_matching_res(self):
+        return self.img_kps, self.matches
 
 
