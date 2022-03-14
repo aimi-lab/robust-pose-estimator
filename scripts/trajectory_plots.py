@@ -17,14 +17,24 @@ def load_scared_pose(fnames:List=None) -> np.ndarray:
         for fname in fnames:
             with open(str(fname), 'r') as f: pose_elem = json.load(f)
             pose = np.array(pose_elem['camera-pose'])
-            pose[0:3, 3] = -pose[0:3, 3] # neg. translation as Intuitive's coordinate system is inverted wrt. OpenCV
-            pose[0:3, 0:3] = pose[0:3, 0:3].T # invert rotation as Intuitive's coordinate system is inverted wrt. OpenCV
             pose_list.append(pose)
-    # all other pose estimation methods
+
+    elif str(fnames[0]).lower().__contains__('orbslam'): # ORBSLAM2
+        fname = fnames[0]
+        with open(str(fname), 'r') as f: pose_elem_list = json.load(f)
+        pose_list = []
+        for pose_elem in pose_elem_list:
+            pose = np.array(pose_elem['camera-pose'])
+            pose[0:3, 3] = -pose[0:3, 3]  # neg. translation as Intuitive's coordinate system is inverted wrt. OpenCV
+            pose[0:3, 0:3] = pose[0:3, 0:3].T  # invert rotation as Intuitive's coordinate system is inverted wrt. OpenCV
+            pose_list.append(pose)
     else:
         fname = fnames[0]
-        with open(str(fname), 'r') as f: pose_list = json.load(f)
-        pose_list = [pose_list[i]['camera-pose'] for i in range(len(pose_list))]
+        with open(str(fname), 'r') as f: pose_elem_list = json.load(f)
+        pose_list = []
+        for pose_elem in pose_elem_list:
+            pose = np.array(pose_elem['camera-pose'])
+            pose_list.append(pose)
     
     pose_arrs = np.array(pose_list)[:, :4, :4]
 

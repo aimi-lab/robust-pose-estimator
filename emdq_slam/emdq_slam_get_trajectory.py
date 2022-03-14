@@ -52,6 +52,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     if args.outpath is None:
-        args.outpath = os.path.join(args.input, 'emdq_slam')
+        args.outpath = os.path.join(args.input, 'data','emdq_slam')
 
     main(args.input, args.outpath)
