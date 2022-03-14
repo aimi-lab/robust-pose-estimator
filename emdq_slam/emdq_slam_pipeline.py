@@ -5,12 +5,12 @@ from alley_oop.geometry.opencv_utils import kpts2npy
 from emdq import pyEMDQ
 
 class EmdqSLAM(object):
-    def __init__(self, camera):
-        self.detector_descriptor = cv2.xfeatures2d.SURF_create(nOctaves=1, hessianThreshold=300)
-        self.matcher = cv2.BFMatcher_create(cv2.NORM_L2, crossCheck=False)
+    def __init__(self, camera, config):
+        self.detector_descriptor = cv2.xfeatures2d.SURF_create(nOctaves=1, hessianThreshold=config['surf_thr'])
+        self.matcher = cv2.BFMatcher_create(cv2.NORM_L2, crossCheck=config['match_cross_check'])
         self.last_descriptors = None
         self.camera = camera
-        self.lowes_ratio = 0.3
+        self.lowes_ratio = config['lowes_ratio']
         self.emdq = pyEMDQ(1.0)
         self.last_pose = np.eye(4)
         self.matches = []
