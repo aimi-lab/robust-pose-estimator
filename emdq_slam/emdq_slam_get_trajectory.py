@@ -11,9 +11,9 @@ from viewer.slam_viewer import SlamViewer
 
 def main(input_path, output_path):
 
-    width, height, bf, intrinsics = readCalibJson(os.path.join(input_path, 'slam_config_640x480.yaml'))
+    width, height, bf, intrinsics = readCalibJson(os.path.join(input_path, 'slam_config_640x480.yaml')) #ToDo use rectified
     transform = ResizeRGBD((width, height))
-    viewer = SlamViewer()
+    viewer = SlamViewer(intrinsics)
 
     try:
         dataset = RGBDDataset(input_path, bf, transform=transform)
@@ -22,14 +22,14 @@ def main(input_path, output_path):
 
     camera = PinholeCamera(intrinsics)
     slam = EmdqSLAM(camera)
-
+    viewer.set_reference(dataset[0][0], dataset[0][1])
     trajectory = []
     for img, depth, mask, img_number in tqdm(dataset, total=len(dataset)):
         pose, inliers = slam(img, depth, mask)
         if inliers == 0:
             break
         trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number, 'residual': 0.0, 'key_frame': True})
-        viewer(img, *slam.get_matching_res())
+        #viewer(img, *slam.get_matching_res(), pose)
     os.makedirs(output_path, exist_ok=True)
     with open(os.path.join(output_path, 'trajectory.json'), 'w') as f:
         json.dump(trajectory, f)
