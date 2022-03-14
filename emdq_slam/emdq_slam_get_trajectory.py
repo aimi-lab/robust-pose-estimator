@@ -23,7 +23,7 @@ def main(input_path, output_path, config):
 
     camera = PinholeCamera(intrinsics)
     slam = EmdqSLAM(camera, config['slam'])
-    viewer.set_reference(dataset[0][0], dataset[0][1])
+    if viewer is not None: viewer.set_reference(dataset[0][0], dataset[0][1])
     trajectory = []
     for img, depth, mask, img_number in tqdm(dataset, total=len(dataset)):
         pose, inliers = slam(img, depth, mask)
