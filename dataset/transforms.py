@@ -47,7 +47,7 @@ class ResizeStereo(StereoTransform):
         crop = w * scale - self.size[0], h * scale - self.size[1]
         left_img = cv2.resize(left_img, (int(w * scale), int(h * scale)))
         left_img = left_img[int(crop[1] / 2):int(h * scale - crop[1] / 2), int(crop[0] / 2):int(w * scale - crop[0] / 2)]
-        right_img = cv2.resize(left_img, (int(w * scale), int(h * scale)))
+        right_img = cv2.resize(right_img, (int(w * scale), int(h * scale)))
         right_img = right_img[int(crop[1] / 2):int(h * scale - crop[1] / 2),
                    int(crop[0] / 2):int(w * scale - crop[0] / 2)]
         if label is not None:

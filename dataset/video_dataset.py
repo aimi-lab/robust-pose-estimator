@@ -19,7 +19,7 @@ class StereoVideoDataset(IterableDataset):
             self.rectify = None
         self.transform = ResizeStereo(img_size)
         vid_grabber = cv2.VideoCapture(self.video_file)
-        self.length = int(vid_grabber.get(cv2.CAP_PROP_FRAME_COUNT))
+        self.length = int(vid_grabber.get(cv2.CAP_PROP_FRAME_COUNT)/sample)
         self.sample = sample
 
     def __iter__(self):

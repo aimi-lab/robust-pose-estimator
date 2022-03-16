@@ -37,8 +37,8 @@ def main(input_path, output_path, config, force_cpu):
             dataset = ScaredDataset(input_path, calib['bf'], img_size=calib['img_size'])
         except AssertionError:
             video_file = glob.glob(os.path.join(input_path, '*.mp4'))[0]
-            dataset = StereoVideoDataset(video_file, calib_file, img_size=calib['img_size'], sample=6)
-            disp_model = DisparityModel(calibration=calib, device=device)
+            dataset = StereoVideoDataset(video_file, calib_file, img_size=calib['img_size'], sample=config['sample'])
+            disp_model = DisparityModel(calibration=calib, device=device, depth_clipping=config['depth_clipping'])
             seg_model = SemanticSegmentationModel('stereo_slam/segmentation_network/trained/PvtB2_combined_TAM_fold1.pth', device)
 
     camera = PinholeCamera(calib['intrinsics']['left'])
@@ -48,8 +48,9 @@ def main(input_path, output_path, config, force_cpu):
     for data in tqdm(dataset, total=len(dataset)):
         if isinstance(dataset, StereoVideoDataset):
             limg, rimg, img_number = data
-            depth = disp_model(limg, rimg)
+            depth, depth_valid = disp_model(limg, rimg)
             mask = seg_model.get_mask(limg)[0]
+            mask &= depth_valid  # mask tools and non-valid depth
         else:
             limg, depth, mask, img_number = data
         pose, inliers = slam(limg, depth, mask)
@@ -60,6 +61,7 @@ def main(input_path, output_path, config, force_cpu):
     os.makedirs(output_path, exist_ok=True)
     with open(os.path.join(output_path, 'trajectory.json'), 'w') as f:
         json.dump(trajectory, f)
+    print('finished')
 
 
 if __name__ == '__main__':

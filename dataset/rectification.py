@@ -3,7 +3,7 @@ import os
 import numpy as np
 import configparser
 import json
-from stereo_slam.disparity.stereo_rectify import rectify_pair, get_rect_maps
+from stereo_slam.disparity.stereo_rectify import rectify_pair, get_rect_maps, pseudo_rectify
 
 
 class StereoRectifier(object):

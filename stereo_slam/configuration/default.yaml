@@ -8,6 +8,12 @@ img_size:
   - 640
   - 512
 
+sample: 1
+
+depth_clipping:
+  - 0
+  - 300 # in mm
+
 viewer:
   enable: False
   show: True
