@@ -5,18 +5,19 @@ import glob
 import torch
 import warnings
 from torch.utils.data import Dataset
-from dataset.transforms import RGBDTransform
+from dataset.transforms import ResizeRGBD
+from typing import Tuple
 
 
 class ScaredDataset(Dataset):
-    def __init__(self, input_folder:str, baseline:float, transform:RGBDTransform=None, ret_disparity=False):
+    def __init__(self, input_folder:str, baseline:float, img_size: Tuple, ret_disparity=False):
         super().__init__()
         self.imgs = sorted(glob.glob(os.path.join(input_folder, 'data','video_frames', '*l.png')))
         self.disparity = sorted(glob.glob(os.path.join(input_folder, 'data','disparity_frames', '*.pfm')))
         assert len(self.imgs) == len(self.disparity)
         assert len(self.imgs) > 0
 
-        self.transform = transform
+        self.transform = ResizeRGBD(img_size)
         self.baseline = baseline
         self.ret_disparity = ret_disparity
 

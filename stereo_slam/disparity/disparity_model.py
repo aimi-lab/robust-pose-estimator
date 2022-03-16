@@ -18,8 +18,7 @@ class DisparityModel(nn.Module):
 
         self.model = self._load(config)
         self.infer_depth = infer_depth
-        self.baseline_f = torch.nn.Parameter(torch.sqrt(torch.sum(calibration['extrinsics'][:3,3]**2))
-                                             * calibration['intrinsics']['left'][0,0])
+        self.baseline_f = torch.nn.Parameter(calibration['bf'])
 
     def forward(self, limg, rimg):
         with torch.no_grad():

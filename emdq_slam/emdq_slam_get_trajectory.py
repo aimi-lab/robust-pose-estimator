@@ -1,8 +1,7 @@
 from alley_oop.geometry.camera import PinholeCamera
-from dataset.camera_utils import readCalibJson
 from dataset.semantic_dataset import RGBDDataset
 from dataset.scared_dataset import ScaredDataset
-from dataset.transforms import ResizeRGBD
+from dataset.rectification import StereoRectifier
 from emdq_slam.emdq_slam_pipeline import EmdqSLAM
 import os
 import json
@@ -11,17 +10,25 @@ from viewer.slam_viewer import SlamViewer
 
 
 def main(input_path, output_path, config):
+    if os.path.isfile(os.path.join(input_path, 'camcal.json')):
+        calib_file = os.path.join(input_path, 'camcal.json')
+    elif os.path.isfile(os.path.join(input_path, 'StereoCalibration.ini')):
+        calib_file = os.path.join(input_path, 'StereoCalibration.ini')
+    elif os.path.isfile(os.path.join(input_path, 'endoscope_calibration.yaml')):
+        calib_file = os.path.join(input_path, 'endoscope_calibration.yaml')
+    else:
+        raise RuntimeError('no calibration file found')
 
-    width, height, bf, intrinsics = readCalibJson(os.path.join(input_path, 'slam_config_640x480.yaml')) #ToDo use rectified
-    transform = ResizeRGBD((width, height))
-    viewer = SlamViewer(intrinsics, config['viewer']) if config['viewer']['enable'] else None
+    rect = StereoRectifier(calib_file, img_size_new=config['img_size'])
+    calib = rect.get_rectified_calib()
+    viewer = SlamViewer(calib['intrinsics']['left'], config['viewer']) if config['viewer']['enable'] else None
 
     try:
-        dataset = RGBDDataset(input_path, bf, transform=transform)
+        dataset = RGBDDataset(input_path, calib['bf'], img_size=calib['img_size'])
     except AssertionError:
-        dataset = ScaredDataset(input_path, bf, transform=transform)
+        dataset = ScaredDataset(input_path, calib['bf'], img_size=calib['img_size'])
 
-    camera = PinholeCamera(intrinsics)
+    camera = PinholeCamera(calib['intrinsics']['left'])
     slam = EmdqSLAM(camera, config['slam'])
     if viewer is not None: viewer.set_reference(dataset[0][0], dataset[0][1])
     trajectory = []

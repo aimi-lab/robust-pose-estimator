@@ -4,6 +4,10 @@ slam:
   lowes_ratio: 0.7
   node_spacing: 20
 
+img_size:
+  - 640
+  - 512
+
 viewer:
   enable: False
   show: True
