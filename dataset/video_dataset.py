@@ -8,7 +8,7 @@ from dataset.rectification import StereoRectifier
 
 
 class StereoVideoDataset(IterableDataset):
-    def __init__(self, input_folder:str, img_size:Tuple=None, rectify: bool=True):
+    def __init__(self, input_folder:str, img_size:Tuple=None, rectify: bool=True, sample: int=1):
         super().__init__()
         self.video_file = glob.glob(os.path.join(input_folder, '*.mp4'))
         assert len(self.video_file) == 1
@@ -24,24 +24,31 @@ class StereoVideoDataset(IterableDataset):
         self.transform = ResizeStereo(img_size)
         vid_grabber = cv2.VideoCapture(self.video_file)
         self.length = int(vid_grabber.get(cv2.CAP_PROP_FRAME_COUNT))
+        self.sample = sample
 
     def __iter__(self):
-        img_left, img_right = self._parse_video()
-        return img_left, img_right
+        return self._parse_video()
 
     def _parse_video(self):
         vid_grabber = cv2.VideoCapture(self.video_file)
+        counter = 0
         while True:
-            ret, img = vid_grabber.read()
+            while True:
+                ret, img = vid_grabber.read()
+                if not ret:
+                    break
+                if counter%self.sample == 0:
+                    break
             if not ret:
                 break
+            counter += 1
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             img_left, img_right = self.split_stereo_img(img)
             if self.img_transform is not None:
                 img_left, img_right = self.img_transform(img_left, img_right)
             if self.rectify is not None:
                 img_left, img_right = self.rectify(img_left, img_right)
-            yield img_left, img_right
+            yield img_left, img_right, counter
         vid_grabber.release()
 
     def __len__(self):
