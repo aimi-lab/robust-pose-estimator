@@ -37,6 +37,7 @@ class DisparityModel(nn.Module):
             rimg = rimg.unsqueeze(0)
         with torch.no_grad():
             out = self.model(NestedTensor(limg, rimg))
+            out = out['disp_pred']
             if self.infer_depth:
                 out = self.baseline_f / out
         if is_numpy:

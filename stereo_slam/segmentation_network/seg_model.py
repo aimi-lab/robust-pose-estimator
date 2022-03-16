@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import numpy as np
 from torchvision.transforms import Compose, Normalize
 from stereo_slam.segmentation_network.decoder import DeepLabV3PlusDecoder
 from stereo_slam.segmentation_network.pvt import pvt_v2_b2
@@ -36,9 +37,9 @@ def get_model(checkpoint):
 class ToTensor(object):
     def __call__(self, input):
         if torch.is_tensor(input):
-            return input.permute(0,3,1,2).float()/255.0
+            return input.unsqueeze(0).permute(0,3,1,2).float()/255.0
         else:
-            return torch.tensor(input).permute(0,3,1,2).float() / 255.0
+            return torch.tensor(input).unsqueeze(0).permute(0,3,1,2).float() / 255.0
 
 
 class SemanticSegmentationModel(nn.Module):
@@ -58,13 +59,14 @@ class SemanticSegmentationModel(nn.Module):
     def get_mask(self, image):
         with torch.no_grad():
             is_numpy = not torch.is_tensor(image)
-            image = self.transform(image.unsqueeze(0)).to(self.device)
+            image = self.transform(image).to(self.device)
             soft_predictions = self.forward(image)
             mask = self.get_mask_from_prediction(soft_predictions)
+            soft_predictions = soft_predictions.squeeze(0)
         if is_numpy:
-            mask.cpu().numpy()
-            soft_predictions.cpu().numpy()
-        return mask, soft_predictions.squeeze(0)
+            mask = mask.cpu().numpy()
+            soft_predictions = soft_predictions.cpu().numpy()
+        return mask, soft_predictions
 
     def get_mask_from_prediction(self, predictions):
         predictions = torch.argmax(predictions, dim=-1)

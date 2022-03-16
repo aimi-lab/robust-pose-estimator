@@ -31,13 +31,13 @@ class StereoVideoDataset(IterableDataset):
         while True:
             while True:
                 ret, img = vid_grabber.read()
+                counter += 1
                 if not ret:
                     break
-                if counter%self.sample == 0:
+                if (counter-1)%self.sample == 0:
                     break
             if not ret:
                 break
-            counter += 1
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             img_left, img_right = self._split_stereo_img(img)
             if self.transform is not None:
