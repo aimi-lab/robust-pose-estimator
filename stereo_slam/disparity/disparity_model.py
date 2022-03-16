@@ -48,7 +48,7 @@ class DisparityModel(nn.Module):
         if is_numpy:
             out = out.cpu().numpy()
             clip_mask = clip_mask.cpu().numpy()
-        return out.squeeze(), clip_mask
+        return out.squeeze(), clip_mask.squeeze()
 
     def _load(self, config):
         model = STTR(config)
