@@ -3,6 +3,7 @@ import torch.nn as nn
 import yaml
 import os
 from stereo_slam.disparity.sttr_light.sttr import STTR
+from stereo_slam.disparity.sttr_light.utilities.misc import NestedTensor
 from torchvision.transforms import ToTensor
 
 
@@ -19,7 +20,7 @@ class DisparityModel(nn.Module):
 
         self.model = self._load(config)
         self.infer_depth = infer_depth
-        self.baseline_f = torch.nn.Parameter(calibration['bf'])
+        self.baseline_f = torch.nn.Parameter(torch.tensor(calibration['bf']))
         self.device = device
         self.model.eval()
         self.to(device)
@@ -35,7 +36,7 @@ class DisparityModel(nn.Module):
             limg = limg.unsqueeze(0)
             rimg = rimg.unsqueeze(0)
         with torch.no_grad():
-            out = self.model(limg, rimg)
+            out = self.model(NestedTensor(limg, rimg))
             if self.infer_depth:
                 out = self.baseline_f / out
         if is_numpy:

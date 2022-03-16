@@ -8,15 +8,11 @@ from dataset.rectification import StereoRectifier
 
 
 class StereoVideoDataset(IterableDataset):
-    def __init__(self, input_folder:str, img_size:Tuple=None, rectify: bool=True, sample: int=1):
+    def __init__(self, video_file:str, calib_file: str, img_size:Tuple=None, rectify: bool=True, sample: int=1):
         super().__init__()
-        self.video_file = glob.glob(os.path.join(input_folder, '*.mp4'))
-        assert len(self.video_file) == 1
-        self.video_file = self.video_file[0]
+        self.video_file = video_file
+        assert os.path.isfile(self.video_file)
         if rectify:
-            calib_file = os.path.join(input_folder, 'camcal.json') if \
-                os.path.isfile(os.path.join(input_folder, 'camcal.json')) \
-                else os.path.join(input_folder, 'StereoCalibration.ini')
             assert os.path.isfile(calib_file)
             self.rectify = StereoRectifier(calib_file, img_size)
         else:
@@ -43,9 +39,9 @@ class StereoVideoDataset(IterableDataset):
                 break
             counter += 1
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            img_left, img_right = self.split_stereo_img(img)
-            if self.img_transform is not None:
-                img_left, img_right = self.img_transform(img_left, img_right)
+            img_left, img_right = self._split_stereo_img(img)
+            if self.transform is not None:
+                img_left, img_right = self.transform(img_left, img_right)
             if self.rectify is not None:
                 img_left, img_right = self.rectify(img_left, img_right)
             yield img_left, img_right, counter
@@ -54,7 +50,7 @@ class StereoVideoDataset(IterableDataset):
     def __len__(self):
         return self.length
 
-    def _split_stereo_img(self, img, left_is_top):
+    def _split_stereo_img(self, img):
         h, w = img.shape[:2]
         img_left = img[:h // 2]  # upper half
         img_right = img[h // 2:]  # lower half

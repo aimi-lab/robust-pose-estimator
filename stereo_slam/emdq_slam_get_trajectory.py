@@ -4,14 +4,17 @@ from dataset.scared_dataset import ScaredDataset
 from dataset.video_dataset import StereoVideoDataset
 from dataset.rectification import StereoRectifier
 from emdq_slam.emdq_slam_pipeline import EmdqSLAM
-import os
+import os, glob
 import json
+import torch
 from tqdm import tqdm
 from viewer.slam_viewer import SlamViewer
 from stereo_slam.disparity.disparity_model import DisparityModel
+from stereo_slam.segmentation_network.seg_model import SemanticSegmentationModel
 
 
-def main(input_path, output_path, config):
+def main(input_path, output_path, config, force_cpu):
+    device = torch.device('cuda' if (torch.cuda.is_available() & (not force_cpu)) else 'cpu')
     if os.path.isfile(os.path.join(input_path, 'camcal.json')):
         calib_file = os.path.join(input_path, 'camcal.json')
     elif os.path.isfile(os.path.join(input_path, 'StereoCalibration.ini')):
@@ -26,13 +29,17 @@ def main(input_path, output_path, config):
     viewer = SlamViewer(calib['intrinsics']['left'], config['viewer']) if config['viewer']['enable'] else None
 
     try:
+        assert False
         dataset = RGBDDataset(input_path, calib['bf'], img_size=calib['img_size'])
     except AssertionError:
         try:
+            assert False
             dataset = ScaredDataset(input_path, calib['bf'], img_size=calib['img_size'])
         except AssertionError:
-            dataset = StereoVideoDataset(input_path, img_size=calib['img_size'], sample=6)
+            video_file = glob.glob(os.path.join(input_path, '*.mp4'))[0]
+            dataset = StereoVideoDataset(video_file, calib_file, img_size=calib['img_size'], sample=6)
             disp_model = DisparityModel(calibration=calib, device=device)
+            seg_model = SemanticSegmentationModel('stereo_slam/segmentation_network/trained/PvtB2_combined_TAM_fold1.pth', device)
 
     camera = PinholeCamera(calib['intrinsics']['left'])
     slam = EmdqSLAM(camera, config['slam'])
@@ -42,7 +49,7 @@ def main(input_path, output_path, config):
         if isinstance(dataset, StereoVideoDataset):
             limg, rimg, img_number = data
             depth = disp_model(limg, rimg)
-            mask = seg_model(limg)
+            mask = seg_model.get_mask(limg)[0]
         else:
             limg, depth, mask, img_number = data
         pose, inliers = slam(limg, depth, mask)
@@ -73,8 +80,12 @@ if __name__ == '__main__':
     parser.add_argument(
         '--config',
         type=str,
-        default='emdq_slam/configuration/default.yaml',
+        default='stereo_slam/configuration/default.yaml',
         help='Configuration file.'
+    )
+    parser.add_argument(
+        '--force_cpu',
+        help='force use of CPU.'
     )
 
     args = parser.parse_args()
@@ -83,4 +94,4 @@ if __name__ == '__main__':
     if args.outpath is None:
         args.outpath = os.path.join(args.input, 'data','emdq_slam')
 
-    main(args.input, args.outpath, config)
+    main(args.input, args.outpath, config, args.force_cpu is not None)
