@@ -10,7 +10,8 @@ class SlamViewer(object):
         self.src_kpts = None
         self.ref_img = None
         self.ref_pose = None
-        self.intrinsics = camera_intrinsics / scale
+        self.intrinsics = camera_intrinsics
+        self.intrinsics[:2, :] /= scale
         self.scale = scale
 
     def set_reference(self, ref_img, ref_depth, ref_pose=np.eye(4)):

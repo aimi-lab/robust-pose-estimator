@@ -46,13 +46,12 @@ class EmdqSLAM(object):
         kps3d = self.camera.project3d(kpts2npy(img_kps).T, kps_depth).T
         pose = np.eye(4)
         inliers = -1
-        emdq_matches = []
+        filt_matches = []
 
         if self.last_descriptors is not None:
             # perform brute-force matching
             rawMatches = self.matcher.knnMatch(self.last_descriptors[1], features, k=2, compactResult=True)
             # Lowe's ratio test
-            filt_matches = []
             for m in rawMatches:
                 if len(m) == 2 and m[0].distance < m[1].distance * self.lowes_ratio:
                     filt_matches.append((m[0].queryIdx, m[0].trainIdx, m[0].distance))
@@ -62,8 +61,8 @@ class EmdqSLAM(object):
             if inliers > 0:
                 nodes_last_frame = self.warp_canonical_model()
                 deformationfield = self.emdq.predict(nodes_last_frame)
-                deformed_kps3d = deformationfield[:,:3]
                 #sigma_error = deformationfield[:, 4]
+                deformed_kps3d = deformationfield[:,:3]
                 # factor rigid, non-rigid components
                 diff_pose, residuals, _ , displacements = align(reference=deformed_kps3d.T, query=nodes_last_frame.T, ret_homogenous=True)
                 # apply deformation by updating node displacements
@@ -75,7 +74,7 @@ class EmdqSLAM(object):
                 self.add_node(depth)
 
                 # run ARAP
-        self.matches = emdq_matches
+        self.matches = filt_matches
         self.img_kps = img_kps
         self.last_descriptors = (kps3d, features)
         return pose, inliers
