@@ -29,11 +29,9 @@ def main(input_path, output_path, config, force_cpu):
     viewer = SlamViewer(calib['intrinsics']['left'], config['viewer']) if config['viewer']['enable'] else None
 
     try:
-        assert False
         dataset = RGBDDataset(input_path, calib['bf'], img_size=calib['img_size'])
     except AssertionError:
         try:
-            assert False
             dataset = ScaredDataset(input_path, calib['bf'], img_size=calib['img_size'])
         except AssertionError:
             video_file = glob.glob(os.path.join(input_path, '*.mp4'))[0]
