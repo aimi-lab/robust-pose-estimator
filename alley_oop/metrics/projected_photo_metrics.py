@@ -53,7 +53,7 @@ def synth_view(img, dept, rmat, tvec, kmat0, kmat1=None, mode='bilinear'):
         ipts = create_img_coords_t(y, x, b, ref_type=img)
 
     # back-project coordinates into space
-    opts = reverse_project(ipts, kmat=kmat1, dept=dept.flatten())
+    opts = reverse_project(ipts, kmat=kmat1, depth=dept.flatten())
 
     # rotate, translate and forward-project points
     npts = forward_project(opts, kmat=kmat0, rmat=rmat, tvec=tvec)

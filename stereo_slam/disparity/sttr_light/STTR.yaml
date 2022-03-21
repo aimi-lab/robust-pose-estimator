@@ -1,0 +1,13 @@
+
+  loadmodel: 'stereo_slam/disparity/sttr_light/trained/sttr_light_sceneflow_pretrained_model.pth.tar'
+  cal_expansion_ratio: 4
+  cal_feat_dim: 16
+  cal_num_blocks: 8
+  channel_dim: 128
+  clip_max_norm: 0.1
+  context_adjustment_layer: 'cal'
+  nheads: 8
+  num_attn_layers: 6
+  num_workers: 1
+  position_encoding: 'sine1d_rel'
+  regression_head: 'ot'
