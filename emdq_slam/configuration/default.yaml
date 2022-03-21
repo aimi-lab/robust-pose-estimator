@@ -9,7 +9,7 @@ img_size:
   - 512
 
 viewer:
-  enable: False
+  enable: True
   show: True
   matches: True
   view_synthesis: True
