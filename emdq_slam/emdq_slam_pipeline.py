@@ -32,7 +32,7 @@ class EmdqSLAM(object):
         return self.track(img, depth, mask)
 
     def init_nodes(self, depth):
-        ipts = create_img_coords_np(depth.shape[0]/self.spacing, depth.shape[1]/self.spacing) #ToDo would be better using spatial sampling based on 3d point distances
+        ipts = create_img_coords_np(depth.shape[0], depth.shape[1],self.spacing) #ToDo would be better using spatial sampling based on 3d point distances
         node_depth = depth[::self.spacing, ::self.spacing].reshape(2, -1)
         self.nodes = self.camera.project3d(ipts, node_depth).T
         self.displacements = np.zeros_like(self.nodes)
@@ -79,14 +79,14 @@ class EmdqSLAM(object):
         self.last_descriptors = (kps3d, features)
         return pose, inliers
 
-    def fuse(self):
-        pass
-
     def get_matching_res(self):
         return self.img_kps, self.matches
 
-    def warp_canonical_model(self):
-        return self.warp_rigid(self.nodes) + self.displacements
+    def warp_canonical_model(self, current_reference=True):
+        if current_reference:
+            return self.warp_rigid(self.nodes) + self.displacements
+        else:
+            return self.nodes + self.displacements
 
     def warp_rigid(self, points3d, inverse=False):
         if inverse:
@@ -109,5 +109,4 @@ class EmdqSLAM(object):
             self.nodes = np.row_stack((self.nodes, self.warp_rigid(candidate_nodes, inverse=True)))
             self.displacements = np.row_stack((self.displacements, np.zeros((candidate_nodes.shape[0], 3))))
             self.dist_tree = cKDTree(self.nodes)
-        print(f'nodes: {len(self.nodes)}')
 

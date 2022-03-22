@@ -1,7 +1,11 @@
 import cv2
 import numpy as np
 from alley_oop.metrics.projected_photo_metrics import synth_view
-
+import open3d
+from viewer.view_render import Render
+from scipy.spatial.transform import Rotation as R
+from matplotlib import cm
+import time
 
 class SlamViewer(object):
     def __init__(self, camera_intrinsics, config, scale=2):
@@ -38,3 +42,25 @@ class SlamViewer(object):
         if self.config['show']: cv2.waitKey(100)
         self.src_img = trg_img
         self.src_kpts = trg_kpts
+
+
+class viewer3d(object):
+    def __init__(self, max_error: float=10.0):
+        self.pcd_gt = open3d.geometry.PointCloud()
+        self.pcd_predicted = open3d.geometry.PointCloud()
+        self.render3d = Render(self.pcd_gt)
+        self.max_error = max_error
+
+    def __call__(self, gt_pcl, predicted_pcl, gt_colors=None, error_dists=None):
+        self.pcd_gt.points = open3d.utility.Vector3dVector(gt_pcl)
+        if gt_colors is not None:
+            self.pcd_gt.colors = open3d.utility.Vector3dVector(gt_colors / 255.0)
+        self.pcd_predicted.points = open3d.utility.Vector3dVector(predicted_pcl)
+        if error_dists is not None:
+            colormap = cm.get_cmap('CMRmap')
+            error_colors = colormap(np.clip(error_dists, 0, self.max_error)/self.max_error)[:,:3]
+            self.pcd_predicted.colors = open3d.utility.Vector3dVector(error_colors)
+        pose = np.eye(4)
+        pose[:3, :3] = R.from_euler('xyz', [10.0, 10.0, 0.0], degrees=True).as_matrix()
+        pose[:3, 3] = [-10,10,0]
+        _ = self.render3d.render(pose, self.pcd_gt, add_pcd=self.pcd_predicted)

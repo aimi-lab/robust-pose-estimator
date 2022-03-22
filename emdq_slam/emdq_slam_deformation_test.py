@@ -1,12 +1,11 @@
 from alley_oop.geometry.camera import PinholeCamera
-from dataset.semantic_dataset import RGBDDataset
-from dataset.scared_dataset import ScaredDataset
-from dataset.rectification import StereoRectifier
+from alley_oop.metrics.point_cloud_metrics import pcl_ae, nearest_neighbour_dist
 from emdq_slam.emdq_slam_pipeline import EmdqSLAM
 from alley_oop.metrics.trajectory_metrics import absolute_trajectory_error
 import cv2
 import numpy as np
 from alley_oop.phantom.deformable_texture_phantom import DeformableTexturePhantom
+from viewer.slam_viewer import viewer3d
 
 
 def main(config):
@@ -35,17 +34,20 @@ def main(config):
     #     cv2.waitKey(1)
 
     slam = EmdqSLAM(camera, config['slam'])
-
+    viewer = viewer3d()
     trajectory = []
     for i, (img, depth, points3d) in enumerate(phantom):
         pose, inliers = slam(img, depth)
         if inliers == 0:
             break
         trajectory.append(pose)
+        absolute_pcl_error = pcl_ae(points3d, slam.warp_canonical_model(current_reference=False))
+        print(absolute_pcl_error)
+        viewer(points3d[::100], slam.warp_canonical_model(current_reference=False), img.reshape(-1,3)[::100], nearest_neighbour_dist(points3d, slam.warp_canonical_model(current_reference=False)))
+
     ate_pos, ate_rot = absolute_trajectory_error(len(trajectory)*[np.eye(4)], trajectory)
     print(ate_pos) #  ToDo render point cloud in slam and compare to gt
     print(ate_rot)
-
 
 if __name__ == '__main__':
     import argparse
