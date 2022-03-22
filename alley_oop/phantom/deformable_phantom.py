@@ -68,13 +68,14 @@ class DeformablePhantom(object):
             plane_pts = self.transform_affine(pts=plane_pts, update=False)
             return plane_pts
 
-# plane = DeformablePhantom()
-# plane2 = DeformablePhantom()
-# from scipy.spatial.transform import Rotation as R
-# R_true = R.from_euler('x', 20, degrees=True).as_matrix()
-# t_true = np.array([1,1,1])[:,None]
-# plane.transform_affine(rmat=R_true, tvec=t_true)
-# plane.deform(deformation_param=100.0)
-# ax = plane.plot()
-# plane2.plot(ax)
-# plt.show()
+plane = DeformablePhantom()
+plane2 = DeformablePhantom()
+from scipy.spatial.transform import Rotation as R
+R_true = R.from_euler('x', 20, degrees=True).as_matrix()
+t_true = np.array([1,1,1])[:,None]
+plane.transform_affine(rmat=R_true, tvec=t_true)
+plane.deform(deformation_param=100.0)
+ax = plane2.plot()
+plane.plot(ax)
+plt.legend(['original', 'deformed'])
+plt.show()

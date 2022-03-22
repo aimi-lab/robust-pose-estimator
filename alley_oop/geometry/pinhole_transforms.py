@@ -8,6 +8,7 @@ def forward_project(
         kmat: Union[np.ndarray, torch.Tensor],
         rmat: Union[np.ndarray, torch.Tensor] = None,
         tvec: Union[np.ndarray, torch.Tensor] = None,
+        ret_depth: bool = False
                     ):
 
     # determine library given input type
@@ -25,9 +26,10 @@ def forward_project(
     ipts = pmat @ opts
 
     # inhomogenization
-    ipts = ipts[:3] / ipts[-1]
-
-    return ipts
+    depth = ipts[-1].copy()
+    ipts = ipts[:3] / depth
+    if ret_depth: return ipts, depth
+    else: return ipts
 
 
 def reverse_project(
