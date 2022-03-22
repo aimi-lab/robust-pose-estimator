@@ -72,12 +72,12 @@ class DeformableTexturePhantom(object):
                 pcl_loc = self.deform(deformation_param=self.deform_param*(j/self.steps-1), update=False)
                 pcl_loc = self.transform_affine(pts=pcl_loc, update=False)
                 img, depth = self.camera.render(pcl_loc.T, self.pcl_rgb, self.size)
-                yield img, depth
+                yield img, depth, pcl_loc
             for j in range(self.steps):
                 pcl_loc = self.deform(deformation_param=self.deform_param*(-j/self.steps), update=False)
                 pcl_loc = self.transform_affine(pts=pcl_loc, update=False)
                 img, depth = self.camera.render(pcl_loc.T, self.pcl_rgb, self.size)
-                yield img, depth
+                yield img, depth, pcl_loc
         raise StopIteration
 
     def animate(self):
@@ -107,24 +107,26 @@ class DeformableTexturePhantom(object):
             pcl_loc = self.transform_affine(pts=pcl_loc, update=False)
             return pcl_loc
 
-import cv2
-img = cv2.cvtColor(cv2.resize(cv2.imread('../../tests/test_data/000000l.png'), (640, 480)), cv2.COLOR_BGR2RGB)
-disparity = cv2.resize(cv2.imread('../../tests/test_data/000000l.pfm', cv2.IMREAD_UNCHANGED), (640, 480))/2
-depth = 2144.878173828125 / disparity
-camera = PinholeCamera(np.array([[517.654052734375, 0, 298.4775085449219],
-                                         [0, 517.5438232421875, 244.20501708984375],
-                                         [0,0,1]]))
-phantom = DeformableTexturePhantom(img, depth, camera)
 
-phantom.deform(deformation_param=10.0)
-phantom.animate()
-disp_img = np.zeros((480*2, 640*2,3), dtype=np.uint8)
+if __name__ == '__main__':
+    import cv2
+    img = cv2.cvtColor(cv2.resize(cv2.imread('../../tests/test_data/000000l.png'), (640, 480)), cv2.COLOR_BGR2RGB)
+    disparity = cv2.resize(cv2.imread('../../tests/test_data/000000l.pfm', cv2.IMREAD_UNCHANGED), (640, 480))/2
+    depth = 2144.878173828125 / disparity
+    camera = PinholeCamera(np.array([[517.654052734375, 0, 298.4775085449219],
+                                             [0, 517.5438232421875, 244.20501708984375],
+                                             [0,0,1]]))
+    phantom = DeformableTexturePhantom(img, depth, camera)
 
-for i, (img, depth) in enumerate(phantom):
-    if i==0:
-        disp_img[:480, :640] = img
-        disp_img[480:, :640] = depth[...,None]
-    disp_img[:480, 640:] = img
-    disp_img[480:, 640:] = depth[..., None]
-    cv2.imshow('phantom', disp_img)
-    cv2.waitKey(100)
+    phantom.deform(deformation_param=10.0)
+    phantom.animate()
+    disp_img = np.zeros((480*2, 640*2,3), dtype=np.uint8)
+
+    for i, (img, depth, points3d) in enumerate(phantom):
+        if i==0:
+            disp_img[:480, :640] = img
+            disp_img[480:, :640] = depth[...,None]
+        disp_img[:480, 640:] = img
+        disp_img[480:, 640:] = depth[..., None]
+        cv2.imshow('phantom', disp_img)
+        cv2.waitKey(100)
