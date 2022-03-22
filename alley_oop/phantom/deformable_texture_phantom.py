@@ -74,21 +74,24 @@ class DeformableTexturePhantom(object):
         ax.imshow(img)
         return ax, img
 
-    def animate(self):
+    def animate(self, steps=10, repeats=1):
         pcd = open3d.geometry.PointCloud()
         self.render3d = Render(pcd)
-        for i in range(5):
-            if i%2 == 0:
-                pcl_loc = self.deform(update=False)
+        for i in range(repeats):
+            for j in range(steps):
+                pcl_loc = self.deform(deformation_param=self.deform_param*(j/steps-1), update=False)
                 pcl_loc = self.transform_affine(pts=pcl_loc, update=False)
-            else:
-                pcl_loc = self.pcl_loc
-            pcd.points = open3d.utility.Vector3dVector(pcl_loc)
-            pcd.colors = open3d.utility.Vector3dVector(self.pcl_rgb / 255.0)
-            img = self.render3d.render(np.eye(4), pcd)
-            time.sleep(2)
-        ax.imshow(img)
-        return ax, img
+                pcd.points = open3d.utility.Vector3dVector(pcl_loc)
+                pcd.colors = open3d.utility.Vector3dVector(self.pcl_rgb / 255.0)
+                _ = self.render3d.render(np.eye(4), pcd)
+                time.sleep(0.01)
+            for j in range(steps):
+                pcl_loc = self.deform(deformation_param=self.deform_param*(-j/steps), update=False)
+                pcl_loc = self.transform_affine(pts=pcl_loc, update=False)
+                pcd.points = open3d.utility.Vector3dVector(pcl_loc)
+                pcd.colors = open3d.utility.Vector3dVector(self.pcl_rgb / 255.0)
+                _ = self.render3d.render(np.eye(4), pcd)
+                time.sleep(0.01)
 
     def pts(self, original=False):
         if original:
@@ -111,7 +114,7 @@ plane2 = DeformableTexturePhantom(img, depth, camera)
 plane.deform(deformation_param=10.0)
 fig, ax = plt.subplots(1,2)
 #ax = plane2.plot()
-plane.animate()
+plane.animate(20, 2)
 plane.plot(ax[0])
 plane2.plot(ax[1])
 print('dd')
