@@ -8,8 +8,9 @@ import open3d
 import time
 from scipy.spatial.transform import Rotation as R
 
+
 class DeformableTexturePhantom(object):
-    def __init__(self, img, depth, camera:PinholeCamera, n_deformation_nodes: int=1):
+    def __init__(self, img, depth, camera:PinholeCamera, n_deformation_nodes: int=1, steps: int=10, repeats: int=1):
         np.random.seed(123456)
         self.camera = camera
         # generate 3D points by backprojection
@@ -23,6 +24,8 @@ class DeformableTexturePhantom(object):
         np.random.shuffle(random_locs)
         self.random_locs = random_locs[:n_deformation_nodes]
         self.random_deform_rot = 20*np.random.rand(1)
+        self.steps = steps
+        self.repeats = repeats
 
     def transform_affine(self, pts=None, rmat=np.eye(3), tvec=np.zeros((3,1)), update=True):
         affine_t = np.eye(4)
@@ -60,33 +63,36 @@ class DeformableTexturePhantom(object):
 
         #query + noise_level * np.random.randn(*query.shape)
 
-    def render(self, apply_deform=True):
-        if apply_deform:
-            pcl_loc = self.deform(update=False)
-            pcl_loc = self.transform_affine(pts=pcl_loc, update=False)
-        else:
-            pcl_loc = self.pcl_loc
-        img, depth = self.camera.render(pcl_loc.T, self.pcl_rgb, self.size)
-        return img, depth
+    def __iter__(self):
+        return self._render_iteratively()
 
-    def plot(self, ax=plt.gca(), apply_deform=True):
-        img, depth = self.render(apply_deform)
-        ax.imshow(img)
-        return ax, img
+    def _render_iteratively(self):
+        for i in range(self.repeats):
+            for j in range(self.steps):
+                pcl_loc = self.deform(deformation_param=self.deform_param*(j/self.steps-1), update=False)
+                pcl_loc = self.transform_affine(pts=pcl_loc, update=False)
+                img, depth = self.camera.render(pcl_loc.T, self.pcl_rgb, self.size)
+                yield img, depth
+            for j in range(self.steps):
+                pcl_loc = self.deform(deformation_param=self.deform_param*(-j/self.steps), update=False)
+                pcl_loc = self.transform_affine(pts=pcl_loc, update=False)
+                img, depth = self.camera.render(pcl_loc.T, self.pcl_rgb, self.size)
+                yield img, depth
+        raise StopIteration
 
-    def animate(self, steps=10, repeats=1):
+    def animate(self):
         pcd = open3d.geometry.PointCloud()
         self.render3d = Render(pcd)
-        for i in range(repeats):
-            for j in range(steps):
-                pcl_loc = self.deform(deformation_param=self.deform_param*(j/steps-1), update=False)
+        for i in range(self.repeats):
+            for j in range(self.steps):
+                pcl_loc = self.deform(deformation_param=self.deform_param*(j/self.steps-1), update=False)
                 pcl_loc = self.transform_affine(pts=pcl_loc, update=False)
                 pcd.points = open3d.utility.Vector3dVector(pcl_loc)
                 pcd.colors = open3d.utility.Vector3dVector(self.pcl_rgb / 255.0)
                 _ = self.render3d.render(np.eye(4), pcd)
                 time.sleep(0.01)
-            for j in range(steps):
-                pcl_loc = self.deform(deformation_param=self.deform_param*(-j/steps), update=False)
+            for j in range(self.steps):
+                pcl_loc = self.deform(deformation_param=self.deform_param*(-j/self.steps), update=False)
                 pcl_loc = self.transform_affine(pts=pcl_loc, update=False)
                 pcd.points = open3d.utility.Vector3dVector(pcl_loc)
                 pcd.colors = open3d.utility.Vector3dVector(self.pcl_rgb / 255.0)
@@ -108,15 +114,17 @@ depth = 2144.878173828125 / disparity
 camera = PinholeCamera(np.array([[517.654052734375, 0, 298.4775085449219],
                                          [0, 517.5438232421875, 244.20501708984375],
                                          [0,0,1]]))
-plane = DeformableTexturePhantom(img, depth, camera)
-plane2 = DeformableTexturePhantom(img, depth, camera)
+phantom = DeformableTexturePhantom(img, depth, camera)
 
-plane.deform(deformation_param=10.0)
-fig, ax = plt.subplots(1,2)
-#ax = plane2.plot()
-plane.animate(20, 2)
-plane.plot(ax[0])
-plane2.plot(ax[1])
-print('dd')
-#plt.legend(['original', 'deformed'])
-plt.show()
+phantom.deform(deformation_param=10.0)
+phantom.animate()
+disp_img = np.zeros((480*2, 640*2,3), dtype=np.uint8)
+
+for i, (img, depth) in enumerate(phantom):
+    if i==0:
+        disp_img[:480, :640] = img
+        disp_img[480:, :640] = depth[...,None]
+    disp_img[:480, 640:] = img
+    disp_img[480:, 640:] = depth[..., None]
+    cv2.imshow('phantom', disp_img)
+    cv2.waitKey(100)
