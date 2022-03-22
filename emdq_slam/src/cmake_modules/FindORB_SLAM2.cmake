@@ -6,7 +6,6 @@
 #  ORB_SLAM2_LIBRARIES - The libraries needed to use ORB_SLAM2
 #  ORB_SLAM2_DEFINITIONS - Compiler switches required for using ORB_SLAM2
 
-# TODO: This need to find dependencies properly, I can't find an example of how to do that
 #find_package(OpenCV REQUIRED)
 #find_package(Eigen3 REQUIRED)
 #find_package(Pangolin REQUIRED)

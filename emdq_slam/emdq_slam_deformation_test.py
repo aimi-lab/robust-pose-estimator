@@ -46,7 +46,7 @@ def main(config):
         viewer(points3d[::100], slam.warp_canonical_model(current_reference=False), img.reshape(-1,3)[::100], nearest_neighbour_dist(points3d, slam.warp_canonical_model(current_reference=False)))
 
     ate_pos, ate_rot = absolute_trajectory_error(len(trajectory)*[np.eye(4)], trajectory)
-    print(ate_pos) #  ToDo render point cloud in slam and compare to gt
+    print(ate_pos)
     print(ate_rot)
 
 if __name__ == '__main__':

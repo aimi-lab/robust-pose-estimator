@@ -32,7 +32,7 @@ class EmdqSLAM(object):
         return self.track(img, depth, mask)
 
     def init_nodes(self, depth):
-        ipts = create_img_coords_np(depth.shape[0], depth.shape[1],self.spacing) #ToDo would be better using spatial sampling based on 3d point distances
+        ipts = create_img_coords_np(depth.shape[0], depth.shape[1],self.spacing)
         node_depth = depth[::self.spacing, ::self.spacing].reshape(2, -1)
         self.nodes = self.camera.project3d(ipts, node_depth).T
         self.displacements = np.zeros_like(self.nodes)
