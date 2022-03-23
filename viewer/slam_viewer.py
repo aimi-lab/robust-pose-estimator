@@ -44,11 +44,11 @@ class SlamViewer(object):
         self.src_kpts = trg_kpts
 
 
-class viewer3d(object):
-    def __init__(self, max_error: float=10.0):
+class Viewer3d(object):
+    def __init__(self, max_error: float=10.0, blocking=False):
         self.pcd_gt = open3d.geometry.PointCloud()
         self.pcd_predicted = open3d.geometry.PointCloud()
-        self.render3d = Render(self.pcd_gt)
+        self.render3d = Render(self.pcd_gt, blocking=blocking)
         self.max_error = max_error
 
     def __call__(self, gt_pcl, predicted_pcl, gt_colors=None, error_dists=None):

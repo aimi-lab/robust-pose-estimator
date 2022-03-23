@@ -5,7 +5,7 @@ from alley_oop.metrics.trajectory_metrics import absolute_trajectory_error
 import cv2
 import numpy as np
 from alley_oop.phantom.deformable_texture_phantom import DeformableTexturePhantom
-from viewer.slam_viewer import viewer3d
+from viewer.slam_viewer import Viewer3d
 
 
 def main(config):
@@ -34,7 +34,7 @@ def main(config):
     #     cv2.waitKey(1)
 
     slam = EmdqSLAM(camera, config['slam'])
-    viewer = viewer3d()
+    viewer = Viewer3d(blocking=True)
     trajectory = []
     for i, (img, depth, points3d) in enumerate(phantom):
         pose, inliers = slam(img, depth)
@@ -43,7 +43,7 @@ def main(config):
         trajectory.append(pose)
         absolute_pcl_error = pcl_ae(points3d, slam.warp_canonical_model(current_reference=False))
         print(absolute_pcl_error)
-        viewer(points3d[::100], slam.warp_canonical_model(current_reference=False), img.reshape(-1,3)[::100], nearest_neighbour_dist(points3d, slam.warp_canonical_model(current_reference=False)))
+        viewer(points3d[::20], slam.warp_canonical_model(current_reference=False), img.reshape(-1,3)[::20], nearest_neighbour_dist(points3d, slam.warp_canonical_model(current_reference=False)))
 
     ate_pos, ate_rot = absolute_trajectory_error(len(trajectory)*[np.eye(4)], trajectory)
     print(ate_pos)

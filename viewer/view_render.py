@@ -3,13 +3,15 @@ import numpy as np
 
 
 class Render(object):
-    def __init__(self, pcd, image_width=640, image_height=480):
+    def __init__(self, pcd, image_width=640, image_height=480, blocking=False):
         super().__init__()
         self.pcd = pcd
-
+        self.blocking = blocking
+        self.exit_loop = not blocking
         self.image_height = image_height
         self.image_width = image_width
-        self.viewer = o3d.visualization.Visualizer()
+        self.viewer = o3d.visualization.VisualizerWithKeyCallback()
+        self.viewer.register_key_callback(81, self.exit_loop_callback)
         self.viewer.create_window(width=self.image_width,
                              height=self.image_height, visible=True)
 
@@ -25,8 +27,12 @@ class Render(object):
         #ref_view.extrinsic = np.linalg.inv(pose)
         return self.ref_view
 
+    def exit_loop_callback(self, dummy):
+        self.exit_loop = True
+
     def render(self, pose, pcd=None, add_pcd=None, zoom=0.5):
         # define viewer
+        self.exit_loop =  not self.blocking
         if pcd is not None:
             self.viewer.remove_geometry(self.pcd, reset_bounding_box=True)
             self.pcd = pcd
@@ -35,12 +41,13 @@ class Render(object):
             self.viewer.add_geometry(add_pcd)
         self.control.convert_from_pinhole_camera_parameters(self.pose2view(pose))
         self.control.set_zoom(zoom)
-        self.viewer.poll_events()
-        self.viewer.update_renderer()
-        #self.viewer.run()
+        while not self.exit_loop:
+            self.viewer.poll_events()
+            self.viewer.update_renderer()
         image = self.viewer.capture_screen_float_buffer(False)
         if add_pcd is not None:
             self.viewer.remove_geometry(add_pcd)
+
         return image
 
 # import sys
