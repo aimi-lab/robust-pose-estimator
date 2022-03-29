@@ -2,7 +2,7 @@ from alley_oop.geometry.camera import PinholeCamera
 from dataset.semantic_dataset import RGBDDataset
 from dataset.scared_dataset import ScaredDataset
 from dataset.rectification import StereoRectifier
-from emdq_slam.emdq_slam_pipeline import EmdqSLAM
+from emdq_slam.emdq_slam_pipeline import EmdqSLAM, EmdqGlueSLAM
 import os
 import json
 from tqdm import tqdm
@@ -29,7 +29,7 @@ def main(input_path, output_path, config):
         dataset = ScaredDataset(input_path, calib['bf'], img_size=calib['img_size'])
 
     camera = PinholeCamera(calib['intrinsics']['left'])
-    slam = EmdqSLAM(camera, config['slam'])
+    slam = EmdqGlueSLAM(camera, config['slam'])
     if viewer is not None: viewer.set_reference(dataset[0][0], dataset[0][1])
     trajectory = []
     for img, depth, mask, img_number in tqdm(dataset, total=len(dataset)):

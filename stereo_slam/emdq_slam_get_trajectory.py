@@ -3,7 +3,7 @@ from dataset.semantic_dataset import RGBDDataset
 from dataset.scared_dataset import ScaredDataset
 from dataset.video_dataset import StereoVideoDataset
 from dataset.rectification import StereoRectifier
-from emdq_slam.emdq_slam_pipeline import EmdqSLAM
+from emdq_slam.emdq_slam_pipeline import EmdqSLAM, EmdqGlueSLAM
 import os, glob
 import json
 import torch
@@ -40,7 +40,7 @@ def main(input_path, output_path, config, force_cpu):
             seg_model = SemanticSegmentationModel('stereo_slam/segmentation_network/trained/PvtB2_combined_TAM_fold1.pth', device)
 
     camera = PinholeCamera(calib['intrinsics']['left'])
-    slam = EmdqSLAM(camera, config['slam'])
+    slam = EmdqGlueSLAM(camera, config['slam'])
     if viewer is not None: viewer.set_reference(dataset[0][0], dataset[0][1])
     trajectory = []
     for data in tqdm(dataset, total=len(dataset)):
@@ -80,7 +80,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--config',
         type=str,
-        default='stereo_slam/configuration/emdq_slam.yaml',
+        default='configuration/emdq_slam.yaml',
         help='Configuration file.'
     )
     parser.add_argument(

@@ -18,4 +18,4 @@ viewer:
   enable: True
   show: True
   matches: True
-  view_synthesis: True
+  view_synthesis: False

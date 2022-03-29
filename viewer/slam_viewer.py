@@ -24,9 +24,12 @@ class SlamViewer(object):
         self.ref_pose = ref_pose
 
     def __call__(self, trg_img, trg_kpts, matches, pose):
+        if not isinstance(trg_kpts[0], cv2.KeyPoint):
+            trg_kpts = [cv2.KeyPoint(kp[0], kp[1], 1.0) for kp in trg_kpts]
         if self.config['matches'] & (self.src_img is not None):
             if not isinstance(matches[0], cv2.DMatch):
                 matches = [cv2.DMatch(m[0], m[1], m[2]) for m in matches]
+
             out_img = cv2.drawMatches(cv2.cvtColor(self.src_img, cv2.COLOR_RGB2BGR),self.src_kpts,
                                       cv2.cvtColor(trg_img, cv2.COLOR_RGB2BGR), trg_kpts,
                                       matches, None, 0.5)

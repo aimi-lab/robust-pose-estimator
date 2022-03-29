@@ -6,7 +6,8 @@ from alley_oop.geometry.opencv_utils import kpts2npy
 from emdq import pyEMDQ
 from scipy.spatial.distance import cdist, pdist
 from scipy.spatial import cKDTree
-
+from .superglue.superglue import SuperGlueMatcher
+import torch
 
 class EmdqSLAM(object):
     def __init__(self, camera, config):
@@ -109,4 +110,45 @@ class EmdqSLAM(object):
             self.nodes = np.row_stack((self.nodes, self.warp_rigid(candidate_nodes, inverse=True)))
             self.displacements = np.row_stack((self.displacements, np.zeros((candidate_nodes.shape[0], 3))))
             self.dist_tree = cKDTree(self.nodes)
+
+
+class EmdqGlueSLAM(EmdqSLAM):
+    def __init__(self, camera, config):
+        super().__init__(camera, config)
+        self.matcher = SuperGlueMatcher(torch.device('cpu'))
+        self.detector_descriptor = None
+        self.kps3d_last = None
+
+    def track(self, img, depth, mask=None):
+        # extract key-points and descriptors
+        img_kps, filt_matches = self.matcher(img, mask)
+        # project key-points to 3d
+        kps_depth = np.asarray([depth[int(kp[1]), int(kp[0])] for kp in img_kps])
+        kps3d = self.camera.project3d(img_kps.T, kps_depth).T
+        pose = np.eye(4)
+        inliers = -1
+
+        if self.kps3d_last is not None:
+            # run EMDQ
+            inliers = self.emdq.fit(self.kps3d_last, kps3d,  filt_matches)
+            if inliers > 0:
+                nodes_last_frame = self.warp_canonical_model()
+                deformationfield = self.emdq.predict(nodes_last_frame)
+                #sigma_error = deformationfield[:, 4]
+                deformed_kps3d = deformationfield[:,:3]
+                # factor rigid, non-rigid components
+                diff_pose, residuals, _ , displacements = align(reference=deformed_kps3d.T, query=nodes_last_frame.T, ret_homogenous=True)
+                # apply deformation by updating node displacements
+                # (nodes = canonical model, displacements are the warping to current frame)
+                self.displacements += (self.last_pose[:3, :3].T @ displacements).T
+                # chain poses
+                pose = diff_pose@self.last_pose
+                self.last_pose = pose
+                self.add_node(depth)
+
+                # run ARAP
+        self.matches = filt_matches
+        self.img_kps = img_kps
+        self.kps3d_last = kps3d
+        return pose, inliers
 
