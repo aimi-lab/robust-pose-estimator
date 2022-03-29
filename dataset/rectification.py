@@ -21,8 +21,8 @@ class StereoRectifier(object):
             # scale intrinsics
             scale = img_size_new[0]/cal['img_size'][0]
             assert scale == img_size_new[1]/cal['img_size'][1]
-            cal['lkmat'] *= scale
-            cal['rkmat'] *= scale
+            cal['lkmat'][:2] *= scale
+            cal['rkmat'][:2] *= scale
             cal['img_size'] = img_size_new
         self.img_size = cal['img_size']
 
@@ -87,38 +87,38 @@ class StereoRectifier(object):
     def _load_calib_ini(fname):
         config = configparser.ConfigParser()
         config.read(fname)
-        img_size = (config['StereoLeft']['res_x'], config['StereoLeft']['res_y'])
+        img_size = (float(config['StereoLeft']['res_x']), float(config['StereoLeft']['res_y']))
 
         lkmat = np.eye(3)
-        lkmat[0, 0] = config['StereoLeft']['fc_x']
-        lkmat[1, 1] = config['StereoLeft']['fc_y']
-        lkmat[0, 2] = config['StereoLeft']['cc_x']
-        lkmat[2, 2] = config['StereoLeft']['cc_y']
+        lkmat[0, 0] = float(config['StereoLeft']['fc_x'])
+        lkmat[1, 1] = float(config['StereoLeft']['fc_y'])
+        lkmat[0, 2] = float(config['StereoLeft']['cc_x'])
+        lkmat[1, 2] = float(config['StereoLeft']['cc_y'])
 
         rkmat = np.eye(3)
-        rkmat[0, 0] = config['StereoRight']['fc_x']
-        rkmat[1, 1] = config['StereoRight']['fc_y']
-        rkmat[0, 2] = config['StereoRight']['cc_x']
-        rkmat[2, 2] = config['StereoRight']['cc_y']
+        rkmat[0, 0] = float(config['StereoRight']['fc_x'])
+        rkmat[1, 1] = float(config['StereoRight']['fc_y'])
+        rkmat[0, 2] = float(config['StereoRight']['cc_x'])
+        rkmat[1, 2] = float(config['StereoRight']['cc_y'])
 
-        ld = np.array([config['StereoLeft']['kc_0'], config['StereoLeft']['kc_0'],config['StereoLeft']['kc_1'],
-                       config['StereoLeft']['kc_2'],config['StereoLeft']['kc_3'],config['StereoLeft']['kc_4'],
-                       config['StereoLeft']['kc_5'], config['StereoLeft']['kc_6'],config['StereoLeft']['kc_7']])
-        rd = np.array([config['StereoRight']['kc_0'], config['StereoRight']['kc_0'], config['StereoRight']['kc_1'],
-                       config['StereoRight']['kc_2'], config['StereoRight']['kc_3'], config['StereoRight']['kc_4'],
-                       config['StereoRight']['kc_5'], config['StereoRight']['kc_6'], config['StereoRight']['kc_7']])
+        ld = np.array([float(config['StereoLeft']['kc_0']),float(config['StereoLeft']['kc_1']),
+                       float(config['StereoLeft']['kc_2']),float(config['StereoLeft']['kc_3']),float(config['StereoLeft']['kc_4']),
+                       float(config['StereoLeft']['kc_5']), float(config['StereoLeft']['kc_6']),float(config['StereoLeft']['kc_7'])])
+        rd = np.array([float(config['StereoRight']['kc_0']),float(config['StereoRight']['kc_1']),
+                       float(config['StereoRight']['kc_2']),float(config['StereoRight']['kc_3']),float(config['StereoRight']['kc_4']),
+                       float(config['StereoRight']['kc_5']), float(config['StereoRight']['kc_6']),float(config['StereoRight']['kc_7'])])
 
-        tvec = np.array([config['StereoRight']['T_0'],config['StereoRight']['T_1'],config['StereoRight']['T_2']])
+        tvec = np.array([float(config['StereoRight']['T_0']),float(config['StereoRight']['T_1']),float(config['StereoRight']['T_2'])])
         rmat = np.zeros((3,3))
-        rmat[0, 0] = config['StereoRight']['R_0']
-        rmat[0, 1] = config['StereoRight']['R_1']
-        rmat[0, 2] = config['StereoRight']['R_2']
-        rmat[1, 0] = config['StereoRight']['R_3']
-        rmat[1, 1] = config['StereoRight']['R_4']
-        rmat[1, 2] = config['StereoRight']['R_5']
-        rmat[2, 0] = config['StereoRight']['R_6']
-        rmat[2, 1] = config['StereoRight']['R_7']
-        rmat[2, 2] = config['StereoRight']['R_8']
+        rmat[0, 0] = float(config['StereoRight']['R_0'])
+        rmat[0, 1] = float(config['StereoRight']['R_1'])
+        rmat[0, 2] = float(config['StereoRight']['R_2'])
+        rmat[1, 0] = float(config['StereoRight']['R_3'])
+        rmat[1, 1] = float(config['StereoRight']['R_4'])
+        rmat[1, 2] = float(config['StereoRight']['R_5'])
+        rmat[2, 0] = float(config['StereoRight']['R_6'])
+        rmat[2, 1] = float(config['StereoRight']['R_7'])
+        rmat[2, 2] = float(config['StereoRight']['R_8'])
 
         cal = {}
         cal['lkmat'] = lkmat
