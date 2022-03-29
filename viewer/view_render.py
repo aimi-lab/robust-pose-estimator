@@ -32,7 +32,9 @@ class Render(object):
 
     def render(self, pose, pcd=None, add_pcd=None, zoom=0.5):
         # define viewer
-        self.exit_loop =  not self.blocking
+        self.exit_loop = not self.blocking
+        if self.blocking:
+            print('blocking mode: press q to continue')
         if pcd is not None:
             self.viewer.remove_geometry(self.pcd, reset_bounding_box=True)
             self.pcd = pcd
@@ -41,6 +43,8 @@ class Render(object):
             self.viewer.add_geometry(add_pcd)
         self.control.convert_from_pinhole_camera_parameters(self.pose2view(pose))
         self.control.set_zoom(zoom)
+        self.viewer.poll_events()
+        self.viewer.update_renderer()
         while not self.exit_loop:
             self.viewer.poll_events()
             self.viewer.update_renderer()
