@@ -13,7 +13,7 @@ from stereo_slam.disparity.disparity_model import DisparityModel
 from stereo_slam.segmentation_network.seg_model import SemanticSegmentationModel
 
 
-def main(input_path, output_path, config, force_cpu):
+def main(input_path, output_path, config, force_cpu, nsamples):
     device = torch.device('cuda' if (torch.cuda.is_available() & (not force_cpu)) else 'cpu')
     if os.path.isfile(os.path.join(input_path, 'camcal.json')):
         calib_file = os.path.join(input_path, 'camcal.json')
@@ -55,6 +55,8 @@ def main(input_path, output_path, config, force_cpu):
         if inliers == 0:
             break
         trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number, 'residual': 0.0, 'key_frame': True})
+        if len(trajectory) > nsamples:
+            break
         if viewer is not None: viewer(limg, *slam.get_matching_res(), pose)
     os.makedirs(output_path, exist_ok=True)
     with open(os.path.join(output_path, 'trajectory.json'), 'w') as f:
@@ -87,6 +89,12 @@ if __name__ == '__main__':
         '--force_cpu',
         help='force use of CPU.'
     )
+    parser.add_argument(
+        '--nsamples',
+        type=int,
+        default=10000000000,
+        help='force use of CPU.'
+    )
 
     args = parser.parse_args()
     with open(args.config, 'r') as ymlfile:
@@ -94,4 +102,4 @@ if __name__ == '__main__':
     if args.outpath is None:
         args.outpath = os.path.join(args.input, 'data','emdq_slam')
 
-    main(args.input, args.outpath, config, args.force_cpu is not None)
+    main(args.input, args.outpath, config, args.force_cpu is not None, args.nsamples)

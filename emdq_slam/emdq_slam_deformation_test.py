@@ -1,6 +1,6 @@
 from alley_oop.geometry.camera import PinholeCamera
 from alley_oop.metrics.point_cloud_metrics import pcl_ae, nearest_neighbour_dist
-from emdq_slam.emdq_slam_pipeline import EmdqSLAM
+from emdq_slam.emdq_slam_pipeline import EmdqSLAM, EmdqGlueSLAM
 from alley_oop.metrics.trajectory_metrics import absolute_trajectory_error
 import cv2
 import numpy as np
@@ -16,7 +16,7 @@ def main(config):
     camera = PinholeCamera(np.array([[517.654052734375, 0, 298.4775085449219],
                                      [0, 517.5438232421875, 244.20501708984375],
                                      [0, 0, 1]]))
-    phantom = DeformableTexturePhantom(img, depth, camera, n_deformation_nodes=3, steps=20)
+    phantom = DeformableTexturePhantom(img, depth, camera, n_deformation_nodes=1, steps=10)
 
     phantom.deform(deformation_param=3.0)
     #phantom.animate()
@@ -33,7 +33,7 @@ def main(config):
     #     cv2.imshow('phantom', disp_img)
     #     cv2.waitKey(1)
 
-    slam = EmdqSLAM(camera, config['slam'])
+    slam = EmdqGlueSLAM(camera, config['slam'])
     viewer = Viewer3d(blocking=True)
     trajectory = []
     for i, (img, depth, points3d) in enumerate(phantom):

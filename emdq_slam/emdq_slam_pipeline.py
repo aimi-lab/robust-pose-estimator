@@ -115,7 +115,7 @@ class EmdqSLAM(object):
 class EmdqGlueSLAM(EmdqSLAM):
     def __init__(self, camera, config):
         super().__init__(camera, config)
-        self.matcher = SuperGlueMatcher(torch.device('cpu'))
+        self.matcher = SuperGlueMatcher(torch.device('cuda'))
         self.detector_descriptor = None
         self.kps3d_last = None
 

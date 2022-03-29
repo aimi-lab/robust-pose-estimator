@@ -32,8 +32,9 @@ class SuperGlueMatcher():
                     # convert to grayscale
                     img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
                 img = torch.from_numpy(img/255.).float()[None, None].to(self.device)
-            if not torch.is_tensor(mask):
-                mask = torch.from_numpy(mask).to(self.device)
+            if mask is not None:
+                if not torch.is_tensor(mask):
+                    mask = torch.from_numpy(mask).to(self.device)
 
             # detect and compute
             pred = self.superpoint({'image': img})
