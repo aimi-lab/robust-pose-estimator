@@ -7,6 +7,7 @@ import os
 import json
 from tqdm import tqdm
 from viewer.slam_viewer import SlamViewer
+import torch
 
 
 def main(input_path, output_path, config):
@@ -29,7 +30,7 @@ def main(input_path, output_path, config):
         dataset = ScaredDataset(input_path, calib['bf'], img_size=calib['img_size'])
 
     camera = PinholeCamera(calib['intrinsics']['left'])
-    slam = EmdqGlueSLAM(camera, config['slam'])
+    slam = EmdqGlueSLAM(camera, config['slam'], torch.device('cuda'))
     if viewer is not None: viewer.set_reference(dataset[0][0], dataset[0][1])
     trajectory = []
     for img, depth, mask, img_number in tqdm(dataset, total=len(dataset)):

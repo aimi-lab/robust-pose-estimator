@@ -11,6 +11,8 @@ from tqdm import tqdm
 from viewer.slam_viewer import SlamViewer
 from stereo_slam.disparity.disparity_model import DisparityModel
 from stereo_slam.segmentation_network.seg_model import SemanticSegmentationModel
+from emdq_slam.emdq_slam_pipeline import EmdqGlueSLAM
+from alley_oop.geometry.camera import PinholeCamera
 
 
 def main(input_path, output_path, config, force_cpu, nsamples):
@@ -41,6 +43,8 @@ def main(input_path, output_path, config, force_cpu, nsamples):
             seg_model = SemanticSegmentationModel('stereo_slam/segmentation_network/trained/PvtB2_combined_TAM_fold1.pth', device)
 
     slam = pyElasticFusion(calib['intrinsics']['left'], calib['img_size'][0], calib['img_size'][1], 7.0, True, 15.0)
+    camera = PinholeCamera(calib['intrinsics']['left'])
+    slam2 = EmdqGlueSLAM(camera, config['emdq'], device)
     trajectory = []
     last_pose = np.eye(4)
     for i, data in enumerate(tqdm(dataset, total=len(dataset))):
@@ -49,14 +53,15 @@ def main(input_path, output_path, config, force_cpu, nsamples):
             depth, depth_valid = disp_model(limg, rimg)
             mask = seg_model.get_mask(limg)[0]
             mask &= depth_valid  # mask tools and non-valid depth
-            diff_pose = np.linalg.pinv(last_pose)@pose_kinematics if config['slam']['kinematics'] != 'none' else np.eye(4)
-            last_pose = pose_kinematics
+
         else:
             limg, depth, mask, img_number = data
-            diff_pose = np.eye(4)
-            config['slam']['kinematics'] = 'fuse'
+            config['efusion']['kinematics'] = 'fuse'
         #if (i == 0) & (viewer is not None): viewer.set_reference(limg, depth)
-        pose= slam.processFrame(limg, depth.astype(np.uint16), (mask == 0).astype(np.uint8), img_number, diff_pose, config['slam']['kinematics'] == 'fuse')
+        emdq_pose, inliers = slam2(limg, depth, mask)
+        diff_pose = np.linalg.pinv(emdq_pose) @ last_pose  # that's the inverted relative pose, the inversion is required due to different coordinate systems of opencv and efusion
+        last_pose = emdq_pose
+        pose= slam.processFrame(limg, depth.astype(np.uint16), (mask == 0).astype(np.uint8), img_number, diff_pose, config['efusion']['kinematics'] == 'fuse')
         if (i%200) == 0:
             pcl = slam.getPointCloud()
             if pcl is not None:
@@ -89,7 +94,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--config',
         type=str,
-        default='configuration/efusion_slam.yaml',
+        default='configuration/combined.yaml',
         help='Configuration file.'
     )
     parser.add_argument(
