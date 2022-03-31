@@ -1,6 +1,6 @@
-imageio
 matplotlib
-numpy
+
+imageio
 Pillow
 scikit-image
 scikit-learn
@@ -9,3 +9,4 @@ PyQt5
 open3d
 torch
 torchvision
+numpy==1.18
