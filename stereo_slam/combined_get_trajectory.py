@@ -1,3 +1,5 @@
+import sys
+sys.path.append('..')
 from dataset.semantic_dataset import RGBDDataset
 from dataset.scared_dataset import ScaredDataset
 from dataset.video_dataset import StereoVideoDataset

@@ -1,3 +1,5 @@
+import sys
+sys.path.append('..')
 import cv2
 import numpy as np
 from alley_oop.geometry.absolute_pose_quarternion import align

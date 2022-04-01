@@ -1,3 +1,5 @@
+import sys
+sys.path.append('..')
 from alley_oop.geometry.camera import PinholeCamera
 from alley_oop.metrics.point_cloud_metrics import pcl_ae, nearest_neighbour_dist
 from emdq_slam.emdq_slam_pipeline import EmdqSLAM, EmdqGlueSLAM

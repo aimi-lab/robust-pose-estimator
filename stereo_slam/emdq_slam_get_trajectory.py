@@ -1,3 +1,5 @@
+import sys
+sys.path.append('..')
 from alley_oop.geometry.camera import PinholeCamera
 from dataset.semantic_dataset import RGBDDataset
 from dataset.scared_dataset import ScaredDataset
