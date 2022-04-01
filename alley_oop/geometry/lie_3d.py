@@ -9,7 +9,7 @@ def lie_alebra2group_rot(wvec: np.ndarray = None):
 
     assert wvec.size == 3
 
-    wmat = lie_wmat(wvec)
+    wmat = lie_hatmap(wvec)
 
     rmat = np.exp(wmat)
 
@@ -34,7 +34,7 @@ def lie_group2algebra_rot(rmat: np.ndarray = None):
 def lie_group2algebra(rmat: np.ndarray = None, tvec: np.ndarray = None):
 
     wvec = lie_group2algebra_rot(rmat)
-    wmat = lie_wmat(wvec)
+    wmat = lie_hatmap(wvec)
 
     theta = (wvec.T @ wvec)**.5
     a_term = np.sin(theta) / theta
@@ -49,7 +49,7 @@ def lie_group2algebra(rmat: np.ndarray = None, tvec: np.ndarray = None):
 
 def lie_algebra2group(wvec: np.ndarray = None, uvec: np.ndarray = None):
 
-    wmat = lie_wmat(wvec)
+    wmat = lie_hatmap(wvec)
     rmat = np.exp(wmat)
 
     theta = (wvec.T @ wvec)**.5
@@ -65,7 +65,13 @@ def lie_algebra2group(wvec: np.ndarray = None, uvec: np.ndarray = None):
     return rmat, tvec
 
 
-def lie_wmat(wvec: np.ndarray = None):
+def lie_hatmap(wvec: np.ndarray = None):
+    """ 
+    create hat-map in so(3) from Euler vector in R^3
+    
+    :param wvec: Euler vector in R^3
+    :return: hat-map in so(3)
+    """
 
     assert wvec.size == 3
 
