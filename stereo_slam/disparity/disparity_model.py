@@ -14,7 +14,7 @@ class Struct:
 
 
 class DisparityModel(nn.Module):
-    def __init__(self, calibration, device=torch.device('cpu'), infer_depth=True, depth_clipping=(-torch.inf, torch.inf)):
+    def __init__(self, calibration, device=torch.device('cpu'), infer_depth=True, depth_clipping=(-float('inf'), float('inf'))):
         super().__init__()
         with open('stereo_slam/disparity/sttr_light/STTR.yaml', 'r') as ymlfile:
             config = Struct(**yaml.load(ymlfile, Loader=yaml.SafeLoader))

@@ -10,3 +10,4 @@ torch
 torchvision
 numpy==1.18
 opencv-python
+segmentation-models-pytorch
