@@ -91,7 +91,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--config',
         type=str,
-        default='configuration/efusion_slam.yaml',
+        default='stereo_slam/configuration/efusion_slam.yaml',
         help='Configuration file.'
     )
     parser.add_argument(
