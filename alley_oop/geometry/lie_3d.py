@@ -5,7 +5,7 @@
 import numpy as np
 
 
-def lie_alebra2group_rot(wvec: np.ndarray = None):
+def lie_algebra2group_rot(wvec: np.ndarray = None):
 
     assert wvec.size == 3
 
