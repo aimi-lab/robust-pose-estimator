@@ -54,7 +54,7 @@ def lie_SE3_to_se3(rmat: np.ndarray = None, tvec: np.ndarray = None):
 def lie_se3_to_SE3(wvec: np.ndarray = None, uvec: np.ndarray = None):
 
     wmat = lie_hatmap(wvec)
-    rmat = np.exp(wmat)
+    rmat = lie_so3_to_SO3(wvec)
 
     theta = (wvec.T @ wvec)**.5
     a_term = np.sin(theta) / theta
