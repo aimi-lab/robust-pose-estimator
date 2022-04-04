@@ -31,10 +31,7 @@ def lie_SO3_to_so3(rmat: np.ndarray = None):
     theta_term = theta/(2*np.sin(theta)) if theta != 0 else 0.5
     ln_rmat = theta_term * (rmat-rmat.T)
 
-    wvec = np.zeros(3)
-    wvec[0] = (ln_rmat[2, 1]-ln_rmat[1, 2]) / 2
-    wvec[1] = (ln_rmat[0, 2]-ln_rmat[2, 0]) / 2
-    wvec[2] = (ln_rmat[1, 0]-ln_rmat[0, 1]) / 2
+    wvec = np.array([ln_rmat[2, 1]-ln_rmat[1, 2], ln_rmat[0, 2]-ln_rmat[2, 0], ln_rmat[1, 0]-ln_rmat[0, 1]]) / 2
 
     return wvec
 
