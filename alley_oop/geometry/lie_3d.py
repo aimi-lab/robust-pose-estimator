@@ -11,7 +11,9 @@ def lie_algebra2group_rot(wvec: np.ndarray = None):
 
     wmat = lie_hatmap(wvec)
 
-    rmat = np.exp(wmat)
+    theta = (wvec.T @ wvec)**.5
+    
+    rmat = np.eye(3) + wmat * (np.sin(theta)/theta) + wmat**2*((1-np.cos(theta))/theta**2)
 
     return rmat
 
