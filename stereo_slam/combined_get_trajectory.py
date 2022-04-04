@@ -113,6 +113,6 @@ if __name__ == '__main__':
     with open(args.config, 'r') as ymlfile:
         config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
     if args.outpath is None:
-        args.outpath = os.path.join(args.input, 'data','efusion')
+        args.outpath = os.path.join(args.input, 'data','combined')
 
     main(args.input, args.outpath, config, args.force_cpu is not None, args.nsamples)

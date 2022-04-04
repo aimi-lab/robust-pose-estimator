@@ -13,6 +13,13 @@ from tqdm import tqdm
 from viewer.slam_viewer import SlamViewer
 from stereo_slam.disparity.disparity_model import DisparityModel
 from stereo_slam.segmentation_network.seg_model import SemanticSegmentationModel
+import open3d
+
+def save_ply(pcl_array, path):
+    pcl = open3d.geometry.PointCloud()
+    pcl.points = open3d.utility.Vector3dVector(pcl_array[:, :3])
+    pcl.colors = open3d.utility.Vector3dVector(pcl_array[:, 4:7])
+    open3d.io.write_point_cloud(path, pcl)
 
 
 def main(input_path, output_path, config, force_cpu, nsamples):
@@ -59,10 +66,6 @@ def main(input_path, output_path, config, force_cpu, nsamples):
             config['slam']['kinematics'] = 'fuse'
         #if (i == 0) & (viewer is not None): viewer.set_reference(limg, depth)
         pose= slam.processFrame(limg, depth.astype(np.uint16), (mask == 0).astype(np.uint8), img_number, diff_pose, config['slam']['kinematics'] == 'fuse')
-        if (i%200) == 0:
-            pcl = slam.getPointCloud()
-            if pcl is not None:
-                print(pcl.shape)
         trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number, 'residual': 0.0, 'key_frame': True})
         if len(trajectory) > nsamples:
             break
@@ -70,6 +73,10 @@ def main(input_path, output_path, config, force_cpu, nsamples):
     os.makedirs(output_path, exist_ok=True)
     with open(os.path.join(output_path, 'trajectory.json'), 'w') as f:
         json.dump(trajectory, f)
+    pcl = slam.getPointCloud()
+    if pcl is not None:
+        save_ply(pcl, os.path.join(output_path, 'map.ply'))
+        print(pcl.shape)
     print('finished')
 
 
