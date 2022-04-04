@@ -4,10 +4,10 @@ import numpy as np
 from alley_oop.geometry.quaternions import euler2quat, quat2euler
 
 
-class QuaternionConverionTester(unittest.TestCase):
+class QuaternionConversionTester(unittest.TestCase):
 
     def __init__(self, *args, **kwargs):
-        super(QuaternionConverionTester, self).__init__(*args, **kwargs)
+        super(QuaternionConversionTester, self).__init__(*args, **kwargs)
 
     def setUp(self):
 
