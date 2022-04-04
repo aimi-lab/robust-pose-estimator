@@ -19,10 +19,15 @@ def lie_algebra2group_rot(wvec: np.ndarray = None):
 def lie_group2algebra_rot(rmat: np.ndarray = None):
 
     assert rmat.size == 9
+
+    # check if trace = -1
+    if (np.trace(rmat)+1):
+        #   rotation by +/- pi, +/- 3pi etc.
+        pass
     
     theta = np.arccos((np.trace(rmat)-1)/2)
-
-    ln_rmat = theta/(2*np.sin(theta)) * (rmat-rmat.T)
+    theta_term = theta/(2*np.sin(theta)) if theta != 0 else 0.5
+    ln_rmat = theta_term * (rmat-rmat.T)
 
     wvec = np.zeros(3)
     wvec[0] = (ln_rmat[2, 1]-ln_rmat[1, 2]) / 2
