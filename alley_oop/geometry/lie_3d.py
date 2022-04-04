@@ -35,6 +35,7 @@ def lie_SO3_to_so3(rmat: np.ndarray = None):
 
     return wvec
 
+
 def lie_SE3_to_se3(rmat: np.ndarray = None, tvec: np.ndarray = None):
 
     wvec = lie_SO3_to_so3(rmat)
@@ -50,6 +51,7 @@ def lie_SE3_to_se3(rmat: np.ndarray = None, tvec: np.ndarray = None):
     uvec = vmat_inv @ tvec
 
     return wvec, uvec
+
 
 def lie_se3_to_SE3(wvec: np.ndarray = None, uvec: np.ndarray = None):
 
