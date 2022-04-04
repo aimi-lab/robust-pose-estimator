@@ -75,7 +75,7 @@ def compose_projection_matrix(
 
 def decompose_projection_matrix(
         pmat: Union[np.ndarray, torch.Tensor],
-        scale: bool = False,
+        scale: bool = True,
                                ):
     """
     https://www.robots.ox.ac.uk/~vgg/hzbook/code/vgg_multiview/vgg_KR_from_P.m
@@ -86,18 +86,39 @@ def decompose_projection_matrix(
 
     n = pmat.shape[0] if len(pmat.shape) == 2 else lib.sqrt(pmat.size)
     hmat = pmat.reshape(n, -1)[:, :n]
-    rmat, kmat = lib.linalg.qr(hmat, mode='reduced')
+    rmat, kmat = decompose_rq(hmat)
 
     if scale:
-        kmat = kmat / kmat[n - 1, n - 1]
+        kmat = kmat / kmat[n-1, n-1]
         if kmat[0, 0] < 0:
-            D = np.diag([-1, -1, *lib.ones(n - 2)])
-            kmat = lib.dot(D, kmat)
-            rmat = lib.dot(rmat, D)
+            dmat = lib.diag([-1, -1, *lib.ones(n - 2)])
+            kmat = lib.einsum('ij,jk -> ik', dmat, kmat)
+            rmat = lib.einsum('ij,jk -> ik', rmat, dmat)
 
     tvec = -lib.linalg.lstsq(-pmat[:, :n], pmat[:, -1], rcond=None)[0][:, None] if pmat.shape[1] == 4 else lib.zeros(n)
 
     return kmat, rmat, tvec
+
+def decompose_rq(hmat:Union[np.ndarray, torch.Tensor]):
+    """
+    https://github.com/petercorke/machinevision-toolbox-matlab/blob/master/vgg_rq.m
+    """
+
+    # determine library given input type
+    lib = np if isinstance(hmat, np.ndarray) else torch
+
+    hmat = hmat.T
+    rmat, kmat = lib.linalg.qr(hmat[::-1, ::-1])    #, mode='reduced'
+    rmat = rmat.T
+    rmat = rmat[::-1, ::-1]
+    kmat = kmat.T
+    kmat = kmat[::-1, ::-1]
+
+    if lib.linalg.det(rmat) < 0:
+        kmat[:, 0] *= -1
+        rmat[0, :] *= -1
+
+    return rmat, kmat
 
 
 def create_img_coords_t(
