@@ -11,7 +11,7 @@ class QuaternionConversionTester(unittest.TestCase):
 
     def setUp(self):
 
-        pass
+        np.random.seed(3008)
 
     def test_quaternion_conversion(self):
 
