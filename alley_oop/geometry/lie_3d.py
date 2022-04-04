@@ -5,20 +5,20 @@
 import numpy as np
 
 
-def lie_algebra2group_rot(wvec: np.ndarray = None):
+def lie_so3_to_SO3(wvec: np.ndarray = None):
 
     assert wvec.size == 3
 
     wmat = lie_hatmap(wvec)
 
     theta = (wvec.T @ wvec)**.5
-    
+
     rmat = np.eye(3) + wmat * (np.sin(theta)/theta) + wmat**2*((1-np.cos(theta))/theta**2)
 
     return rmat
 
 
-def lie_group2algebra_rot(rmat: np.ndarray = None):
+def lie_SO3_to_so3(rmat: np.ndarray = None):
 
     assert rmat.size == 9
 
@@ -38,9 +38,9 @@ def lie_group2algebra_rot(rmat: np.ndarray = None):
 
     return wvec
 
-def lie_group2algebra(rmat: np.ndarray = None, tvec: np.ndarray = None):
+def lie_SE3_to_se3(rmat: np.ndarray = None, tvec: np.ndarray = None):
 
-    wvec = lie_group2algebra_rot(rmat)
+    wvec = lie_SO3_to_so3(rmat)
     wmat = lie_hatmap(wvec)
 
     theta = (wvec.T @ wvec)**.5
@@ -54,7 +54,7 @@ def lie_group2algebra(rmat: np.ndarray = None, tvec: np.ndarray = None):
 
     return wvec, uvec
 
-def lie_algebra2group(wvec: np.ndarray = None, uvec: np.ndarray = None):
+def lie_se3_to_SE3(wvec: np.ndarray = None, uvec: np.ndarray = None):
 
     wmat = lie_hatmap(wvec)
     rmat = np.exp(wmat)
