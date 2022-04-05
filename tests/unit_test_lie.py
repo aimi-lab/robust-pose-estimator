@@ -29,7 +29,7 @@ class Lie3DTester(unittest.TestCase):
             rs = lie_SO3_to_so3(qs)
 
             # assertion
-            self.assertTrue(np.allclose(p, rs, atol=10e-2))
+            self.assertTrue(np.allclose(p, rs, atol=10e-11))
 
     def test_all(self):
 
