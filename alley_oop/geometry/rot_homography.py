@@ -2,6 +2,7 @@ import torch
 from torch.nn.functional import conv2d
 import numpy as np
 from torchgeometry import homography_warp
+from alley_oop.geometry.lie_3d import lie_alebra2group_rot
 
 """ this is an implementation of  
     https://www.robots.ox.ac.uk/~cmei/articles/omni_track_mei.pdf
@@ -44,7 +45,7 @@ def batch_proj_jacobian(img):
         we adapt J(H0) for the special case of rotation with three skew-symmetric matrices as generators for so(3)
 
         this leads to [xy         -1-x**2       y
-                       -1+y**2     -xy          x]"""
+                       1+y**2     -xy          -x]"""
     xs, ys = torch.meshgrid(torch.arange(img.shape[-1]), torch.arange(img.shape[-2]))
     xs = xs.reshape(-1)
     ys = ys.reshape(-1)
@@ -58,9 +59,9 @@ def batch_proj_jacobian(img):
     J2[:, 0, 0] = xs*ys
     J2[:, 0, 1] = -xs*xs-1
     J2[:, 0, 2] = ys
-    J2[:, 1, 0] = ys*ys-1
+    J2[:, 1, 0] = ys*ys+1
     J2[:, 1, 1] = -xs*ys
-    J2[:, 1, 2] = xs
+    J2[:, 1, 2] = -xs
 
     return J2
 
@@ -84,9 +85,7 @@ def ems_jacobian(img1, img2, batch_proj_jac=None):
 
 
 def so3(x):
-    phi = torch.sqrt(torch.dot(x,x))
-    w_x = x[0]*G1
-    return torch.eye(3) + torch.sin(phi)/phi
+    return torch.tensor(lie_alebra2group_rot(x.numpy().squeeze())).float()
 
 def warp_img(img, R, K):
     import cv2
@@ -94,7 +93,7 @@ def warp_img(img, R, K):
     return torch.tensor(img2cv)
 
 
-def efficient_least_squares(img1, img2, K, n_iter=100, res_thr=0.0001):
+def efficient_least_squares(img1, img2, K, n_iter=1000, res_thr=0.00001):
     proj_jac = batch_proj_jacobian(img1)
 
     R_lr = torch.eye(3).unsqueeze(0)
@@ -109,17 +108,20 @@ def efficient_least_squares(img1, img2, K, n_iter=100, res_thr=0.0001):
 
         # update rotation estimate
         R_lr = R_lr @ so3(x0)
-        if residuals.mean() < res_thr
+        plot(warped_img, img2)
+
+        if residuals.mean() < res_thr:
             break
     return R_lr, residuals, warped_img
 
 from scipy.spatial.transform import Rotation
-img1 = torch.rand((100,120)).float()
+import cv2
+img1 = torch.tensor(cv2.resize(cv2.imread('../../tests/test_data/000000l.png', cv2.IMREAD_GRAYSCALE), (160, 128))).float()
 f=1200.0
 cx=60
 cy=50
 intrinsics = torch.tensor([[f, 0, cx], [0, f, cy], [0,0,1.0]]).float()
-R_true = torch.tensor(Rotation.from_euler('z', 10.0, degrees=True).as_matrix()).float()
+R_true = torch.tensor(Rotation.from_euler('z', 3.0, degrees=True).as_matrix()).float()
 img2cv = warp_img(img1, R_true, intrinsics)
 def plot(img1, img2):
     import matplotlib.pyplot as plt
@@ -129,6 +131,8 @@ def plot(img1, img2):
     plt.show()
 plot(img1, img2cv)
 R, residuals, warped_img = efficient_least_squares(img1, img2cv, intrinsics)
+print(R)
+print(residuals)
 plot(warped_img, img2cv)
 
 

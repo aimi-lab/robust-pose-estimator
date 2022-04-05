@@ -6,12 +6,12 @@ import numpy as np
 
 
 def lie_alebra2group_rot(wvec: np.ndarray = None):
-
+    wvec = wvec.squeeze()
     assert wvec.size == 3
 
     wmat = lie_hatmap(wvec)
-
-    rmat = np.exp(wmat)
+    phi = np.sqrt(np.dot(wvec, wvec))
+    rmat = np.eye(3) + np.sin(phi)/phi * wmat + (1-np.cos(phi))/phi**2 * wmat@wmat
 
     return rmat
 
@@ -76,9 +76,9 @@ def lie_hatmap(wvec: np.ndarray = None):
     assert wvec.size == 3
 
     wmat = np.array([
-        [0, -wvec[2], +wvec[1]],
-        [+wvec[2], 0, -wvec[0]],
-        [-wvec[1], +wvec[0], 0],
+        [0, -wvec[2], wvec[1]],
+        [wvec[2], 0, -wvec[0]],
+        [-wvec[1], wvec[0], 0],
     ])
 
     return wmat
