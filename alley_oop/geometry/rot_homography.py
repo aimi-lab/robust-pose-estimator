@@ -2,7 +2,7 @@ import torch
 from torch.nn.functional import conv2d
 import numpy as np
 from torchgeometry import homography_warp
-from alley_oop.geometry.lie_3d import lie_alebra2group_rot, lie_hatmap
+from alley_oop.geometry.lie_3d import lie_so3_to_SO3, lie_hatmap
 
 """ this is an implementation of  
     https://www.robots.ox.ac.uk/~cmei/articles/omni_track_mei.pdf
@@ -92,7 +92,7 @@ def ems_jacobian(img1, img2, K, batch_proj_jac=None):
 
 
 def so3(x):
-    return torch.tensor(lie_alebra2group_rot(x.numpy().squeeze())).float()
+    return torch.tensor(lie_so3_to_SO3(x.numpy().squeeze()))
 
 def warp_img(img, R, K):
     import cv2
@@ -102,17 +102,16 @@ def warp_img(img, R, K):
 
 def efficient_least_squares(img1, img2, K, n_iter=1000, res_thr=0.00001):
 
-    R_lr = torch.eye(3).unsqueeze(0)
+    R_lr = torch.eye(3).double()
     J_proj = None
     for i in range(n_iter):
         # compute residuals f(x)
         warped_img = warp_img(img1, R_lr, K)
         J, J_proj = ems_jacobian(warped_img, img2, K, J_proj)
         J_pinv = torch.linalg.pinv(J)
-        residuals = (0.5*(warped_img - img2)**2).reshape(-1, 1)
+        residuals = ((warped_img - img2)).reshape(-1, 1)
         # compute update parameter x0
         x0 = -J_pinv @ residuals
-
         # update rotation estimate
         R_lr = R_lr @ so3(x0)
         print(x0)
@@ -125,12 +124,12 @@ def efficient_least_squares(img1, img2, K, n_iter=1000, res_thr=0.00001):
 
 from scipy.spatial.transform import Rotation
 import cv2
-img1 = torch.tensor(cv2.resize(cv2.imread('../../tests/test_data/000000l.png', cv2.IMREAD_GRAYSCALE), (160, 128))).float()
+img1 = torch.tensor(cv2.resize(cv2.imread('../../tests/test_data/000000l.png', cv2.IMREAD_GRAYSCALE), (160, 128))).float()/255.0
 f=1200.0
 cx=79.5
 cy=63.5
 intrinsics = torch.tensor([[f, 0, cx], [0, f, cy], [0,0,1.0]]).float()
-R_true = torch.tensor(Rotation.from_euler('z', 3.0, degrees=True).as_matrix()).float()
+R_true = torch.tensor(Rotation.from_euler('z', 5.0, degrees=True).as_matrix()).float()
 img2cv = warp_img(img1, R_true, intrinsics)
 def plot(img1, img2):
     import matplotlib.pyplot as plt
@@ -139,7 +138,7 @@ def plot(img1, img2):
     ax[1].imshow(img2.squeeze())
     plt.show()
 plot(img1, img2cv)
-R, residuals, warped_img = efficient_least_squares(img1, img2cv, intrinsics)
+R, residuals, warped_img = efficient_least_squares(img2cv, img1, intrinsics.double())
 print(R)
 print(residuals)
 plot(warped_img, img2cv)
