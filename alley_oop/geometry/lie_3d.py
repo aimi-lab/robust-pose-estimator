@@ -7,20 +7,21 @@ import numpy as np
 
 def lie_so3_to_SO3(wvec: np.ndarray = None):
 
-    assert wvec.size == 3
-
-    wmat = lie_hatmap(wvec)
+    # check if vector of zeros
+    if not wvec.any():
+        return np.eye(3)
 
     theta = (wvec.T @ wvec)**.5
 
-    rmat = np.eye(3) + wmat * (np.sin(theta)/theta) + wmat**2*((1-np.cos(theta))/theta**2)
+    wvec = wvec / theta if theta > np.finfo(np.float64).eps else wvec
+    wmat = lie_hatmap(wvec)
+
+    rmat = np.eye(3) + wmat * (np.sin(theta)/theta) + wmat @ wmat.T *((1-np.cos(theta))/theta**2)
 
     return rmat
 
 
 def lie_SO3_to_so3(rmat: np.ndarray = None):
-
-    assert rmat.size == 9
 
     # check if trace = -1
     if (np.trace(rmat)+1):
@@ -79,7 +80,7 @@ def lie_hatmap(wvec: np.ndarray = None):
     :return: hat-map in so(3)
     """
 
-    assert wvec.size == 3
+    assert wvec.size == 3, 'argument must be a 3-vector'
 
     wmat = np.array([
         [0, -wvec[2], +wvec[1]],
@@ -88,3 +89,12 @@ def lie_hatmap(wvec: np.ndarray = None):
     ])
 
     return wmat
+
+
+def is_SO3(rmat: np.ndarray, tol=100, eps: float = np.finfo(np.float64).eps):
+
+    assert rmat.size == 9, 'matrix must have 9 elements'
+    assert np.linalg.norm(rmat @ rmat.T - np.eye(rmat.shape[0])) < tol * eps, 'R @ R.T must yield identity'
+    assert np.linalg.det(rmat @ rmat.T) > 0, 'det(R @ R.T) must be greater than zero'
+    
+    return True
