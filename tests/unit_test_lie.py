@@ -3,8 +3,6 @@ import numpy as np
 
 from alley_oop.geometry.lie_3d import lie_so3_to_SO3, lie_SO3_to_so3, is_SO3
 
-#import spatialmath.base as tr
-
 class Lie3DTester(unittest.TestCase):
 
     def __init__(self, *args, **kwargs):
@@ -20,14 +18,14 @@ class Lie3DTester(unittest.TestCase):
 
         for p in arr:
             
-            # convert to radians
+            # convert 3-vector to rotation matrix
             qs = lie_so3_to_SO3(p)
 
+            # check if rotation matrix is SO3
             rval = is_SO3(qs)
-
             self.assertTrue(rval)
 
-            # convert to quaternions
+            # convert rotation matrix to 3-vector
             rs = lie_SO3_to_so3(qs)
 
             # assertion
