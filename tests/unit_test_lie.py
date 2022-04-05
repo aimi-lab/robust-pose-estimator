@@ -1,8 +1,9 @@
 import unittest
 import numpy as np
 
-from alley_oop.geometry.lie_3d import lie_so3_to_SO3, lie_SO3_to_so3
+from alley_oop.geometry.lie_3d import lie_so3_to_SO3, lie_SO3_to_so3, is_SO3
 
+#import spatialmath.base as tr
 
 class Lie3DTester(unittest.TestCase):
 
@@ -21,6 +22,10 @@ class Lie3DTester(unittest.TestCase):
             
             # convert to radians
             qs = lie_so3_to_SO3(p)
+
+            rval = is_SO3(qs)
+
+            self.assertTrue(rval)
 
             # convert to quaternions
             rs = lie_SO3_to_so3(qs)

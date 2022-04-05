@@ -7,20 +7,21 @@ import numpy as np
 
 def lie_so3_to_SO3(wvec: np.ndarray = None):
 
-    assert wvec.size == 3
-
-    wmat = lie_hatmap(wvec)
+    # check if vector of zeros
+    if not wvec.any():
+        return np.eye(3)
 
     theta = (wvec.T @ wvec)**.5
 
-    rmat = np.eye(3) + wmat * (np.sin(theta)/theta) + wmat**2*((1-np.cos(theta))/theta**2)
+    wvec = wvec / theta if theta > np.finfo(np.float64).eps else wvec
+    wmat = lie_hatmap(wvec)
+
+    rmat = np.eye(3) + wmat * (np.sin(theta)) + wmat @ wmat *((1-np.cos(theta)))
 
     return rmat
 
 
 def lie_SO3_to_so3(rmat: np.ndarray = None):
-
-    assert rmat.size == 9
 
     # check if trace = -1
     if (np.trace(rmat)+1):
@@ -46,7 +47,7 @@ def lie_SE3_to_se3(rmat: np.ndarray = None, tvec: np.ndarray = None):
     b_term = (1-np.cos(theta)) / theta**2
     #c_term = (1-a_term) / theta**2
 
-    vmat_inv = np.eye(3) - .5*wmat + 1/theta**2*(1-a_term/(2*b_term))*wmat**2
+    vmat_inv = np.eye(3) - .5*wmat + 1/theta**2*(1-a_term/(2*b_term))*wmat @ wmat
 
     uvec = vmat_inv @ tvec
 
@@ -64,7 +65,7 @@ def lie_se3_to_SE3(wvec: np.ndarray = None, uvec: np.ndarray = None):
     c_term = (1-a_term) / theta**2
     
     #rmat = np.eye(3) - a_term*wmat + b_term*wmat**2
-    vmat = np.eye(3) - b_term*wmat + c_term*wmat**2
+    vmat = np.eye(3) - b_term*wmat + c_term*wmat @ wmat
 
     tvec = vmat @ uvec
 
@@ -79,7 +80,7 @@ def lie_hatmap(wvec: np.ndarray = None):
     :return: hat-map in so(3)
     """
 
-    assert wvec.size == 3
+    assert wvec.size == 3, 'argument must be a 3-vector'
 
     wmat = np.array([
         [0, -wvec[2], +wvec[1]],
@@ -88,3 +89,12 @@ def lie_hatmap(wvec: np.ndarray = None):
     ])
 
     return wmat
+
+
+def is_SO3(rmat: np.ndarray, tol=100, eps: float = np.finfo(np.float64).eps):
+
+    assert rmat.size == 9, 'matrix must have 9 elements'
+    assert np.linalg.norm(rmat @ rmat.T - np.eye(rmat.shape[0])) < tol * eps, 'R @ R.T must yield identity'
+    assert np.linalg.det(rmat @ rmat.T) > 0, 'det(R @ R.T) must be greater than zero'
+    
+    return True
