@@ -16,7 +16,7 @@ def lie_so3_to_SO3(wvec: np.ndarray = None):
     wvec = wvec / theta if theta > np.finfo(np.float64).eps else wvec
     wmat = lie_hatmap(wvec)
 
-    rmat = np.eye(3) + wmat * (np.sin(theta)/theta) + wmat @ wmat.T *((1-np.cos(theta))/theta**2)
+    rmat = np.eye(3) + wmat * (np.sin(theta)) + wmat @ wmat *((1-np.cos(theta)))
 
     return rmat
 
@@ -47,7 +47,7 @@ def lie_SE3_to_se3(rmat: np.ndarray = None, tvec: np.ndarray = None):
     b_term = (1-np.cos(theta)) / theta**2
     #c_term = (1-a_term) / theta**2
 
-    vmat_inv = np.eye(3) - .5*wmat + 1/theta**2*(1-a_term/(2*b_term))*wmat**2
+    vmat_inv = np.eye(3) - .5*wmat + 1/theta**2*(1-a_term/(2*b_term))*wmat @ wmat
 
     uvec = vmat_inv @ tvec
 
@@ -65,7 +65,7 @@ def lie_se3_to_SE3(wvec: np.ndarray = None, uvec: np.ndarray = None):
     c_term = (1-a_term) / theta**2
     
     #rmat = np.eye(3) - a_term*wmat + b_term*wmat**2
-    vmat = np.eye(3) - b_term*wmat + c_term*wmat**2
+    vmat = np.eye(3) - b_term*wmat + c_term*wmat @ wmat
 
     tvec = vmat @ uvec
 
