@@ -5,35 +5,40 @@
 import numpy as np
 
 
-def lie_alebra2group_rot(wvec: np.ndarray = None):
-    wvec = wvec.squeeze()
+def lie_so3_to_SO3(wvec: np.ndarray = None):
+
     assert wvec.size == 3
 
     wmat = lie_hatmap(wvec)
-    phi = np.sqrt(np.dot(wvec, wvec))
-    rmat = np.eye(3) + np.sin(phi)/phi * wmat + (1-np.cos(phi))/phi**2 * wmat@wmat
+
+    theta = (wvec.T @ wvec)**.5
+
+    rmat = np.eye(3) + wmat * (np.sin(theta)/theta) + wmat**2*((1-np.cos(theta))/theta**2)
 
     return rmat
 
 
-def lie_group2algebra_rot(rmat: np.ndarray = None):
+def lie_SO3_to_so3(rmat: np.ndarray = None):
 
     assert rmat.size == 9
+
+    # check if trace = -1
+    if (np.trace(rmat)+1):
+        #   rotation by +/- pi, +/- 3pi etc.
+        pass
     
     theta = np.arccos((np.trace(rmat)-1)/2)
+    theta_term = theta/(2*np.sin(theta)) if theta != 0 else 0.5
+    ln_rmat = theta_term * (rmat-rmat.T)
 
-    ln_rmat = theta/(2*np.sin(theta)) * (rmat-rmat.T)
-
-    wvec = np.zeros(3)
-    wvec[0] = (ln_rmat[2, 1]-ln_rmat[1, 2]) / 2
-    wvec[1] = (ln_rmat[0, 2]-ln_rmat[2, 0]) / 2
-    wvec[2] = (ln_rmat[1, 0]-ln_rmat[0, 1]) / 2
+    wvec = np.array([ln_rmat[2, 1]-ln_rmat[1, 2], ln_rmat[0, 2]-ln_rmat[2, 0], ln_rmat[1, 0]-ln_rmat[0, 1]]) / 2
 
     return wvec
 
-def lie_group2algebra(rmat: np.ndarray = None, tvec: np.ndarray = None):
 
-    wvec = lie_group2algebra_rot(rmat)
+def lie_SE3_to_se3(rmat: np.ndarray = None, tvec: np.ndarray = None):
+
+    wvec = lie_SO3_to_so3(rmat)
     wmat = lie_hatmap(wvec)
 
     theta = (wvec.T @ wvec)**.5
@@ -47,10 +52,11 @@ def lie_group2algebra(rmat: np.ndarray = None, tvec: np.ndarray = None):
 
     return wvec, uvec
 
-def lie_algebra2group(wvec: np.ndarray = None, uvec: np.ndarray = None):
+
+def lie_se3_to_SE3(wvec: np.ndarray = None, uvec: np.ndarray = None):
 
     wmat = lie_hatmap(wvec)
-    rmat = np.exp(wmat)
+    rmat = lie_so3_to_SO3(wvec)
 
     theta = (wvec.T @ wvec)**.5
     a_term = np.sin(theta) / theta
@@ -76,9 +82,9 @@ def lie_hatmap(wvec: np.ndarray = None):
     assert wvec.size == 3
 
     wmat = np.array([
-        [0, -wvec[2], wvec[1]],
-        [wvec[2], 0, -wvec[0]],
-        [-wvec[1], wvec[0], 0],
+        [0, -wvec[2], +wvec[1]],
+        [+wvec[2], 0, -wvec[0]],
+        [-wvec[1], +wvec[0], 0],
     ])
 
     return wmat
