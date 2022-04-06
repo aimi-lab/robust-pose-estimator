@@ -1,7 +1,5 @@
-import numpy as np
-
 from alley_oop.interpol.synth_view import synth_view
-
+from alley_oop.utils.lib_handling import get_lib_type
 
 def dual_projected_photo_loss(img0, img1, dep0, dep1, rmat, tvec, kmat0, kmat1=None):
 
@@ -22,8 +20,11 @@ def projected_photo_loss(rimg, qimg, dept, rmat, tvec, kmat0, kmat1=None, dbg_op
     # generate view at perspective
     nimg = synth_view(qimg, dept, rmat, tvec, kmat0, kmat1)
 
+    # determine library given input type
+    lib = get_lib_type(nimg)
+
     # compute loss
-    rmse = np.mean((rimg - nimg)**2)**.5
+    rmse = lib.mean((rimg - nimg)**2)**.5
 
     if dbg_opt:
         import imageio

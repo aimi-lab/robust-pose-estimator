@@ -3,7 +3,13 @@ import torch
 from scipy.interpolate import LinearNDInterpolator, CloughTocher2DInterpolator, NearestNDInterpolator
 
 
-def img_map_scipy(img, ipts, npts, mode='bilinear', fill_val: float = 0):
+def img_map_scipy(
+        img: np.ndarray = None, 
+        ipts: np.ndarray = None, 
+        npts: np.ndarray = None, 
+        mode: str = 'bilinear', 
+        fill_val: float = 0
+    ) -> np.ndarray:
 
     # interpolator settings
     if mode == 'bilinear':
@@ -21,7 +27,11 @@ def img_map_scipy(img, ipts, npts, mode='bilinear', fill_val: float = 0):
     return nimg
 
 
-def img_map_torch(img, npts, mode='bilinear'):
+def img_map_torch(
+        img: np.ndarray = None, 
+        npts: np.ndarray = None, 
+        mode: str = 'bilinear'
+    ) -> torch.Tensor:
 
     # create new sample grid
     y, x = img.shape[-2:]

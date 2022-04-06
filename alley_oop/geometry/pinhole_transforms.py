@@ -3,6 +3,9 @@ import numpy as np
 from typing import Union
 
 
+from alley_oop.utils.lib_handling import get_lib_type
+
+
 def forward_project(
         opts: Union[np.ndarray, torch.Tensor],
         kmat: Union[np.ndarray, torch.Tensor],
@@ -11,7 +14,7 @@ def forward_project(
                     ):
 
     # determine library given input type
-    lib = np if isinstance(opts, np.ndarray) else torch
+    lib = get_lib_type(opts)
 
     # init values potentially missing
     rmat = lib.eye(3) if rmat is None else rmat
@@ -41,7 +44,7 @@ def reverse_project(
                     ):
 
     # determine library given input type
-    lib = np if isinstance(ipts, np.ndarray) else torch
+    lib = get_lib_type(ipts)
 
     # init values potentially missing
     rmat = lib.eye(3) if rmat is None else rmat
@@ -66,7 +69,7 @@ def compose_projection_matrix(
                              ):
 
     # determine library given input type
-    lib = np if isinstance(kmat, np.ndarray) else torch
+    lib = get_lib_type(kmat)
 
     return kmat @ lib.hstack([rmat, tvec])
 
@@ -80,7 +83,7 @@ def decompose_projection_matrix(
     """
 
     # determine library given input type
-    lib = np if isinstance(pmat, np.ndarray) else torch
+    lib = get_lib_type(pmat)
 
     n = pmat.shape[0] if len(pmat.shape) == 2 else lib.sqrt(pmat.size)
     hmat = pmat.reshape(n, -1)[:, :n]
@@ -103,7 +106,7 @@ def decompose_rq(hmat:Union[np.ndarray, torch.Tensor]):
     """
 
     # determine library given input type
-    lib = np if isinstance(hmat, np.ndarray) else torch
+    lib = get_lib_type(hmat)
 
     hmat = hmat.T
     rmat, kmat = lib.linalg.qr(hmat[::-1, ::-1])    #, mode='reduced'
@@ -127,7 +130,7 @@ def create_img_coords_t(
                        ):
 
     # determine library given input type
-    lib = np if isinstance(ref_type, np.ndarray) else torch
+    lib = get_lib_type(ref_type)
 
     # create 2-D coordinates
     x_mesh = lib.linspace(0, x-1, x).repeat(b, y, 1).type_as(ref_type) + .5

@@ -1,13 +1,10 @@
-import numpy
-import torch
-
 from alley_oop.geometry.pinhole_transforms import forward_project, reverse_project
-
+from alley_oop.utils.lib_handling import get_lib_type
 
 def feat_homo_rmse(rpts, qpts, hmat):
 
     # determine library given input type
-    lib = numpy if isinstance(hmat, numpy.ndarray) else torch
+    lib = get_lib_type(hmat)
 
     # map points from one view to another
     npts = hmat @ rpts
@@ -21,7 +18,7 @@ def feat_homo_rmse(rpts, qpts, hmat):
 def feat_proj_rmse(pts0, pts1, rmat, tvec, kmat0, kmat1, dep0, dep1, method: str = '3d'):
 
     # determine library given input type
-    lib = numpy if isinstance(pts0, numpy.ndarray) else torch
+    lib = get_lib_type(pts0)
 
     # project into space
     opt0 = reverse_project(pts0, kmat0, disp=dep0)
