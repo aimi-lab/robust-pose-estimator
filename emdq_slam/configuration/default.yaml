@@ -1,0 +1,15 @@
+slam:
+  surf_thr: 300.0
+  match_cross_check: False
+  lowes_ratio: 0.7
+  node_spacing: 10
+
+img_size:
+  - 640
+  - 512
+
+viewer:
+  enable: True
+  show: True
+  matches: True
+  view_synthesis: True

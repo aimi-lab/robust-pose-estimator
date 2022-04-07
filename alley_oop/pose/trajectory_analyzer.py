@@ -45,7 +45,10 @@ class TrajectoryAnalyzer(object):
                 self.ax.quiver(x_es, y_es, z_es, u_es, v_es, w_es, length=1, normalize=True, color=color)
 
                 # plot correspondences given alternative pose trajectory
-                if len(self.pose_list) > 1: self.plot_pose_correspondence(self.pose_list[-1][i], self.pose_list[-2][i])
+                try:
+                    if len(self.pose_list) > 1: self.plot_pose_correspondence(self.pose_list[-1][i], self.pose_list[-2][i])
+                except IndexError:
+                    break
 
         # plot coordinate frame of first view
         for cc, base_vec in zip(('blue', 'red', 'green'),(np.array((1, 0, 0)),np.array((0, 1, 0)),np.array((0, 0, 1)))):
@@ -55,8 +58,10 @@ class TrajectoryAnalyzer(object):
             self.ax.quiver(x_es, y_es, z_es, u_es, v_es, w_es, length=2, normalize=True, color=cc)
 
             # plot correspondences given alternative pose trajectory
-            if len(self.pose_list) > 1: self.plot_pose_correspondence(self.pose_list[-1][i], self.pose_list[-2][i])
-
+            try:
+                if len(self.pose_list) > 1: self.plot_pose_correspondence(self.pose_list[-1][i], self.pose_list[-2][i])
+            except IndexError:
+                break
     def plot_pose_correspondence(self, pose_a, pose_b):
 
         assert pose_a.shape == pose_b.shape, 'number of pose dimensions unequal'
@@ -77,7 +82,9 @@ class TrajectoryAnalyzer(object):
         # compute RMSE
         tvec_a = self.pose_list[idx_a][:, :3, -1]
         tvec_b = self.pose_list[idx_b][:, :3, -1]
-        rmse = np.round(np.mean((tvec_a-tvec_b)**2, axis=0)**.5, 4)
+        min_len = np.min((len(tvec_a), len(tvec_b)))
+
+        rmse = np.round(np.mean((tvec_a[:min_len]-tvec_b[:min_len])**2, axis=0)**.5, 4)
 
         # plot RMSE in figure
         if plot_opt: self.ax.text(x=1, y=1, z=0, s='Transl. RMSE: '+str(rmse))
