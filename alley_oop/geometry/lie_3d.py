@@ -13,6 +13,12 @@ def lie_so3_to_SO3(
     wvec: Union[np.ndarray, torch.Tensor] = None,
     tol: float = 10e-12
     ) -> Union[np.ndarray, torch.Tensor]:
+    """ 
+    create rotation matrix SO(3) from Euler vector
+    
+    :param wvec: Euler vector
+    :return: rotation matrix in SO(3)
+    """
 
     lib = get_lib_type(wvec)
 
@@ -20,12 +26,17 @@ def lie_so3_to_SO3(
     if not wvec.any():
         return lib.eye(3)
 
+    # compute scale from vector norm
     theta = (wvec.T @ wvec)**.5
 
+    # normalize vector
     wvec = wvec / theta if theta > tol else wvec
+
+    # construct hat-map which is so(3)
     wmat = lie_hatmap(wvec)
 
-    rmat = lib.eye(3) + wmat * (lib.sin(theta)) + wmat @ wmat *((1-lib.cos(theta)))
+    # compute exponential of hat-map using Taylor expansion (known as Rodrigues formula)
+    rmat = lib.eye(3) + wmat * lib.sin(theta) + wmat @ wmat *(1-lib.cos(theta))
 
     return rmat
 
@@ -33,6 +44,12 @@ def lie_so3_to_SO3(
 def lie_SO3_to_so3(
         rmat: Union[np.ndarray, torch.Tensor] = None
     ) -> Union[np.ndarray, torch.Tensor]:
+    """ 
+    create Euler vector from rotation matrix in SO(3)
+    
+    :param rmat: rotation matrix in SO(3)
+    :return: Euler vector
+    """
 
     lib = get_lib_type(rmat)
 
@@ -41,12 +58,17 @@ def lie_SO3_to_so3(
         #   rotation by +/- pi, +/- 3pi etc.
         pass
     
+    # compute scale
     theta = lib.arccos((lib.trace(rmat)-1)/2)
     theta_term = theta/(2*lib.sin(theta)) if theta != 0 else 0.5
+
+    # compute logarithm of rotation matrix
     ln_rmat = theta_term * (rmat-rmat.T)
 
+    # obtain used array data type
     data_class = get_data_class(rmat)
 
+    # extract elements from hat-map
     wvec = data_class([ln_rmat[2, 1]-ln_rmat[1, 2], ln_rmat[0, 2]-ln_rmat[2, 0], ln_rmat[1, 0]-ln_rmat[0, 1]]) / 2
 
     return wvec
@@ -56,6 +78,10 @@ def lie_SE3_to_se3(
         rmat: Union[np.ndarray, torch.Tensor] = None, 
         tvec: Union[np.ndarray, torch.Tensor] = None
     ) -> Union[np.ndarray, torch.Tensor]:
+    """
+    caution: not tested 
+    tbd: catch cases where theta=0
+    """
 
     lib = get_lib_type(rmat)
 
@@ -78,6 +104,10 @@ def lie_se3_to_SE3(
         wvec: Union[np.ndarray, torch.Tensor] = None,
         uvec: Union[np.ndarray, torch.Tensor] = None
     ) -> Union[np.ndarray, torch.Tensor]:
+    """
+    caution: not tested 
+    tbd: catch cases where theta=0
+    """
 
     lib = get_lib_type(wvec)
 
@@ -124,11 +154,17 @@ def is_SO3(
         rmat: Union[np.ndarray, torch.Tensor], 
         tol: float = 10e-6, 
     ) -> bool:
+    """
+    test whether provided rotation matrix is part of SO(3) group
+
+    :param rmat: rotation matrix in SO(3)
+    :return: True
+    """
 
     lib = get_lib_type(rmat)
 
     assert rmat.shape[0] == 3 and rmat.shape[1] == 3, 'matrix must be 3x3'
-    assert lib.linalg.norm(rmat @ rmat.T - lib.eye(rmat.shape[0])) < tol, 'R @ R.T must yield identity'
     assert lib.linalg.det(rmat @ rmat.T) > 0, 'det(R @ R.T) must be greater than zero'
+    assert lib.linalg.norm(rmat @ rmat.T - lib.eye(rmat.shape[0])) < tol, 'R @ R.T must yield identity'
     
     return True
