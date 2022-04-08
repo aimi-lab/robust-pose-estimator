@@ -23,7 +23,7 @@ class RotationEstimator(torch.nn.Module):
         self.res_thr = res_thr
         self.intrinsics = torch.nn.Parameter(intrinsics)
         self.warper = HomographyWarper(img_shape[0], img_shape[1], normalized_coordinates=False)
-        self.batch_proj_jac = torch.nn.Parameter((self._batch_jw(img_shape, intrinsics) @ self._j_rot())[:, :2]) # remove third line (zeros because we don't use w coordinates)
+        self.batch_proj_jac = torch.nn.Parameter((self._batch_jw(img_shape, intrinsics) @ self._j_rot()))
         self.d = torch.nn.Parameter(torch.empty(0))  # dummy device store
 
     def estimate(self, ref_img: torch.Tensor, target_img:torch.Tensor, mask: torch.Tensor=None):
@@ -93,7 +93,7 @@ class RotationEstimator(torch.nn.Module):
         f = K[0,0]
 
         # fast
-        J2 = torch.zeros((img_shape[-1] * img_shape[-2], 3, 9))
+        J2 = torch.zeros((img_shape[-1] * img_shape[-2], 2, 9))
         J2[:, 0, 0] = u -cu
         J2[:, 0, 1] = v -cv
         J2[:, 0, 2] = f
