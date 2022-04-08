@@ -4,6 +4,7 @@ from torch.nn.functional import conv2d, pad
 from alley_oop.geometry.lie_3d import lie_so3_to_SO3, lie_hatmap
 import warnings
 from alley_oop.geometry.warping import HomographyWarper
+from typing import Tuple
 
 
 class RotationEstimator(torch.nn.Module):
@@ -14,8 +15,10 @@ class RotationEstimator(torch.nn.Module):
     It estimates the camera rotation between two images (assuming rotation only) using efficient second-order minimization
 """
 
-    def __init__(self, img_shape, intrinsics, n_iter=10000, res_thr=0.0001):
+    def __init__(self, img_shape: Tuple, intrinsics: torch.Tensor, n_iter: int=10000, res_thr: float=0.0001):
         super(RotationEstimator, self).__init__()
+        assert len(img_shape) == 2
+        assert intrinsics.shape == (3,3)
         self.n_iter = n_iter
         self.res_thr = res_thr
         self.intrinsics = torch.nn.Parameter(intrinsics)
@@ -23,7 +26,8 @@ class RotationEstimator(torch.nn.Module):
         self.batch_proj_jac = torch.nn.Parameter((self._batch_jw(img_shape, intrinsics) @ self._j_rot())[:, :2]) # remove third line (zeros because we don't use w coordinates)
         self.d = torch.nn.Parameter(torch.empty(0))  # dummy device store
 
-    def estimate(self, ref_img, target_img, mask=None):
+    def estimate(self, ref_img: torch.Tensor, target_img:torch.Tensor, mask: torch.Tensor=None):
+        """ estimate rotation using efficient second-order optimization"""
         R_lr = torch.eye(3).to(self.d.device)
         residuals = None
         warped_img = None
@@ -59,34 +63,8 @@ class RotationEstimator(torch.nn.Module):
             warnings.warn(f"EMS not converged after {self.n_iter}", RuntimeWarning)
         return R_lr, residuals, warped_img
 
-    def gradient_descent(self, ref_img, target_img, learning_rate=1e-6, mask=None):
-        R_lr = torch.eye(3)
-        residuals = None
-        warped_img = None
-        converged = False
-        for i in range(self.n_iter):
-            # compute residuals f(x)
-            warped_img = self._warp_img(ref_img, R_lr, self.intrinsics)
-            J_img = self._image_jacobian(warped_img.unsqueeze(0))
-            J_img = J_img.reshape(warped_img.shape[0] * warped_img.shape[1], 1, 2).squeeze(0)
-            J = (J_img @ self.batch_proj_jac).squeeze()
-            residuals = ((warped_img - target_img)).reshape(-1, 1)
-            if mask is not None:
-                residuals = mask.reshape(-1,1)*residuals
-
-            # compute update parameter x0
-            x0 = learning_rate*J.T @ residuals
-            # update rotation estimate
-            R_lr = R_lr @ lie_so3_to_SO3(x0.squeeze())
-            if (residuals**2).mean() < self.res_thr:
-                converged = True
-                break
-        if not converged:
-            warnings.warn(f"EMS not converged after {self.n_iter}", RuntimeWarning)
-        return R_lr, residuals, warped_img
-
     @staticmethod
-    def _image_jacobian(img):
+    def _image_jacobian(img:torch.Tensor):
         sobel = [[-0.125, -0.25, -0.125], [0, 0, 0], [0.125, 0.25, 0.125]]
         if img.ndim < 4:
             img = img.unsqueeze(1)
@@ -99,7 +77,7 @@ class RotationEstimator(torch.nn.Module):
         return jacobian
 
     @staticmethod
-    def _batch_jw(img_shape, K):
+    def _batch_jw(img_shape:Tuple, K:torch.Tensor):
         """ jacobian of action w with respect to R(0)
             w<KR(x)K'><(u v 1)T>
             adapted from https://www.robots.ox.ac.uk/~cmei/articles/single_view_track_ITRO.pdf where H(x) = K R(x) K'
@@ -145,7 +123,7 @@ class RotationEstimator(torch.nn.Module):
         J[:, 2] = torch.tensor(lie_hatmap(np.array([0,0,1]))).reshape(-1)
         return J
 
-    def _ems_jacobian(self, img1, img2):
+    def _ems_jacobian(self, img1:torch.Tensor, img2:torch.Tensor):
         """ Jacobian for efficient least squares (Jimg1 + Jimg2)/2 * Jproj in R^(h*w)x2"""
         assert img1.ndim == 2
         assert img2.ndim == 2
@@ -160,7 +138,9 @@ class RotationEstimator(torch.nn.Module):
         J = J_img @ self.batch_proj_jac
         return J.squeeze(1)
 
-    def _warp_img(self, img, R, K):
+    def _warp_img(self, img:torch.Tensor, R:torch.Tensor, K:torch.Tensor):
+        assert R.shape == (3,3)
+        assert K.shape == (3,3)
         homography = (K @ R@ torch.linalg.inv(K))
         if homography.ndim == 2:
             homography = homography.unsqueeze(0)
