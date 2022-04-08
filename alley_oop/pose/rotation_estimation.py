@@ -6,7 +6,7 @@ import warnings
 from alley_oop.geometry.warping import HomographyWarper
 
 
-class RotationEstimator(object):
+class RotationEstimator(torch.nn.Module):
     """ this is an implementation of
     https://www.robots.ox.ac.uk/~cmei/articles/omni_track_mei.pdf
     https://www.robots.ox.ac.uk/~cmei/articles/single_view_track_ITRO.pdf
@@ -15,14 +15,16 @@ class RotationEstimator(object):
 """
 
     def __init__(self, img_shape, intrinsics, n_iter=10000, res_thr=0.0001):
+        super(RotationEstimator, self).__init__()
         self.n_iter = n_iter
         self.res_thr = res_thr
-        self.intrinsics = intrinsics
+        self.intrinsics = torch.nn.Parameter(intrinsics)
         self.warper = HomographyWarper(img_shape[0], img_shape[1], normalized_coordinates=False)
-        self.batch_proj_jac = (self._batch_jw(img_shape, intrinsics) @ self._j_rot())[:, :2] # remove third line (zeros because we don't use w coordinates)
+        self.batch_proj_jac = torch.nn.Parameter((self._batch_jw(img_shape, intrinsics) @ self._j_rot())[:, :2]) # remove third line (zeros because we don't use w coordinates)
+        self.d = torch.nn.Parameter(torch.empty(0))  # dummy device store
 
     def estimate(self, ref_img, target_img, mask=None):
-        R_lr = torch.eye(3)
+        R_lr = torch.eye(3).to(self.d.device)
         residuals = None
         warped_img = None
         converged = False
@@ -89,8 +91,8 @@ class RotationEstimator(object):
         if img.ndim < 4:
             img = img.unsqueeze(1)
         batch, channels, h, w= img.shape
-        sobel_kernely = torch.tensor(sobel, dtype=torch.float32).unsqueeze(0).expand(1, channels, 3, 3)
-        sobel_kernelx = torch.tensor(sobel, dtype=torch.float32).unsqueeze(0).expand(1, channels, 3, 3).transpose(2,3)
+        sobel_kernely = torch.tensor(sobel, dtype=torch.float32).unsqueeze(0).expand(1, channels, 3, 3).to(img.device)
+        sobel_kernelx = torch.tensor(sobel, dtype=torch.float32).unsqueeze(0).expand(1, channels, 3, 3).transpose(2,3).to(img.device)
         x_grad = pad(conv2d(img, sobel_kernelx, stride=1, padding='valid', groups=channels)[...,1:-1,1:-1], (2,2,2,2)).reshape(batch, channels, -1)
         y_grad = pad(conv2d(img, sobel_kernely, stride=1, padding='valid', groups=channels)[...,1:-1,1:-1], (2,2,2,2)).reshape(batch, channels, -1)
         jacobian = torch.stack((x_grad, y_grad), dim=-1)
@@ -165,52 +167,6 @@ class RotationEstimator(object):
         if img.ndim == 2:
             img = img.unsqueeze(0).unsqueeze(0)
         return self.warper(img, torch.linalg.inv(homography)).squeeze() #ToDo why do we have to invert the homography to be consistent with opencv?
-
-
-# import numpy as np
-# from scipy.spatial.transform import Rotation
-# from alley_oop.pose.rotation_estimation import RotationEstimator
-#
-# import cv2
-# import torch
-# # generate dummy intrinsics and dummy images
-# f = 1200.0
-# cx = 79.5
-# cy = 63.5
-# intrinsics = torch.tensor([[f, 0, cx], [0, f, cy], [0, 0, 1.0]]).float()
-# R_true = torch.tensor(Rotation.from_euler('xyz', [0,1,10], degrees=True).as_matrix()).float()
-# from alley_oop.geometry.lie_3d import lie_SO3_to_so3
-# x_opt = lie_SO3_to_so3(R_true)
-# print('optimal x: ', x_opt)
-# img1 = torch.tensor(cv2.resize(cv2.imread('../../tests/test_data/000000l.png', cv2.IMREAD_GRAYSCALE),
-#                                 (160, 128))).float() / 255.0
-# # img1 = torch.empty((160,128))
-# # img1[:] = torch.arange(0,128)/128.0
-# # img1 = img1.T
-# estimator = RotationEstimator(img1.shape, intrinsics)
-# #img1 = torch.ones((128,160))
-# #img1[:100,:] = 0
-# img2cv = cv2.warpPerspective(img1.numpy(),(intrinsics @ R_true@ torch.linalg.inv(intrinsics)).squeeze().numpy(), (img1.shape[1], img1.shape[0]))
-# img2cv = torch.tensor(img2cv)
-# mask = (img2cv != 0)
-#
-# R, residuals, warped_img = estimator.estimate(img1, img2cv, mask=mask)
-# print('optimal x: ', lie_SO3_to_so3(R_true))
-# print('estimated x: ', lie_SO3_to_so3(R))
-# import matplotlib.pyplot as plt
-# fig, ax = plt.subplots(1, 3)
-# ax[0].imshow(img1)
-# ax[1].imshow(img2cv)
-# ax[2].imshow(estimator._warp_img(img1, R, intrinsics))
-#
-# plt.show()
-#
-#
-# # assertion
-# from alley_oop.geometry.euler_angles import mat2euler
-# print(180/np.pi*mat2euler(R), 180/np.pi*mat2euler(R_true))
-# print(R-R_true)
-
 
 
 

@@ -17,7 +17,7 @@ class Lie3DTester(unittest.TestCase):
     def test_lie_conversion(self):
 
         arr = .25 * np.random.randn(100, 3)
-
+        arr[0] = [0, 0, 0]
         for p in arr:
             
             # convert 3-vector to rotation matrix
@@ -54,6 +54,7 @@ class Lie3DTester(unittest.TestCase):
 
     def test_all(self):
 
+        self.test_lie_conversion_torch()
         self.test_lie_conversion()
 
 
