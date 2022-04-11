@@ -21,10 +21,13 @@ def lie_so3_to_SO3(
     """
 
     lib = get_lib_type(wvec)
+    
+    # define identity matrix in advance to account for torch device
+    eye_3 = lib.eye(3).to(wvec.device) if lib == torch else lib.eye(3)
 
     # check if vector of zeros
     if not wvec.any():
-        return lib.eye(3)
+        return eye_3
 
     # compute scale from vector norm
     theta = (wvec.T @ wvec)**.5
@@ -39,7 +42,7 @@ def lie_so3_to_SO3(
         wmat = lie_hatmap(wvec)
 
     # compute exponential of hat-map using Taylor expansion (known as Rodrigues formula)
-    rmat = lib.eye(3) + lib.sin(theta) * wmat + (1-lib.cos(theta)) * wmat @ wmat
+    rmat = eye_3 + lib.sin(theta) * wmat + (1-lib.cos(theta)) * wmat @ wmat
 
     return rmat
 
@@ -92,6 +95,9 @@ def lie_se3_to_SE3(
 
     lib = get_lib_type(wvec)
 
+    # define identity matrix in advance to account for torch device
+    eye_3 = lib.eye(3).to(wvec.device) if lib == torch else lib.eye(3)
+
     # compute scale from vector norm
     theta = (wvec.T @ wvec)**.5
 
@@ -106,8 +112,8 @@ def lie_se3_to_SE3(
     # construct hat-map which is so(3)
     wmat = lie_hatmap(wvec_norm)
     
-    rmat = lib.eye(3) + a_term * wmat + b_term * wmat @ wmat
-    vmat = lib.eye(3) + b_term * wmat + c_term * wmat @ wmat
+    rmat = eye_3 + a_term * wmat + b_term * wmat @ wmat
+    vmat = eye_3 + b_term * wmat + c_term * wmat @ wmat
 
     tvec = vmat @ uvec
 
