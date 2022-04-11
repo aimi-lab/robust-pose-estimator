@@ -3,7 +3,8 @@ from typing import List
 import numpy as np
 import json
 import argparse
-
+import matplotlib as mpl
+mpl.use('Qt5Agg')
 from alley_oop.utils.paths import get_scared_abspath
 from alley_oop.pose.trajectory_analyzer import TrajectoryAnalyzer
 
@@ -16,14 +17,35 @@ def load_scared_pose(fnames:List=None) -> np.ndarray:
         for fname in fnames:
             with open(str(fname), 'r') as f: pose_elem = json.load(f)
             pose = np.array(pose_elem['camera-pose'])
-            pose[0:3, 3] = -pose[0:3, 3] # neg. translation as Intuitive's coordinate system is inverted wrt. OpenCV
-            pose[0:3, 0:3] = pose[0:3, 0:3].T # invert rotation as Intuitive's coordinate system is inverted wrt. OpenCV
             pose_list.append(pose)
-    # all other pose estimation methods
+
+    elif str(fnames[0]).lower().__contains__('orbslam'): # ORBSLAM2
+        fname = fnames[0]
+        with open(str(fname), 'r') as f: pose_elem_list = json.load(f)
+        pose_list = []
+        for pose_elem in pose_elem_list:
+            pose = np.array(pose_elem['camera-pose'])
+            pose[0:3, 3] = -pose[0:3, 3]  # neg. translation as Intuitive's coordinate system is inverted wrt. OpenCV
+            pose[0:3, 0:3] = pose[0:3, 0:3].T  # invert rotation as Intuitive's coordinate system is inverted wrt. OpenCV
+            pose_list.append(pose)
+    elif str(fnames[0]).lower().__contains__('efusion') | str(fnames[0]).lower().__contains__('combined') :  # ORBSLAM2:
+        fname = fnames[0]
+        with open(str(fname), 'r') as f: pose_elem_list = json.load(f)
+        pose_list = []
+        for pose_elem in pose_elem_list:
+            pose = np.array(pose_elem['camera-pose'])
+            pose[0:3, 3] = -pose[0:3, 3]  # neg. translation as Intuitive's coordinate system is inverted wrt. OpenCV
+            pose[0:3, 0:3] = pose[0:3, 0:3].T
+            #pose[:3,3] *= 1000/15
+            pose_list.append(pose)
     else:
         fname = fnames[0]
-        with open(str(fname), 'r') as f: pose_list = json.load(f)
-        pose_list = [pose_list[i]['camera-pose'] for i in range(len(pose_list))]
+        with open(str(fname), 'r') as f:
+            pose_elem_list = json.load(f)
+        pose_list = []
+        for pose_elem in pose_elem_list:
+            pose = np.array(pose_elem['camera-pose'])
+            pose_list.append(pose)
     
     pose_arrs = np.array(pose_list)[:, :4, :4]
 
@@ -32,7 +54,7 @@ def load_scared_pose(fnames:List=None) -> np.ndarray:
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description='ORB SLAM example')
+    parser = argparse.ArgumentParser(description='Plot Trajectories')
 
     parser.add_argument(
         'base_path',
@@ -40,20 +62,13 @@ if __name__ == '__main__':
         help='Path to scared dataset.'
     )
     parser.add_argument(
-        '--pred_folder',
+        '--pred_folders',
         type=str,
+        nargs='+',
         default='orbslam2_rgbd_results',
         help='Folder containing predictions.'
     )
-
-    try:
-        args = parser.parse_args()
-        assert (Path(args.base_path) / 'frame_data').exists()
-        assert (Path(args.base_path) / args.pred_folder).exists()
-        data_path = Path(args.base_path) / args.pred_folder / args.base_path
-        meth_dirs = [str(data_path / 'frame_data')]
-    except:
-        meth_dirs = ['frame_data', 'orbslam2_stereo_results', 'orbslam2_rgbd_results', 'defslam_results', 'superglue_newr']#
+    args = parser.parse_args()
     
     colors = ['b', 'g', 'r', 'k', 'm', 'y']
     d_idx = 1
@@ -61,15 +76,16 @@ if __name__ == '__main__':
     # iterate through keyframes
     for k_idx in range(1, 4):
         pose_plotter = TrajectoryAnalyzer(title='dataset_'+str(d_idx)+', keyframe_'+str(k_idx))
-        for k, meth in enumerate(meth_dirs):
-            fnames = sorted((get_scared_abspath(d_idx, k_idx) / 'data' / meth).rglob('*.json'))
-            pose_arrs = load_scared_pose(fnames)[:195]
+        for k, meth in enumerate(args.pred_folders):
+            print(meth)
+            fnames = sorted((Path(args.base_path) / 'data' / meth).rglob('*.json'))
+            pose_arrs = load_scared_pose(fnames)
             pose_arrs[:, :3, -1] = np.cumsum(pose_arrs[:, :3, -1], axis=0)/-5 if meth.lower().__contains__('defslam') else pose_arrs[:, :3, -1]
             pose_arrs[:, :3, -1] = np.cumsum(pose_arrs[:, :3, -1]*np.array([-1, 1, -1]), axis=0) if meth.lower().__contains__('superglue') else pose_arrs[:, :3, -1]
             pose_arrs[:, :2, -1] = pose_arrs[:, :2, -1][:, ::-1] if meth.lower().__contains__('superglue') else pose_arrs[:, :2, -1]
             color = colors[k%len(colors)]
             pose_plotter.add_pose_trajectory(pose_arrs, label=meth, color=color)
         pose_plotter.legend()
-        pose_plotter.get_rmse_by_idx(idx_a=-1, idx_b=-2, plot_opt=True) if len(meth_dirs) > 1 else None
+        pose_plotter.get_rmse_by_idx(idx_a=-1, idx_b=-2, plot_opt=True) if len(args.base_path) > 1 else None
         pose_plotter.write_file()
         pose_plotter.show()

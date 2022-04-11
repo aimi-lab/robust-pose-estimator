@@ -17,7 +17,7 @@ class Lie3DTester(unittest.TestCase):
     def test_so3_conversions(self):
 
         arr = .25 * np.random.randn(100, 3)
-
+        arr[0] = [0, 0, 0]
         for p in arr:
             
             # convert 3-vector to rotation matrix

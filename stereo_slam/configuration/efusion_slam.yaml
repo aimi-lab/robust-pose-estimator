@@ -1,0 +1,18 @@
+slam:
+  kinematics: 'fuse' # fuse, none, replace
+
+img_size:
+  - 640
+  - 512
+
+sample: 10
+
+depth_clipping:
+  - 0
+  - 300 # in mm
+
+viewer:
+  enable: True
+  show: True
+  matches: True
+  view_synthesis: True

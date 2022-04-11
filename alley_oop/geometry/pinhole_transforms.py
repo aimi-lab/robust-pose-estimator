@@ -11,6 +11,7 @@ def forward_project(
         kmat: Union[np.ndarray, torch.Tensor],
         rmat: Union[np.ndarray, torch.Tensor] = None,
         tvec: Union[np.ndarray, torch.Tensor] = None,
+        ret_depth: bool = False
                     ):
 
     # determine library given input type
@@ -28,9 +29,10 @@ def forward_project(
     ipts = pmat @ opts
 
     # inhomogenization
-    ipts = ipts[:3] / ipts[-1]
-
-    return ipts
+    depth = ipts[-1].copy()
+    ipts = ipts[:3] / depth
+    if ret_depth: return ipts, depth
+    else: return ipts
 
 
 def reverse_project(
@@ -38,7 +40,7 @@ def reverse_project(
         kmat: Union[np.ndarray, torch.Tensor],
         rmat: Union[np.ndarray, torch.Tensor] = None,
         tvec: Union[np.ndarray, torch.Tensor] = None,
-        dept: Union[np.ndarray, torch.Tensor] = None,
+        depth: Union[np.ndarray, torch.Tensor] = None,
         disp: Union[np.ndarray, torch.Tensor] = None,
         base: Union[float, int] = 1.,
                     ):
@@ -50,11 +52,11 @@ def reverse_project(
     rmat = lib.eye(3) if rmat is None else rmat
     tvec = lib.zeros([3, 1]) if tvec is None else tvec
     ipts = lib.vstack([ipts, lib.ones(ipts.shape[1])]) if ipts.shape[0] == 2 else ipts
-    dept = disp2depth(disp=disp, kmat=kmat, base=base) if disp is not None else dept
-    dept = lib.ones(ipts.shape[1]) if dept is None else dept
+    depth = disp2depth(disp=disp, kmat=kmat, base=base) if disp is not None else depth
+    depth = lib.ones(ipts.shape[1]) if depth is None else depth
 
     # pinhole projection
-    opts = dept.flatten() * (lib.linalg.inv(kmat) @ ipts)
+    opts = depth.flatten() * (lib.linalg.inv(kmat) @ ipts)
 
     # from camera to world coordinates
     opts = rmat @ opts + tvec
@@ -143,10 +145,10 @@ def create_img_coords_t(
 def create_img_coords_np(
         y: int = 720,
         x: int = 1280,
-                     ):
+        step: int = 1):
 
-    x_coords = np.arange(0, x) + .5
-    y_coords = np.arange(0, y) + .5
+    x_coords = np.arange(0, x, step) + .5
+    y_coords = np.arange(0, y, step) + .5
     x_mesh, y_mesh = np.meshgrid(x_coords, y_coords)
     ipts = np.vstack([x_mesh.flatten(), y_mesh.flatten(), np.ones(len(x_mesh.flatten()))])
 

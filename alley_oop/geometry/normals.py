@@ -1,25 +1,32 @@
 from scipy.spatial import KDTree
 from sklearn.decomposition import PCA
 import numpy as np
+import torch
+from typing import Union
+from alley_oop.utils.lib_handling import get_lib_type, get_data_class
 
 
-def normals_from_regular_grid(oarr: np.ndarray) -> np.ndarray:
+def normals_from_regular_grid(oarr: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, torch.Tensor]:
     """
     compute normal for each point in a regular grid
     """
 
     assert len(oarr.shape) == 3, 'normal computation from regular grid requires 3 (x, y, z) dimensions'
+    lib = get_lib_type(oarr)
+    dataclass = get_data_class(oarr)
 
     # compute difference in vertical and horizontal direction
     vdif = (oarr[:-1, :, :]-oarr[1:, :, :])[:, :-1, :]
     hdif = (oarr[:, :-1, :]-oarr[:, 1:, :])[:-1, :, :]
 
     # compute normals
-    narr = np.cross(hdif, vdif)
-
+    narr = lib.cross(hdif, vdif)
     # normalize vector length
-    narr /= np.linalg.norm(narr, axis=-1)[..., np.newaxis]
-
+    if torch.is_tensor(oarr):
+        norm = torch.norm(narr, dim=-1, keepdim=True)
+    else:
+        norm = np.linalg.norm(narr, axis=-1)[..., np.newaxis]
+    narr /= norm
     return narr
 
 
