@@ -11,7 +11,7 @@ def forward_project(
         kmat: Union[np.ndarray, torch.Tensor],
         rmat: Union[np.ndarray, torch.Tensor] = None,
         tvec: Union[np.ndarray, torch.Tensor] = None,
-        ret_depth: bool = False
+        inhomogenize_opt: bool = True
                     ):
 
     # determine library given input type
@@ -29,10 +29,9 @@ def forward_project(
     ipts = pmat @ opts
 
     # inhomogenization
-    depth = ipts[-1].copy()
-    ipts = ipts[:3] / depth
-    if ret_depth: return ipts, depth
-    else: return ipts
+    ipts = ipts[:3] / ipts[-1] if inhomogenize_opt else ipts
+
+    return ipts
 
 
 def reverse_project(
@@ -132,12 +131,12 @@ def create_img_coords_t(
                        ):
 
     # determine library given input type
-    lib = get_lib_type(ref_type)
+    #lib = get_lib_type(ref_type)
 
     # create 2-D coordinates
-    x_mesh = lib.linspace(0, x-1, x).repeat(b, y, 1).type_as(ref_type) + .5
-    y_mesh = lib.linspace(0, y-1, y).repeat(b, x, 1).transpose(1, 2).type_as(ref_type) + .5
-    ipts = lib.vstack([x_mesh.flatten(), y_mesh.flatten(), lib.ones(x_mesh.flatten().shape[0])])
+    x_mesh = torch.linspace(0, x-1, x).repeat(b, y, 1) + .5
+    y_mesh = torch.linspace(0, y-1, y).repeat(b, x, 1).transpose(1, 2) + .5
+    ipts = torch.vstack([x_mesh.flatten(), y_mesh.flatten(), torch.ones(x_mesh.flatten().shape[0])])
 
     return ipts
 

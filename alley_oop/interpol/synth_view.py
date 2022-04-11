@@ -30,13 +30,13 @@ def synth_view(
         ipts = create_img_coords_np(y, x)
     else:
         b, _, y, x = dept.unsqueeze(1).size() if len(dept.shape) == 3 else dept.size()
-        ipts = create_img_coords_t(y, x, b, ref_type=img)
+        ipts = create_img_coords_t(y, x, b)
 
     # back-project coordinates into space
-    opts = reverse_project(ipts, kmat=kmat1, dept=dept.flatten())
+    opts = reverse_project(ipts, kmat=kmat1, depth=dept.flatten())
 
     # rotate, translate and forward-project points
-    npts = forward_project(opts, kmat=kmat0, rmat=rmat, tvec=tvec)
+    npts = forward_project(opts, kmat=kmat0, rmat=rmat, tvec=tvec, inhomogenize_opt=True)
 
     if lib == numpy:
         nimg = img_map_scipy(img=img, ipts=ipts, npts=npts, mode=mode)

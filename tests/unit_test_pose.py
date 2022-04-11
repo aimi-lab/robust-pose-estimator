@@ -13,7 +13,7 @@ class PoseTester(unittest.TestCase):
 
     def setUp(self):
 
-        self.plt_opt = True
+        self.plt_opt = False
     
     def test_feat_pose(self):
         
@@ -38,9 +38,9 @@ class PoseTester(unittest.TestCase):
                 refer_solve = estimator.rmat.T @ (query - estimator.tvec)
 
                 # assert output estimates
-                dec_pos = 5
-                tvec_bool = np.allclose(np.round(t_true, dec_pos), np.round(estimator.tvec, dec_pos))
-                rmat_bool = np.allclose(np.round(r_true, dec_pos), np.round(estimator.rmat, dec_pos))
+                dec_pos = 2
+                tvec_bool = np.allclose(t_true, estimator.tvec, atol=10**-dec_pos)
+                rmat_bool = np.allclose(r_true, estimator.rmat, atol=10**-dec_pos)
 
                 # point residuals
                 refer_mse = np.mean((refer_solve - refer) ** 2)

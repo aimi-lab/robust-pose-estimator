@@ -7,10 +7,10 @@ import cv2
 import torch
 
 
-class RotEstimator(unittest.TestCase):
+class RotEstimatorTester(unittest.TestCase):
 
     def __init__(self, *args, **kwargs):
-        super(RotEstimator, self).__init__(*args, **kwargs)
+        super(RotEstimatorTester, self).__init__(*args, **kwargs)
 
     def setUp(self):
 
@@ -37,7 +37,6 @@ class RotEstimator(unittest.TestCase):
         # assertion
         self.assertTrue(np.allclose(R.cpu(), R_true, atol=1e-3))
         self.assertTrue(np.isclose(np.mean((img2cv-warped_img.cpu()).numpy()**2),0.0, atol=1e-5))
-
 
     def test_all(self):
 

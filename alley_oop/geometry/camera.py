@@ -14,7 +14,7 @@ class PinholeCamera(object):
         return reverse_project(points2d, self.intrinsics, depth=depth)
 
     def render(self, points3d, points_rgb, shape):
-        img_pts, depth = forward_project(points3d, self.intrinsics, ret_depth=True)
+        img_pts, depth = forward_project(points3d, self.intrinsics, inhomogenize_opt=True)
         ipts = create_img_coords_np(shape[0], shape[1])
         # RGB
         interpolator = NearestNDInterpolator(img_pts[:2].T, points_rgb, rescale=False)
