@@ -4,12 +4,12 @@
 
 import torch.nn as nn
 
-from stereo_slam.disparity.sttr_light.feat_extractor_backbone import build_backbone
-from stereo_slam.disparity.sttr_light.feat_extractor_tokenizer import build_tokenizer
-from stereo_slam.disparity.sttr_light.pos_encoder import build_position_encoding
-from stereo_slam.disparity.sttr_light.regression_head import build_regression_head
-from stereo_slam.disparity.sttr_light.transformer import build_transformer
-from stereo_slam.disparity.sttr_light.utilities.misc import batched_index_select, NestedTensor
+from other_slam_methods.stereo_slam.disparity.sttr_light.feat_extractor_backbone import build_backbone
+from other_slam_methods.stereo_slam.disparity.sttr_light.feat_extractor_tokenizer import build_tokenizer
+from other_slam_methods.stereo_slam.disparity.sttr_light.pos_encoder import build_position_encoding
+from other_slam_methods.stereo_slam.disparity.sttr_light.regression_head import build_regression_head
+from other_slam_methods.stereo_slam.disparity.sttr_light.transformer import build_transformer
+from other_slam_methods.stereo_slam.disparity.sttr_light.utilities.misc import NestedTensor
 
 
 class STTR(nn.Module):

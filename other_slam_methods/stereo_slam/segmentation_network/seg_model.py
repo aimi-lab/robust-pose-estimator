@@ -1,13 +1,12 @@
 import torch
 import torch.nn as nn
-import numpy as np
 from torchvision.transforms import Compose, Normalize
-from stereo_slam.segmentation_network.decoder import DeepLabV3PlusDecoder
-from stereo_slam.segmentation_network.pvt import pvt_v2_b2
+from other_slam_methods.stereo_slam.segmentation_network.decoder import DeepLabV3PlusDecoder
+from other_slam_methods.stereo_slam.segmentation_network.pvt import pvt_v2_b2
 import segmentation_models_pytorch as smp
-from stereo_slam.segmentation_network.temporal_attention import DeepLabTAM
+from other_slam_methods.stereo_slam.segmentation_network.temporal_attention import DeepLabTAM
 import os
-from stereo_slam.segmentation_network.tmp_scaler import TempScaling
+from other_slam_methods.stereo_slam.segmentation_network.tmp_scaler import TempScaling
 
 
 def get_model(checkpoint):

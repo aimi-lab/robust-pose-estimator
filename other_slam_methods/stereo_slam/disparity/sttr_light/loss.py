@@ -7,7 +7,7 @@ from collections import OrderedDict
 import torch
 from torch import nn, Tensor
 
-from stereo_slam.disparity.sttr_light.utilities.misc import batched_index_select, NestedTensor
+from other_slam_methods.stereo_slam.disparity.sttr_light.utilities.misc import NestedTensor
 
 
 class Criterion(nn.Module):

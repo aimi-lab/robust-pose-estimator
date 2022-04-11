@@ -8,8 +8,8 @@ import torch
 from torch import nn, Tensor
 from torch.utils.checkpoint import checkpoint
 
-from stereo_slam.disparity.sttr_light.attention import MultiheadAttentionRelative
-from stereo_slam.disparity.sttr_light.utilities.misc import get_clones
+from other_slam_methods.stereo_slam.disparity.sttr_light.attention import MultiheadAttentionRelative
+from other_slam_methods.stereo_slam.disparity.sttr_light.utilities.misc import get_clones
 
 layer_idx = 0
 

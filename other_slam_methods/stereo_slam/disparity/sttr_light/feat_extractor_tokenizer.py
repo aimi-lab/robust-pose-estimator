@@ -6,7 +6,7 @@ import torch
 from torch import nn, Tensor
 from torchvision.models.densenet import _DenseBlock
 
-from stereo_slam.disparity.sttr_light.utilities.misc import center_crop
+from other_slam_methods.stereo_slam.disparity.sttr_light.utilities.misc import center_crop
 
 
 class TransitionUp(nn.Module):
