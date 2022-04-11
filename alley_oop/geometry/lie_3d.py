@@ -23,12 +23,8 @@ def lie_so3_to_SO3(
     lib = get_lib_type(wvec)
 
     # check if vector of zeros
-    try:
-        eye = lib.eye(3).to(wvec.device)
-    except AttributeError:
-        eye = lib.eye(3)
     if not wvec.any():
-        return eye
+        return lib.eye(3)
 
     # compute scale from vector norm
     theta = (wvec.T @ wvec)**.5
@@ -43,7 +39,7 @@ def lie_so3_to_SO3(
         wmat = lie_hatmap(wvec)
 
     # compute exponential of hat-map using Taylor expansion (known as Rodrigues formula)
-    rmat = eye(3) + lib.sin(theta) * wmat + (1-lib.cos(theta)) * wmat @ wmat
+    rmat = lib.eye(3) + lib.sin(theta) * wmat + (1-lib.cos(theta)) * wmat @ wmat
 
     return rmat
 
