@@ -3,7 +3,7 @@ import numpy as np
 from torch.nn.functional import conv2d, pad
 from alley_oop.geometry.lie_3d import lie_so3_to_SO3, lie_hatmap
 import warnings
-from alley_oop.geometry.warping import HomographyWarper
+from alley_oop.interpol.warping import HomographyWarper
 from typing import Tuple
 
 
