@@ -128,16 +128,12 @@ def create_img_coords_t(
         y: int = 720,
         x: int = 1280,
         b: int = 1,
-        ref_type: type = torch.Tensor,
                        ):
 
-    # determine library given input type
-    lib = get_lib_type(ref_type)
-
     # create 2-D coordinates
-    x_mesh = lib.linspace(0, x-1, x).repeat(b, y, 1).type_as(ref_type) + .5
-    y_mesh = lib.linspace(0, y-1, y).repeat(b, x, 1).transpose(1, 2).type_as(ref_type) + .5
-    ipts = lib.vstack([x_mesh.flatten(), y_mesh.flatten(), lib.ones(x_mesh.flatten().shape[0])])
+    x_mesh = torch.linspace(0, x-1, x).repeat(b, y, 1) + .5
+    y_mesh = torch.linspace(0, y-1, y).repeat(b, x, 1).transpose(1, 2) + .5
+    ipts = torch.vstack([x_mesh.flatten(), y_mesh.flatten(), torch.ones(x_mesh.flatten().shape[0])])
 
     return ipts
 
