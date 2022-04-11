@@ -36,10 +36,7 @@ def lie_so3_to_SO3(
     wvec = wvec / theta if theta > tol else wvec
 
     # construct hat-map which is so(3)
-    try:
-        wmat = lie_hatmap(wvec).to(wvec.device)
-    except AttributeError:
-        wmat = lie_hatmap(wvec)
+    wmat = lie_hatmap(wvec)
 
     # compute exponential of hat-map using Taylor expansion (known as Rodrigues formula)
     rmat = eye_3 + lib.sin(theta) * wmat + (1-lib.cos(theta)) * wmat @ wmat
@@ -178,6 +175,10 @@ def lie_hatmap(
         [+wvec[2], 0, -wvec[0]],
         [-wvec[1], +wvec[0], 0],
     ])
+
+    # consider torch device
+    if isinstance(wvec, torch.Tensor):
+        wmat = wmat.to(wvec.device)
 
     return wmat
 
