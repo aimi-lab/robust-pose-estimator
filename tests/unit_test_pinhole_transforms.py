@@ -3,6 +3,7 @@ import numpy as np
 import imageio
 import torch
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 from alley_oop.geometry.pinhole_transforms import forward_project, reverse_project, compose_projection_matrix, decompose_projection_matrix, create_img_coords_np
 from alley_oop.geometry.quaternions import quat2rmat, euler2quat
@@ -30,7 +31,7 @@ class PinholeTransformTester(unittest.TestCase):
         self.rmat = np.eye(3)
         self.tvec = np.zeros([3, 1])
         self.zpts = 0.1 * np.random.randn(np.multiply(*self.resolution))[np.newaxis] + 1
-        self.ball = imageio.imread('./test_data/bball.jpeg')
+        self.ball = imageio.imread(Path.cwd() / 'tests' / 'test_data' / 'bball.jpeg')
 
     def test_ortho_plane_projection(self):
 
