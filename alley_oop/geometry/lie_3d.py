@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from typing import Union
 
-from alley_oop.utils.lib_handling import get_lib_type, get_data_class
+from alley_oop.utils.lib_handling import get_lib, get_class
 
 
 def lie_so3_to_SO3(
@@ -20,7 +20,7 @@ def lie_so3_to_SO3(
     :return: rotation matrix in SO(3)
     """
 
-    lib = get_lib_type(wvec)
+    lib = get_lib(wvec)
     
     # define identity matrix in advance to account for torch device
     eye_3 = lib.eye(3).to(wvec.device) if lib == torch else lib.eye(3)
@@ -54,7 +54,7 @@ def lie_SO3_to_so3(
     :return: Lie angle 3-vector
     """
 
-    lib = get_lib_type(rmat)
+    lib = get_lib(rmat)
 
     # check if trace = -1
     if (lib.trace(rmat)+1):
@@ -69,7 +69,7 @@ def lie_SO3_to_so3(
     ln_rmat = theta_term * (rmat-rmat.T)
 
     # obtain used array data type
-    data_class = get_data_class(rmat)
+    data_class = get_class(rmat)
 
     # extract elements from hat-map
     wvec = data_class([ln_rmat[2, 1]-ln_rmat[1, 2], ln_rmat[0, 2]-ln_rmat[2, 0], ln_rmat[1, 0]-ln_rmat[0, 1]]) / 2
@@ -90,7 +90,7 @@ def lie_se3_to_SE3(
     :return: rotation matrix in SO(3), translation vector R^3
     """
 
-    lib = get_lib_type(wvec)
+    lib = get_lib(wvec)
 
     # define identity matrix in advance to account for torch device
     eye_3 = lib.eye(3).to(wvec.device) if lib == torch else lib.eye(3)
@@ -130,7 +130,7 @@ def lie_SE3_to_se3(
     :return: Lie angle 3-vector, Lie translation 3-vector
     """
 
-    lib = get_lib_type(rmat)
+    lib = get_lib(rmat)
 
     wvec = lie_SO3_to_so3(rmat)
 
@@ -168,7 +168,7 @@ def lie_hatmap(
 
     assert len(wvec) == 3, 'argument must be a 3-vector'
 
-    data_class = get_data_class(wvec)
+    data_class = get_class(wvec)
 
     wmat = data_class([
         [0, -wvec[2], +wvec[1]],
@@ -194,7 +194,7 @@ def is_SO3(
     :return: True
     """
 
-    lib = get_lib_type(rmat)
+    lib = get_lib(rmat)
 
     assert rmat.shape[0] == 3 and rmat.shape[1] == 3, 'matrix must be 3x3'
     assert lib.linalg.det(rmat @ rmat.T) > 0, 'det(R @ R.T) must be greater than zero'

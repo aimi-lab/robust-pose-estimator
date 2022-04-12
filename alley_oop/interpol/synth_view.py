@@ -5,7 +5,7 @@ from typing import Union
 from alley_oop.geometry.pinhole_transforms import reverse_project, forward_project
 from alley_oop.geometry.pinhole_transforms import create_img_coords_t, create_img_coords_np
 from alley_oop.interpol.img_mappings import img_map_scipy, img_map_torch
-from alley_oop.utils.lib_handling import get_lib_type
+from alley_oop.utils.lib_handling import get_lib
 
 
 def synth_view(
@@ -19,7 +19,7 @@ def synth_view(
     ) -> Union[numpy.ndarray, torch.Tensor]:
 
     # determine library given input type
-    lib = get_lib_type(img)
+    lib = get_lib(img)
 
     # init values
     kmat1 = kmat0 if kmat1 is None else kmat1

@@ -3,7 +3,7 @@ import numpy as np
 from typing import Union
 
 
-from alley_oop.utils.lib_handling import get_lib_type
+from alley_oop.utils.lib_handling import get_lib
 
 
 def forward_project(
@@ -15,7 +15,7 @@ def forward_project(
                     ):
 
     # determine library given input type
-    lib = get_lib_type(opts)
+    lib = get_lib(opts)
 
     # init values potentially missing
     rmat = lib.eye(3) if rmat is None else rmat
@@ -45,7 +45,7 @@ def reverse_project(
                     ):
 
     # determine library given input type
-    lib = get_lib_type(ipts)
+    lib = get_lib(ipts)
 
     # init values potentially missing
     rmat = lib.eye(3) if rmat is None else rmat
@@ -70,7 +70,7 @@ def compose_projection_matrix(
                              ):
 
     # determine library given input type
-    lib = get_lib_type(kmat)
+    lib = get_lib(kmat)
 
     return kmat @ lib.hstack([rmat, tvec])
 
@@ -84,7 +84,7 @@ def decompose_projection_matrix(
     """
 
     # determine library given input type
-    lib = get_lib_type(pmat)
+    lib = get_lib(pmat)
 
     n = pmat.shape[0] if len(pmat.shape) == 2 else lib.sqrt(pmat.size)
     hmat = pmat.reshape(n, -1)[:, :n]
@@ -107,7 +107,7 @@ def decompose_rq(hmat:Union[np.ndarray, torch.Tensor]):
     """
 
     # determine library given input type
-    lib = get_lib_type(hmat)
+    lib = get_lib(hmat)
 
     hmat = hmat.T
     rmat, kmat = lib.linalg.qr(hmat[::-1, ::-1])    #, mode='reduced'
