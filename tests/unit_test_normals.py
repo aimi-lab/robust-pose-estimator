@@ -1,6 +1,7 @@
 import unittest
 from pathlib import Path
 import numpy as np
+import torch
 
 from alley_oop.geometry.normals import normals_from_pca, normals_from_regular_grid, get_ray_surfnorm_angle
 
@@ -25,25 +26,32 @@ class NormalsTester(unittest.TestCase):
     def test_normals_from_regular_grid(self, plot_opt=False):
         
         # set input points
-        oarr = self.wall_init
+        default_data = self.wall_init
 
-        # compute normals from regular grid
-        narr = normals_from_regular_grid(oarr)
-        
-        # rearrange arrays for plotting
-        naxs = narr.reshape(-1, 3).T
-        opts = oarr[:-1, :-1, :].reshape(-1, 3).T
+        for class_type in [np.array, torch.Tensor]:
+            
+            oarr = class_type(default_data.copy())
 
-        # plottings
-        if plot_opt: self.plot_normals(naxs[:, ::5000], opts[:, ::5000])
+            # compute normals from regular grid
+            narr = normals_from_regular_grid(oarr)
 
-        # compute surface normal angles and check if they are perpendicular
-        degs = get_ray_surfnorm_angle(np.zeros_like(narr).reshape(-1, 3), narr.reshape(-1, 3)) / np.pi * 180
-        self.assertTrue(np.allclose(degs, np.ones(len(degs))*90, atol=0.1))
+            # convert to numpy (if required)
+            narr = narr.numpy() if isinstance(narr, torch.Tensor) else narr
+            
+            # rearrange arrays for plotting
+            naxs = narr.reshape(-1, 3).T
+            opts = oarr[:-1, :-1, :].reshape(-1, 3).T
 
-        # compute ray vs surface normal angles and check if they are non-zero
-        degs = get_ray_surfnorm_angle(opts, naxs) / np.pi * 180
-        self.assertFalse(np.allclose(degs, np.zeros(len(degs))))
+            # plottings
+            if plot_opt: self.plot_normals(naxs[:, ::5000], opts[:, ::5000])
+
+            # compute surface normal angles and check if they are perpendicular
+            degs = get_ray_surfnorm_angle(np.zeros_like(narr).reshape(-1, 3), narr.reshape(-1, 3)) / np.pi * 180
+            self.assertTrue(np.allclose(degs, np.ones(len(degs))*90, atol=0.1))
+
+            # compute ray vs surface normal angles and check if they are non-zero
+            degs = get_ray_surfnorm_angle(opts, naxs) / np.pi * 180
+            self.assertFalse(np.allclose(degs, np.zeros(len(degs))))
 
 
     def test_normals_from_pca(self, plot_opt=False):
