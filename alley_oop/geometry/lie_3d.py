@@ -99,9 +99,9 @@ def lie_se3_to_SE3(
     theta = (wvec.T @ wvec)**.5
 
     # Taylor coefficients
-    a_term = lib.sin(theta) #/ theta
-    b_term = (1-lib.cos(theta)) #/ theta**2
-    c_term = (1-a_term) #/ theta**2
+    a_term = lib.sin(theta)
+    b_term = (1-lib.cos(theta))
+    c_term = (1-a_term)
 
     # normalize vector
     wvec_norm = wvec / theta if theta > tol else wvec
