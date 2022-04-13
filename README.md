@@ -9,7 +9,6 @@
 
 **Note**
 
-if the above install script is not used, submodules need to be loaded manually by
+if the above install script is not used, submodules can be loaded manually by
 
-``` git submodule update --init --recursive ```
-
+``` $ git submodule update --init --recursive ```
