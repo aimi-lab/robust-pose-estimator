@@ -1,6 +1,8 @@
 python3 -m venv env
 source env/bin/activate
 
+git submodule update --init --recursive
+
 python3 -m pip install -r requirements.txt
 python3 -m pip install -r torchimize/requirements.txt
 
