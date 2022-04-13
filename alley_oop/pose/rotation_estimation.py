@@ -44,7 +44,8 @@ class RotationEstimator(torch.nn.Module):
                 converged = True
                 break
             # compute update parameter x0
-            x0 = J_pinv @ residuals
+            #x0 = J_pinv @ residuals
+            x0 = torch.linalg.lstsq(J, residuals).solution
             # update rotation estimate
             R_lr = R_lr @ lie_so3_to_SO3(x0.squeeze())
             # print("residuals: ", (residuals ** 2).mean().item())
