@@ -6,8 +6,8 @@ import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
 
-from stereo_slam.disparity.sttr_light.context_adjustment_layer import build_context_adjustment_layer
-from stereo_slam.disparity.sttr_light.utilities.misc import batched_index_select, torch_1d_sample, NestedTensor
+from other_slam_methods.stereo_slam.disparity.sttr_light.context_adjustment_layer import build_context_adjustment_layer
+from other_slam_methods.stereo_slam.disparity.sttr_light.utilities.misc import torch_1d_sample, NestedTensor
 
 
 class RegressionHead(nn.Module):

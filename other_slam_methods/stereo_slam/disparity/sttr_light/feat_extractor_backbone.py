@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from torch import nn
 from torchvision.models.resnet import BasicBlock
 
-from stereo_slam.disparity.sttr_light.utilities.misc import NestedTensor
+from other_slam_methods.stereo_slam.disparity.sttr_light.utilities.misc import NestedTensor
 
 
 class SppBackbone(nn.Module):

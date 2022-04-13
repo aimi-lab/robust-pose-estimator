@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 import cv2
 
-from emdq_slam.emdq_slam_pipeline import EmdqSLAM
+from other_slam_methods.emdq_slam import EmdqSLAM
 from alley_oop.geometry.camera import PinholeCamera
 
 

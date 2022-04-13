@@ -1,8 +1,8 @@
 import sys
-sys.path.append('..')
+sys.path.append('../..')
 from alley_oop.geometry.camera import PinholeCamera
 from alley_oop.metrics.point_cloud_metrics import pcl_ae, nearest_neighbour_dist
-from emdq_slam.emdq_slam_pipeline import EmdqSLAM, EmdqGlueSLAM
+from other_slam_methods.emdq_slam.emdq_slam_pipeline import EmdqGlueSLAM
 from alley_oop.metrics.trajectory_metrics import absolute_trajectory_error
 import cv2
 import numpy as np

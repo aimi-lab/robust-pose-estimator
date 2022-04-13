@@ -1,6 +1,9 @@
 import unittest
 import numpy as np
 import imageio
+import torch
+import matplotlib.pyplot as plt
+from pathlib import Path
 
 from alley_oop.geometry.pinhole_transforms import forward_project, reverse_project, compose_projection_matrix, decompose_projection_matrix, create_img_coords_np
 from alley_oop.geometry.quaternions import quat2rmat, euler2quat
@@ -28,7 +31,7 @@ class PinholeTransformTester(unittest.TestCase):
         self.rmat = np.eye(3)
         self.tvec = np.zeros([3, 1])
         self.zpts = 0.1 * np.random.randn(np.multiply(*self.resolution))[np.newaxis] + 1
-        self.ball = imageio.imread('./tests/test_data/bball.jpeg')
+        self.ball = imageio.imread(Path.cwd() / 'tests' / 'test_data' / 'bball.jpeg')
 
     def test_ortho_plane_projection(self):
 
@@ -40,7 +43,7 @@ class PinholeTransformTester(unittest.TestCase):
 
             opts = reverse_project(self.ipts, self.kmat, self.rmat, self.tvec, disp=zpts)
 
-            npts = forward_project(opts, self.kmat, self.rmat, self.tvec)
+            npts = forward_project(opts, self.kmat, self.rmat, self.tvec, inhomogenize_opt=True)
 
             self.assertTrue(np.allclose(self.ipts, npts))
 
@@ -82,7 +85,6 @@ class PinholeTransformTester(unittest.TestCase):
         nimg = img_map_scipy(self.ball, ipts=self.ipts, npts=npts)
 
         if self.plot_opt:
-            import matplotlib.pyplot as plt
             plt.figure()
             plt.imshow(nimg)
             plt.show()
@@ -104,6 +106,21 @@ class PinholeTransformTester(unittest.TestCase):
         self.assertTrue(np.allclose(self.kmat, abs(kmat)))
 
         # todo: consider sign results and make sure tvec is correct
+
+    def plot_img_comparison(self):
+
+            if isinstance(self.rimg, torch.Tensor):
+                self.rimg = self.rimg.detach().cpu().numpy()
+
+            if isinstance(self.nimg, torch.Tensor):
+                self.nimg = self.nimg.detach().cpu().numpy()
+
+            _, axs = plt.subplots(nrows=1, ncols=2, figsize=(12, 5))
+            axs[0].imshow(self.rimg)
+            axs[0].set_title('before transformation')
+            axs[1].imshow(self.nimg)
+            axs[1].set_title('after transformation')
+            plt.show()
 
     def test_all(self):
 

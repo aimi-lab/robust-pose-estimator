@@ -13,7 +13,7 @@ class PoseTester(unittest.TestCase):
 
     def setUp(self):
 
-        self.plt_opt = True
+        self.plt_opt = False
     
     def test_feat_pose(self):
         
@@ -38,9 +38,8 @@ class PoseTester(unittest.TestCase):
                 refer_solve = estimator.rmat.T @ (query - estimator.tvec)
 
                 # assert output estimates
-                dec_pos = 5
-                tvec_bool = np.allclose(np.round(t_true, dec_pos), np.round(estimator.tvec, dec_pos))
-                rmat_bool = np.allclose(np.round(r_true, dec_pos), np.round(estimator.rmat, dec_pos))
+                tvec_bool = np.allclose(t_true, estimator.tvec, atol=10**-1)
+                rmat_bool = np.allclose(r_true, estimator.rmat, atol=10**-3)
 
                 # point residuals
                 refer_mse = np.mean((refer_solve - refer) ** 2)
@@ -49,8 +48,8 @@ class PoseTester(unittest.TestCase):
                 try:
                     self.assertTrue(tvec_bool, msg='failed for angle %s at dim %s' % (a, dim))
                     self.assertTrue(rmat_bool, msg='failed for angle %s at dim %s' % (a, dim))
-                    self.assertTrue(refer_mse < 1**-dec_pos, msg='failed for angle %s at dim %s' % (a, dim))
-                    self.assertTrue(query_mse < 1**-dec_pos, msg='failed for angle %s at dim %s' % (a, dim))
+                    self.assertTrue(refer_mse < 1**-3, msg='failed for angle %s at dim %s' % (a, dim))
+                    self.assertTrue(query_mse < 1**-3, msg='failed for angle %s at dim %s' % (a, dim))
                 except AssertionError as e:
                     if self.plt_opt:
                         fig = plt.figure(figsize=(12, 12))

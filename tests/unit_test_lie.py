@@ -96,7 +96,7 @@ class Lie3DTester(unittest.TestCase):
 
         rmat = lie_so3_to_SO3(np.zeros(3))
 
-        self.assertTrue(np.sum(rmat - np.eye(3)) == 0, 'Zero Euler angles do not yield identity matrix')
+        self.assertTrue(np.sum(rmat - np.eye(3)) == 0, 'Zero angles do not yield identity matrix')
 
         rmat, tvec = lie_se3_to_SE3(wvec=np.zeros(3), uvec=np.zeros(3))
 

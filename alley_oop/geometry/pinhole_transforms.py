@@ -3,7 +3,7 @@ import numpy as np
 from typing import Union
 
 
-from alley_oop.utils.lib_handling import get_lib_type
+from alley_oop.utils.lib_handling import get_lib
 
 
 def forward_project(
@@ -11,11 +11,11 @@ def forward_project(
         kmat: Union[np.ndarray, torch.Tensor],
         rmat: Union[np.ndarray, torch.Tensor] = None,
         tvec: Union[np.ndarray, torch.Tensor] = None,
-        ret_depth: bool = False
+        inhomogenize_opt: bool = True
                     ):
 
     # determine library given input type
-    lib = get_lib_type(opts)
+    lib = get_lib(opts)
 
     # init values potentially missing
     rmat = lib.eye(3) if rmat is None else rmat
@@ -29,10 +29,9 @@ def forward_project(
     ipts = pmat @ opts
 
     # inhomogenization
-    depth = ipts[-1].copy()
-    ipts = ipts[:3] / depth
-    if ret_depth: return ipts, depth
-    else: return ipts
+    ipts = ipts[:3] / ipts[-1] if inhomogenize_opt else ipts
+
+    return ipts
 
 
 def reverse_project(
@@ -46,7 +45,7 @@ def reverse_project(
                     ):
 
     # determine library given input type
-    lib = get_lib_type(ipts)
+    lib = get_lib(ipts)
 
     # init values potentially missing
     rmat = lib.eye(3) if rmat is None else rmat
@@ -71,7 +70,7 @@ def compose_projection_matrix(
                              ):
 
     # determine library given input type
-    lib = get_lib_type(kmat)
+    lib = get_lib(kmat)
 
     return kmat @ lib.hstack([rmat, tvec])
 
@@ -85,7 +84,7 @@ def decompose_projection_matrix(
     """
 
     # determine library given input type
-    lib = get_lib_type(pmat)
+    lib = get_lib(pmat)
 
     n = pmat.shape[0] if len(pmat.shape) == 2 else lib.sqrt(pmat.size)
     hmat = pmat.reshape(n, -1)[:, :n]
@@ -108,7 +107,7 @@ def decompose_rq(hmat:Union[np.ndarray, torch.Tensor]):
     """
 
     # determine library given input type
-    lib = get_lib_type(hmat)
+    lib = get_lib(hmat)
 
     hmat = hmat.T
     rmat, kmat = lib.linalg.qr(hmat[::-1, ::-1])    #, mode='reduced'
@@ -128,7 +127,11 @@ def create_img_coords_t(
         y: int = 720,
         x: int = 1280,
         b: int = 1,
+        ref_type: type = torch.Tensor,
                        ):
+
+    # determine library given input type
+    #lib = get_lib_type(ref_type)
 
     # create 2-D coordinates
     x_mesh = torch.linspace(0, x-1, x).repeat(b, y, 1) + .5

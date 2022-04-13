@@ -5,7 +5,7 @@ import torch
 from typing import Union, Type
 from modulefinder import Module
 
-def get_lib_type(
+def get_lib(
         data_object: Union[numpy.ndarray, torch.Tensor]
     ) -> Module:
 
@@ -17,7 +17,7 @@ def get_lib_type(
 
     raise TypeError('%s is not supported' % type(data_object))
 
-def get_data_class(
+def get_class(
         data_object: Union[numpy.ndarray, torch.Tensor]
     ) -> Union[numpy.array, torch.tensor]:
 

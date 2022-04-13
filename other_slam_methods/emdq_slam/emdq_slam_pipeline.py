@@ -1,15 +1,16 @@
 import sys
-sys.path.append('..')
+sys.path.append('../..')
 import cv2
 import numpy as np
 from alley_oop.geometry.absolute_pose_quarternion import align
-from alley_oop.geometry.pinhole_transforms import create_img_coords_t, create_img_coords_np
-from alley_oop.geometry.opencv_utils import kpts2npy
+from alley_oop.geometry.pinhole_transforms import create_img_coords_np
+from alley_oop.utils.opencv import kpts2npy
 from emdq import pyEMDQ
-from scipy.spatial.distance import cdist, pdist
+from scipy.spatial.distance import pdist
 from scipy.spatial import cKDTree
 from .superglue.superglue import SuperGlueMatcher
 import torch
+
 
 class EmdqSLAM(object):
     def __init__(self, camera, config):

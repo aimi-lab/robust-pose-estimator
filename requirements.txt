@@ -9,5 +9,6 @@ open3d
 torch
 torchvision
 numpy==1.18
-opencv-python
+opencv-python==4.3.0.36
 segmentation-models-pytorch
+plyfile

@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from typing import Union
 
-from alley_oop.utils.lib_handling import get_lib_type, get_data_class
+from alley_oop.utils.lib_handling import get_lib, get_class
 
 
 def lie_so3_to_SO3(
@@ -20,15 +20,14 @@ def lie_so3_to_SO3(
     :return: rotation matrix in SO(3)
     """
 
-    lib = get_lib_type(wvec)
+    lib = get_lib(wvec)
+    
+    # define identity matrix in advance to account for torch device
+    eye_3 = lib.eye(3).to(wvec.device) if lib == torch else lib.eye(3)
 
     # check if vector of zeros
-    try:
-        eye = lib.eye(3).to(wvec.device)
-    except AttributeError:
-        eye = lib.eye(3)
     if not wvec.any():
-        return eye
+        return eye_3
 
     # compute scale from vector norm
     theta = (wvec.T @ wvec)**.5
@@ -37,13 +36,10 @@ def lie_so3_to_SO3(
     wvec = wvec / theta if theta > tol else wvec
 
     # construct hat-map which is so(3)
-    try:
-        wmat = lie_hatmap(wvec).to(wvec.device)
-    except AttributeError:
-        wmat = lie_hatmap(wvec)
+    wmat = lie_hatmap(wvec)
 
     # compute exponential of hat-map using Taylor expansion (known as Rodrigues formula)
-    rmat = eye(3) + lib.sin(theta) * wmat + (1-lib.cos(theta)) * wmat @ wmat
+    rmat = eye_3 + lib.sin(theta) * wmat + (1-lib.cos(theta)) * wmat @ wmat
 
     return rmat
 
@@ -58,7 +54,7 @@ def lie_SO3_to_so3(
     :return: Lie angle 3-vector
     """
 
-    lib = get_lib_type(rmat)
+    lib = get_lib(rmat)
 
     # check if trace = -1
     if (lib.trace(rmat)+1):
@@ -73,7 +69,7 @@ def lie_SO3_to_so3(
     ln_rmat = theta_term * (rmat-rmat.T)
 
     # obtain used array data type
-    data_class = get_data_class(rmat)
+    data_class = get_class(rmat)
 
     # extract elements from hat-map
     wvec = data_class([ln_rmat[2, 1]-ln_rmat[1, 2], ln_rmat[0, 2]-ln_rmat[2, 0], ln_rmat[1, 0]-ln_rmat[0, 1]]) / 2
@@ -94,15 +90,18 @@ def lie_se3_to_SE3(
     :return: rotation matrix in SO(3), translation vector R^3
     """
 
-    lib = get_lib_type(wvec)
+    lib = get_lib(wvec)
+
+    # define identity matrix in advance to account for torch device
+    eye_3 = lib.eye(3).to(wvec.device) if lib == torch else lib.eye(3)
 
     # compute scale from vector norm
     theta = (wvec.T @ wvec)**.5
 
     # Taylor coefficients
-    a_term = lib.sin(theta) #/ theta
-    b_term = (1-lib.cos(theta)) #/ theta**2
-    c_term = (1-a_term) #/ theta**2
+    a_term = lib.sin(theta)
+    b_term = (1-lib.cos(theta))
+    c_term = (1-a_term)
 
     # normalize vector
     wvec_norm = wvec / theta if theta > tol else wvec
@@ -110,8 +109,8 @@ def lie_se3_to_SE3(
     # construct hat-map which is so(3)
     wmat = lie_hatmap(wvec_norm)
     
-    rmat = lib.eye(3) + a_term * wmat + b_term * wmat @ wmat
-    vmat = lib.eye(3) + b_term * wmat + c_term * wmat @ wmat
+    rmat = eye_3 + a_term * wmat + b_term * wmat @ wmat
+    vmat = eye_3 + b_term * wmat + c_term * wmat @ wmat
 
     tvec = vmat @ uvec
 
@@ -131,7 +130,7 @@ def lie_SE3_to_se3(
     :return: Lie angle 3-vector, Lie translation 3-vector
     """
 
-    lib = get_lib_type(rmat)
+    lib = get_lib(rmat)
 
     wvec = lie_SO3_to_so3(rmat)
 
@@ -169,13 +168,17 @@ def lie_hatmap(
 
     assert len(wvec) == 3, 'argument must be a 3-vector'
 
-    data_class = get_data_class(wvec)
+    data_class = get_class(wvec)
 
     wmat = data_class([
         [0, -wvec[2], +wvec[1]],
         [+wvec[2], 0, -wvec[0]],
         [-wvec[1], +wvec[0], 0],
     ])
+
+    # consider torch device
+    if isinstance(wvec, torch.Tensor):
+        wmat = wmat.to(wvec.device)
 
     return wmat
 
@@ -191,7 +194,7 @@ def is_SO3(
     :return: True
     """
 
-    lib = get_lib_type(rmat)
+    lib = get_lib(rmat)
 
     assert rmat.shape[0] == 3 and rmat.shape[1] == 3, 'matrix must be 3x3'
     assert lib.linalg.det(rmat @ rmat.T) > 0, 'det(R @ R.T) must be greater than zero'

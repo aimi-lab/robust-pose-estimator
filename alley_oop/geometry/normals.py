@@ -3,7 +3,7 @@ from sklearn.decomposition import PCA
 import numpy as np
 import torch
 from typing import Union
-from alley_oop.utils.lib_handling import get_lib_type, get_data_class
+from alley_oop.utils.lib_handling import get_lib
 
 
 def normals_from_regular_grid(oarr: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, torch.Tensor]:
@@ -12,21 +12,19 @@ def normals_from_regular_grid(oarr: Union[np.ndarray, torch.Tensor]) -> Union[np
     """
 
     assert len(oarr.shape) == 3, 'normal computation from regular grid requires 3 (x, y, z) dimensions'
-    lib = get_lib_type(oarr)
-    dataclass = get_data_class(oarr)
+    lib = get_lib(oarr)
 
     # compute difference in vertical and horizontal direction
-    vdif = (oarr[:-1, :, :]-oarr[1:, :, :])[:, :-1, :]
-    hdif = (oarr[:, :-1, :]-oarr[:, 1:, :])[:-1, :, :]
+    vdif = (oarr[:-1, :, :] - oarr[1:, :, :])[:, :-1, :]
+    hdif = (oarr[:, :-1, :] - oarr[:, 1:, :])[:-1, :, :]
 
     # compute normals
     narr = lib.cross(hdif, vdif)
+
     # normalize vector length
-    if torch.is_tensor(oarr):
-        norm = torch.norm(narr, dim=-1, keepdim=True)
-    else:
-        norm = np.linalg.norm(narr, axis=-1)[..., np.newaxis]
-    narr /= norm
+    norm = lib.sum(narr**2, axis=-1)**.5
+    narr /= norm[..., None]
+
     return narr
 
 

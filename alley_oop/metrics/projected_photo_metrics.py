@@ -1,5 +1,5 @@
 from alley_oop.interpol.synth_view import synth_view
-from alley_oop.utils.lib_handling import get_lib_type
+from alley_oop.utils.lib_handling import get_lib
 
 def dual_projected_photo_loss(img0, img1, dep0, dep1, rmat, tvec, kmat0, kmat1=None):
 
@@ -21,7 +21,7 @@ def projected_photo_loss(rimg, qimg, dept, rmat, tvec, kmat0, kmat1=None, dbg_op
     nimg = synth_view(qimg, dept, rmat, tvec, kmat0, kmat1)
 
     # determine library given input type
-    lib = get_lib_type(nimg)
+    lib = get_lib(nimg)
 
     # compute loss
     rmse = lib.mean((rimg - nimg)**2)**.5

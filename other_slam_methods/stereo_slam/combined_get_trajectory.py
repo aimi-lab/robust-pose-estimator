@@ -1,5 +1,5 @@
 import sys
-sys.path.append('..')
+sys.path.append('../..')
 from dataset.semantic_dataset import RGBDDataset
 from dataset.scared_dataset import ScaredDataset
 from dataset.video_dataset import StereoVideoDataset
@@ -11,9 +11,9 @@ import torch
 import numpy as np
 from tqdm import tqdm
 from viewer.slam_viewer import SlamViewer
-from stereo_slam.disparity.disparity_model import DisparityModel
-from stereo_slam.segmentation_network.seg_model import SemanticSegmentationModel
-from emdq_slam.emdq_slam_pipeline import EmdqGlueSLAM
+from other_slam_methods.stereo_slam.disparity.disparity_model import DisparityModel
+from other_slam_methods.stereo_slam.segmentation_network.seg_model import SemanticSegmentationModel
+from other_slam_methods.emdq_slam import EmdqGlueSLAM
 from alley_oop.geometry.camera import PinholeCamera
 
 
