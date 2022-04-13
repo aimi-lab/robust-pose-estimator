@@ -36,7 +36,6 @@ class RotationEstimator(torch.nn.Module):
             # compute residuals f(x)
             warped_img = self._warp_img(ref_img, R_lr, self.intrinsics)
             J = self._ems_jacobian(warped_img, target_img)
-            J_pinv = torch.linalg.pinv(J)
             residuals = ((warped_img - target_img)).reshape(-1, 1)
             if mask is not None:
                 residuals = mask.reshape(-1,1)*residuals
@@ -44,7 +43,6 @@ class RotationEstimator(torch.nn.Module):
                 converged = True
                 break
             # compute update parameter x0
-            #x0 = J_pinv @ residuals
             x0 = torch.linalg.lstsq(J, residuals).solution
             # update rotation estimate
             R_lr = R_lr @ lie_so3_to_SO3(x0.squeeze())
