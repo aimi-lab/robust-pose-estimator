@@ -7,9 +7,6 @@ from alley_oop.geometry.point_cloud import PointCloud
 from alley_oop.utils.pytorch import batched_dot_product
 from typing import Tuple
 import matplotlib.pyplot as plt
-import sys
-import os
-sys.path.append(os.path.join(os.getcwd(), 'torchimize'))
 from torchimize.functions import lsq_lma
 
 
