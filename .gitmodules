@@ -1,4 +1,0 @@
-[submodule "torchimize"]
-	path = torchimize
-	url = https://github.com/hahnec/torchimize
-	branch = master
