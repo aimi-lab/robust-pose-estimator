@@ -7,13 +7,8 @@
 
 ``` $ bash install_env.sh```
 
-<<<<<<< HEAD
-``` git submodule update --init --recursive ```
-
-=======
 **Note**
 
 if the above install script is not used, submodules can be loaded manually by
 
 ``` $ git submodule update --init --recursive ```
->>>>>>> develop
