@@ -72,6 +72,22 @@ class Lie3DTester(unittest.TestCase):
             self.assertTrue(np.allclose(p[:3], wvec, atol=10e-11))
             self.assertTrue(np.allclose(p[3:], uvec, atol=10e-11))
 
+        for p in arr:
+            # convert 3-vector to rotation matrix
+            hmat = lie_se3_to_SE3(wvec=p[:3], uvec=p[3:], homogenous=True)
+
+            # check if rotation matrix is SO3
+            rval = is_SO3(hmat[:3,:3])
+            self.assertTrue(rval)
+
+            # convert rotation matrix to 3-vector
+            wvec, uvec = lie_SE3_to_se3(hmat[:3,:3], hmat[:3,3])
+
+            # assertion
+            self.assertTrue(np.allclose(p[:3], wvec, atol=10e-11))
+            self.assertTrue(np.allclose(p[3:], uvec, atol=10e-11))
+
+
     def test_se3_conversions_torch(self):
 
         arr = .25 * torch.randn(100, 6, dtype=torch.float64)
@@ -87,6 +103,21 @@ class Lie3DTester(unittest.TestCase):
 
             # convert rotation matrix to 3-vector
             wvec, uvec = lie_SE3_to_se3(rmat, tvec)
+
+            # assertion
+            self.assertTrue(np.allclose(p[:3], wvec, atol=10e-11))
+            self.assertTrue(np.allclose(p[3:], uvec, atol=10e-11))
+
+        for p in arr:
+            # convert 3-vector to rotation matrix
+            hmat = lie_se3_to_SE3(wvec=p[:3], uvec=p[3:], homogenous=True)
+
+            # check if rotation matrix is SO3
+            rval = is_SO3(hmat[:3,:3])
+            self.assertTrue(rval)
+
+            # convert rotation matrix to 3-vector
+            wvec, uvec = lie_SE3_to_se3(hmat[:3,:3], hmat[:3,3])
 
             # assertion
             self.assertTrue(np.allclose(p[:3], wvec, atol=10e-11))

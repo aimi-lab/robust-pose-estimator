@@ -81,6 +81,7 @@ def lie_se3_to_SE3(
         wvec: Union[np.ndarray, torch.Tensor] = None,
         uvec: Union[np.ndarray, torch.Tensor] = None,
         tol: float = 10e-12,
+        homogenous: bool = False
     ) -> Union[np.ndarray, torch.Tensor]:
     """
     create rotation matrix in SO(3) and translation vector R^3 from Lie algebra equivalents
@@ -113,8 +114,13 @@ def lie_se3_to_SE3(
     vmat = eye_3 + b_term * wmat + c_term * wmat @ wmat
 
     tvec = vmat @ uvec
-
-    return rmat, tvec
+    if not homogenous:
+        return rmat, tvec
+    else:
+        hmat = lib.eye(4, dtype=wvec.dtype).to(wvec.device) if lib == torch else lib.eye(4, dtype=wvec.dtype)
+        hmat[:3,:3] = rmat
+        hmat[:3,3] = tvec
+        return hmat
 
 
 def lie_SE3_to_se3(
