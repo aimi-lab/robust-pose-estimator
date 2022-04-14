@@ -1,3 +1,4 @@
 [submodule "torchimize_repo"]
 	path = torchimize_repo
 	url = https://github.com/hahnec/torchimize
+	branch = master
