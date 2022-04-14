@@ -7,6 +7,10 @@ from alley_oop.geometry.point_cloud import PointCloud
 from alley_oop.utils.pytorch import batched_dot_product
 from typing import Tuple
 import matplotlib.pyplot as plt
+import sys
+import os
+sys.path.append(os.path.join(os.getcwd(), 'torchimize'))
+from torchimize.functions import lsq_lma
 
 
 class ICPEstimator(torch.nn.Module):
@@ -76,36 +80,32 @@ class ICPEstimator(torch.nn.Module):
         return (residuals**2).mean()
 
     def residual_fun(self, x, ref_pcl, target_pcl, mask=None):
-        with torch.no_grad():
-            xt = torch.tensor(x).double().to(ref_pcl.pts.device) if not torch.is_tensor(x) else x
-            T_est = lie_se3_to_SE3(xt[:3], xt[3:], homogenous=True)
-            target_pcl_current_c = target_pcl.transform_cpy(torch.linalg.inv(T_est))  # transform into current frame
-            self.src_grid_ids, self.trg_ids = self.associate(ref_pcl, target_pcl_current_c, mask)
-            # compute residuals
-            ref_pcl_world_c = ref_pcl.transform_cpy(T_est)
-            return batched_dot_product(target_pcl.normals[self.trg_ids],
-                                       (ref_pcl_world_c.grid_pts[self.src_grid_ids] - target_pcl.pts[
-                                           self.trg_ids]))#.numpy()
+        xt = torch.tensor(x).double().to(ref_pcl.pts.device) if not torch.is_tensor(x) else x
+        T_est = lie_se3_to_SE3(xt[:3], xt[3:], homogenous=True)
+        target_pcl_current_c = target_pcl.transform_cpy(torch.linalg.inv(T_est))  # transform into current frame
+        self.src_grid_ids, self.trg_ids = self.associate(ref_pcl, target_pcl_current_c, mask)
+        # compute residuals
+        ref_pcl_world_c = ref_pcl.transform_cpy(T_est)
+        return batched_dot_product(target_pcl.normals[self.trg_ids],
+                                   (ref_pcl_world_c.grid_pts[self.src_grid_ids] - target_pcl.pts[
+                                       self.trg_ids]))
 
     def jacobian(self, x, ref_pcl, target_pcl, mask=None):
-        with torch.no_grad():
-            xt = torch.tensor(x).double() if not torch.is_tensor(x) else x
-            T_est = lie_se3_to_SE3(xt[:3], xt[3:], homogenous=True)
-            ref_pcl_world_c = ref_pcl.transform_cpy(T_est)
-            return (target_pcl.normals[self.trg_ids].unsqueeze(1) @ self.j_3d(
-                ref_pcl_world_c.grid_pts[self.src_grid_ids])).squeeze()#.numpy()
+        xt = torch.tensor(x).double() if not torch.is_tensor(x) else x
+        T_est = lie_se3_to_SE3(xt[:3], xt[3:], homogenous=True)
+        ref_pcl_world_c = ref_pcl.transform_cpy(T_est)
+        return (target_pcl.normals[self.trg_ids].unsqueeze(1) @ self.j_3d(
+            ref_pcl_world_c.grid_pts[self.src_grid_ids])).squeeze()
 
-    def estimate_lm(self, ref_depth: torch.Tensor, target_pcl:PointCloud, mask: torch.tensor=None): #ToDo replace scipy by torchimize
+    def estimate_lm(self, ref_depth: torch.Tensor, target_pcl:PointCloud, mask: torch.tensor=None):
         """ Levenberg-Marquard estimation. This is a hacky implementation, we wait until the torchimize is stable"""
         ref_pcl = PointCloud()
         ref_pcl.from_depth(ref_depth, self.intrinsics)
 
-        from scipy.optimize import least_squares
-        # numerical jacobian
-        #res = least_squares(residuals, np.zeros(6, dtype=np.float64), args=(ref_pcl, target_pcl,))
-        # analytical jacobian
-        res = least_squares(self.residual_fun, np.zeros(6, dtype=np.float64), self.jacobian, args=(ref_pcl, target_pcl,mask,))
-        return torch.tensor(lie_se3_to_SE3(res.x[:3], res.x[3:], homogenous=True)), res.cost/ref_depth.numel()
+        x_list, eps = lsq_lma(torch.zeros(6).to(ref_depth.device).to(ref_depth.dtype),self.residual_fun, self.jacobian, args=(ref_pcl, target_pcl,mask,))
+        x = x_list[-1]
+        cost = self.cost_fun(self.residual_fun(x, ref_pcl, target_pcl, mask))
+        return lie_se3_to_SE3(x[:3], x[3:], homogenous=True), cost
 
     def plot(self, ref_pcl, target_pcl, ids, valid):
         ref_pts = ref_pcl.grid_pts[ids].cpu().numpy()
@@ -171,7 +171,7 @@ class ICPEstimator(torch.nn.Module):
         """ closest 3d euclidean distance association"""
 
         from scipy.spatial import KDTree
-        #ToDo add masking
+        #ToDo add masking, support direct torch
         tree = KDTree(target_pcl.pts.numpy())
         closest_pts = tree.query(src_pcl.pts.numpy())[1]
         ids = torch.meshgrid(torch.arange(src_pcl.grid_shape[0]), torch.arange(src_pcl.grid_shape[1]))

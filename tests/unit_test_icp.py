@@ -40,8 +40,8 @@ class RotEstimatorTester(unittest.TestCase):
 
         estimator = ICPEstimator(depth.shape[:2], intrinsics, res_thr=1e-3, association_mode='projective',
                                  dist_thr=100 / 15).to(device)
-
-        T, cost = estimator.estimate_lm(depth.to(device), target_pcl.to(device))
+        with torch.no_grad():
+            T, cost = estimator.estimate_lm(depth.to(device), target_pcl.to(device))
 
         # assertion
         self.assertTrue(np.allclose(T.cpu(), T_true.cpu(), atol=1e-1))
