@@ -24,7 +24,7 @@ class RotEstimatorTester(unittest.TestCase):
         disparity = cv2.resize(cv2.imread(str(Path.cwd() / 'tests' / 'test_data' / '000000l.pfm'), cv2.IMREAD_UNCHANGED), (80, 60)) / 16
         depth = torch.tensor(2144.878173828125 / disparity).double()
         # generate dummy intrinsics and dummy images
-        device = torch.device('cpu') #torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         R_true = torch.tensor(R.from_euler('xyz', (0.0, 0.0, 1), degrees=True).as_matrix()).double()
         t_true = torch.tensor([0, 0.0, 1.0]).double()
@@ -40,12 +40,12 @@ class RotEstimatorTester(unittest.TestCase):
 
         estimator = ICPEstimator(depth.shape[:2], intrinsics, res_thr=1e-3, association_mode='projective',
                                  dist_thr=100 / 15).to(device)
-
-        T, cost = estimator.estimate_lm(depth.to(device), target_pcl.to(device))
+        with torch.no_grad():
+            T, cost = estimator.estimate_lm(depth.to(device), target_pcl.to(device))
 
         # assertion
         self.assertTrue(np.allclose(T.cpu(), T_true.cpu(), atol=1e-1))
-        self.assertTrue(np.allclose(cost,0.0, atol=1e-3))
+        self.assertTrue(np.allclose(cost.cpu(),0.0, atol=1e-3))
 
     def test_all(self):
 
