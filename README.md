@@ -3,9 +3,9 @@
 
 *alley-oop* is a collection of SLAM routines.
 
-**master:** [![tests @ master](https://github.com/aimi-lab/alley-oop/workflows/tests/badge.svg?branch=master&event=push)](https://github.com/aimi-lab/alley-oop/actions/workflows/tests.yaml)
-
-**develop:** [![tests @ develop](https://github.com/aimi-lab/alley-oop/workflows/tests/badge.svg?branch=develop&event=push)](https://github.com/aimi-lab/alley-oop/actions/workflows/tests.yaml)
+| **master** | ** develop ** |
+|-----------|------------|
+| [![tests @ master](https://github.com/aimi-lab/alley-oop/workflows/tests/badge.svg?branch=master&event=push)](https://github.com/aimi-lab/alley-oop/actions/workflows/tests.yaml) | [![tests @ develop](https://github.com/aimi-lab/alley-oop/workflows/tests/badge.svg?branch=develop&event=push)](https://github.com/aimi-lab/alley-oop/actions/workflows/tests.yaml) |
 
 ## Installation
 
