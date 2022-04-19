@@ -47,7 +47,7 @@ jobs:
         with:
           run: python3 -m coverage run tests/unit_test_all.py
       - name: Slack notification
-      - uses: 8398a7/action-slack@v3
+        uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
           fields: repo,message,commit,author,action,eventName,ref,workflow,job,took,pullRequest # selectable (default: repo,message)
