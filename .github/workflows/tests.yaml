@@ -46,10 +46,6 @@ jobs:
         uses: GabrielBB/xvfb-action@v1
         with:
           run: python3 -m coverage run tests/unit_test_all.py
-      #- name: Submit Coverage Report to Coveralls
-      #  env:
-      #    COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
-      #  run: coveralls
       - name: Slack notification
       - uses: 8398a7/action-slack@v3
         with:
@@ -58,3 +54,7 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }} # required
         if: always() # Pick up events even if the job fails or is canceled.
+      #- name: Submit Coverage Report to Coveralls
+      #  env:
+      #    COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
+      #  run: coveralls
