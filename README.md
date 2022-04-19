@@ -3,6 +3,8 @@
 
 *alley-oop* is a collection of SLAM routines.
 
+[![tests](https://github.com/aimi-lab/alley-oop/workflows/tests/badge.svg)](https://github.com/aimi-lab/alley-oop/actions/workflows/tests.yaml)
+
 ## Installation
 
 ``` $ bash install_env.sh```
