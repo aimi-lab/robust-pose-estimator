@@ -1,4 +1,4 @@
-name: Alley-Oop CI Pipeline
+name: tests
 # trigger workflow on push or pull requests
 on:
   push:
