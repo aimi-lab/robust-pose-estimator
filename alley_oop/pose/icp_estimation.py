@@ -1,6 +1,5 @@
 import torch
 import numpy as np
-import warnings
 from alley_oop.geometry.lie_3d import lie_se3_to_SE3
 from alley_oop.geometry.pinhole_transforms import forward_project
 from alley_oop.geometry.point_cloud import PointCloud
@@ -44,34 +43,6 @@ class ICPEstimator(torch.nn.Module):
         self.trg_ids = None
         self.src_grid_ids = None
 
-    def estimate_gn(self, ref_depth: torch.Tensor, target_pcl:PointCloud, mask: torch.Tensor=None):
-        """ Gauss-Newton Optimization"""
-        # re-project depth to 3D space
-        ref_pcl = PointCloud()
-        ref_pcl.from_depth(ref_depth, self.intrinsics)
-        x = torch.zeros(6).to(self.d.device).to(self.intrinsics.dtype)
-        converged = False
-        for i in range(self.n_iter):
-            # perform data-association and compute residuals
-            residuals = self.residual_fun(x, ref_pcl, target_pcl)
-            #self.check_association(ref_pcl)
-            #self.plot(ref_pcl_world_c, target_pcl, ids, valid)
-            if len(self.src_grid_ids[0]) == 0:
-                warnings.warn(f"no projective correspondences found", RuntimeWarning)
-                return lie_se3_to_SE3(x0[:3], x0[3:], homogenous=True), self.cost_fun(residuals)
-            if self.cost_fun(residuals) < self.res_thr:
-                converged = True
-                break
-            # compute jacobian
-            J = self.jacobian(x, ref_pcl, target_pcl)
-            # update using Gauss-Newton
-            x0 = -torch.linalg.lstsq(J, residuals).solution
-            x = x + x0
-
-        if not converged:
-            warnings.warn(f"not converged after {self.n_iter}", RuntimeWarning)
-        return lie_se3_to_SE3(x0[:3], x0[3:], homogenous=True), self.cost_fun(residuals)
-
     @staticmethod
     def cost_fun(residuals):
         return (residuals**2).mean()
@@ -99,7 +70,8 @@ class ICPEstimator(torch.nn.Module):
         ref_pcl = PointCloud()
         ref_pcl.from_depth(ref_depth, self.intrinsics)
 
-        x_list, eps = lsq_lma(torch.zeros(6).to(ref_depth.device).to(ref_depth.dtype),self.residual_fun, self.jacobian, args=(ref_pcl, target_pcl,mask,))
+        x_list, eps = lsq_lma(torch.zeros(6).to(ref_depth.device).to(ref_depth.dtype),self.residual_fun, self.jacobian,
+                              args=(ref_pcl, target_pcl,mask,), max_iter=self.n_iter, tol=self.res_thr)
         x = x_list[-1]
         cost = self.cost_fun(self.residual_fun(x, ref_pcl, target_pcl, mask))
         return lie_se3_to_SE3(x[:3], x[3:], homogenous=True), cost
