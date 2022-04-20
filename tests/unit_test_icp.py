@@ -21,8 +21,10 @@ class RotEstimatorTester(unittest.TestCase):
     def test_estimator(self):
 
         # load test data
-        disparity = cv2.resize(cv2.imread(str(Path.cwd() / 'tests' / 'test_data' / '000000l.pfm'), cv2.IMREAD_UNCHANGED), (80, 60)) / 16
-        depth = torch.tensor(2144.878173828125 / disparity).double()
+        scale = 16
+        disparity = cv2.imread(str(Path.cwd() / 'tests' / 'test_data' / '000000l.pfm'), cv2.IMREAD_UNCHANGED)
+        disparity = cv2.resize(disparity, (int(disparity.shape[1]/scale), int(disparity.shape[0]/scale)))/scale
+        depth = torch.tensor(4289.756 / disparity/2).double()
         # generate dummy intrinsics and dummy images
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -31,14 +33,14 @@ class RotEstimatorTester(unittest.TestCase):
         T_true = torch.eye(4).double()
         T_true[:3, :3] = R_true
         T_true[:3, 3] = t_true
-        intrinsics = torch.tensor([[517.654052734375 / 8, 0, 298.4775085449219 / 8],
-                                   [0, 517.5438232421875 / 8, 244.20501708984375 / 8],
+        intrinsics = torch.tensor([[1035.3/scale, 0, 596.955/scale],
+                                   [0, 1035.3/scale, 488.41/scale],
                                    [0, 0, 1]]).double()
         ref_pcl = PointCloud()
         ref_pcl.from_depth(depth, intrinsics)
         target_pcl = ref_pcl.transform_cpy(T_true)
 
-        estimator = ICPEstimator(depth.shape[:2], intrinsics, res_thr=1e-3, association_mode='projective',
+        estimator = ICPEstimator(depth.shape[:2], intrinsics, res_thr=1e-1, association_mode='projective',
                                  dist_thr=100 / 15).to(device)
         with torch.no_grad():
             T, cost = estimator.estimate_lm(depth.to(device), target_pcl.to(device))
