@@ -99,7 +99,8 @@ class ICPEstimator(torch.nn.Module):
         ref_pcl = PointCloud()
         ref_pcl.from_depth(ref_depth, self.intrinsics)
 
-        x_list, eps = lsq_lma(torch.zeros(6).to(ref_depth.device).to(ref_depth.dtype),self.residual_fun, self.jacobian, args=(ref_pcl, target_pcl,mask,))
+        x_list, eps = lsq_lma(torch.zeros(6).to(ref_depth.device).to(ref_depth.dtype),self.residual_fun, self.jacobian,
+                              args=(ref_pcl, target_pcl,mask,), max_iter=self.n_iter, tol=self.res_thr)
         x = x_list[-1]
         cost = self.cost_fun(self.residual_fun(x, ref_pcl, target_pcl, mask))
         return lie_se3_to_SE3(x[:3], x[3:], homogenous=True), cost
