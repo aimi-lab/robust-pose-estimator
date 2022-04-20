@@ -151,6 +151,8 @@ class Lie3DTester(unittest.TestCase):
         self.test_so3_conversions_torch()
         self.test_se3_conversions()
         self.test_se3_conversions_torch()
+        self.test_zero_so3()
+        self.test_zero_SO3()
 
 
 if __name__ == '__main__':
