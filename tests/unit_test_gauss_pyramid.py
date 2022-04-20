@@ -36,21 +36,24 @@ class GaussPyramidTester(unittest.TestCase):
         kernel_size = 5
         kernel_std = 1
         kernel_scale = 36
+        level_num = 2
 
         gauss_pyramid = GaussPyramid(
             img=self.b_img, 
             kernel_size=kernel_size, 
             kernel_std=kernel_std, 
             kernel_scale=kernel_scale,
+            level_num = level_num,
             )
+
+        pyramid_levels, _ = gauss_pyramid.forward()
 
         # validate input parameters
         self.assertEqual(gauss_pyramid.gauss_kernel.shape[2], kernel_size, 'Unexpected kernel size')
         self.assertEqual(gauss_pyramid.gauss_kernel.shape[3], kernel_size, 'Unexpected kernel size')
         self.assertEqual(gauss_pyramid._kernel_std, kernel_std, 'Unexpected kernel standard deviation')
         self.assertEqual(int(torch.max(gauss_pyramid.gauss_kernel)), kernel_scale, 'Unexpected kernel scale')
-
-        pyramid_levels, _ = gauss_pyramid.forward()
+        self.assertEqual(len(pyramid_levels)-1, level_num, 'Unexpected level number')
 
         # validate types
         self.assertTrue(isinstance(pyramid_levels, list), 'Unexpected pyramid type %s'  % type(pyramid_levels))
