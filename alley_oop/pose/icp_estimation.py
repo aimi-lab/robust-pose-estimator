@@ -17,7 +17,7 @@ class ICPEstimator(torch.nn.Module):
 """
 
     def __init__(self, img_shape: Tuple, intrinsics: torch.Tensor, n_iter: int=20, res_thr: float=0.001,
-                 dist_thr: float=100.0/15, normal_thr: float=0.34, association_mode='projective'):
+                 dist_thr: float=200.0/15, normal_thr: float=0.94, association_mode='projective'):
         """
 
         :param img_shape: height and width of images to process
