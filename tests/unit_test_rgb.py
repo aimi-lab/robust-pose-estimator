@@ -24,15 +24,15 @@ class RGBEstimatorTester(unittest.TestCase):
         disparity = cv2.imread(str(Path.cwd() / 'tests' / 'test_data' / '000000l.pfm'), cv2.IMREAD_UNCHANGED)
         h, w = (int(disparity.shape[0]/scale), int(disparity.shape[1]/scale))
         disparity = cv2.resize(disparity, (w, h))/scale
-        depth = torch.tensor(4289.756 / disparity/2).double()
+        depth = torch.tensor(4289.756 / disparity).double()
         img = torch.tensor(cv2.resize(cv2.imread(str(Path.cwd() / 'tests' / 'test_data' / '000000l.png'), cv2.IMREAD_GRAYSCALE),
                                        (w, h))).float() / 255.0
 
         # generate dummy intrinsics and dummy images
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        R_true = torch.tensor(R.from_euler('xyz', (1.0, 2.0, 5.0), degrees=True).as_matrix()).double()
-        t_true = torch.tensor([0.0, 3.0, 30.0]).double()
+        R_true = torch.tensor(R.from_euler('xyz', (0.0, 2.0, 20.0), degrees=True).as_matrix()).double()
+        t_true = torch.tensor([0.0, 5.0, 30.0]).double()
         T_true = torch.eye(4).double()
         T_true[:3, :3] = R_true
         T_true[:3, 3] = t_true
@@ -46,7 +46,6 @@ class RGBEstimatorTester(unittest.TestCase):
         estimator = RGBPoseEstimator(img.shape[:2], intrinsics).to(device)
         with torch.no_grad():
             T, cost = estimator.estimate_lm(img.double().to(device), depth.to(device), target_img.double().to(device), mask=mask.to(device))
-
         # assertion
         self.assertTrue(np.allclose(T[:3,:3].cpu(), R_true.cpu(), atol=1e-1))
         self.assertTrue(np.allclose(T[:3,3].cpu(), t_true.cpu(), atol=5))
