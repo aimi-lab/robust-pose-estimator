@@ -6,10 +6,11 @@ from tests.unit_test_quaternions import QuaternionConversionTester
 from tests.unit_test_rot_estimation import RotEstimatorTester
 from tests.unit_test_lie import Lie3DTester
 from tests.unit_test_gauss_pyramid import GaussPyramidTester
+from tests.unit_test_grayscale import GrayscaleTester
 
 test_classes = [
     PoseTester, NormalsTester, PinholeTransformTester, PhotoLossTest, Lie3DTester, QuaternionConversionTester,
-    RotEstimatorTester, GaussPyramidTester
+    RotEstimatorTester, GaussPyramidTester, GrayscaleTester
                 ]
 
 for test_class in test_classes:
