@@ -37,12 +37,13 @@ class GaussPyramid(torch.nn.Module):
 
         return self.levels, self.intrinsics_levels
 
-    def create_next_level(self, x: torch.Tensor, border_mode: str = 'constant', border_value: float = 0) -> torch.Tensor:
+    def create_next_level(self, x: torch.Tensor, border_mode: str = 'replicate', border_value: float = 0) -> torch.Tensor:
 
         channels = x.shape[1]
-        gsconv = conv2d(x, self.gauss_kernel, stride=1, padding='valid', groups=channels)
-        padded = pad(gsconv, (2, 2, 2, 2), mode=border_mode, value=border_value)
-        downsp = padded[..., 0::self._ds_step, 0::self._ds_step]
+        padnum = self._kernel_size // 2
+        padded = pad(x, (padnum, padnum, padnum, padnum), mode=border_mode, value=border_value)
+        gsconv = conv2d(padded, self.gauss_kernel, stride=1, padding='same', groups=channels)[..., padnum:-padnum, padnum:-padnum]
+        downsp = gsconv[..., 0::self._ds_step, 0::self._ds_step]
 
         return downsp
 
