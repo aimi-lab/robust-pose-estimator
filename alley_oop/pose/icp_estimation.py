@@ -66,7 +66,7 @@ class ICPEstimator(torch.nn.Module):
             ref_pcl_world_c.grid_pts[self.src_grid_ids])).squeeze()
 
     def estimate_lm(self, ref_depth: torch.Tensor, target_pcl:PointCloud, mask: torch.tensor=None):
-        """ Levenberg-Marquard estimation. This is a hacky implementation, we wait until the torchimize is stable"""
+        """ Levenberg-Marquard estimation."""
         ref_pcl = PointCloud()
         ref_pcl.from_depth(ref_depth, self.intrinsics)
 

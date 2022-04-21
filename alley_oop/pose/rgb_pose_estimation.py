@@ -60,7 +60,7 @@ class RGBPoseEstimator(torch.nn.Module):
         return J.squeeze()
 
     def estimate_lm(self, ref_img: torch.Tensor, ref_depth: torch.Tensor, target_img: torch.Tensor, mask: torch.Tensor=None):
-        """ Levenberg-Marquard estimation. This is a hacky implementation, we wait until the torchimize is stable"""
+        """ Levenberg-Marquard estimation."""
         ref_pcl = PointCloud()
         ref_pcl.from_depth(ref_depth, self.intrinsics)
         x_list, eps = lsq_lma(torch.zeros(6).to(ref_depth.device).to(ref_depth.dtype), self.residual_fun, self.jacobian,

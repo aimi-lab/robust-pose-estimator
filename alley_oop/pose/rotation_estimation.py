@@ -146,7 +146,7 @@ class RotationEstimator(torch.nn.Module):
             homography = homography.unsqueeze(0)
         if img.ndim == 2:
             img = img.unsqueeze(0).unsqueeze(0)
-        return self.warper(img, torch.linalg.inv(homography)).squeeze() #ToDo why do we have to invert the homography to be consistent with opencv?
+        return self.warper(img, torch.linalg.inv(homography)).squeeze()
 
 
 
