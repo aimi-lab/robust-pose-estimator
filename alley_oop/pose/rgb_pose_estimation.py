@@ -8,6 +8,7 @@ from typing import Tuple
 import matplotlib.pyplot as plt
 from torchimize.functions import lsq_lma
 from torch.nn.functional import conv2d, pad
+from alley_oop.interpol.synth_view import synth_view
 
 
 class RGBPoseEstimator(torch.nn.Module):
@@ -70,20 +71,20 @@ class RGBPoseEstimator(torch.nn.Module):
         cost = self.cost_fun(self.residual_fun(x, ref_img, ref_pcl, target_img, mask))
         return lie_se3_to_SE3(x[:3], x[3:], homogenous=True), cost
 
-    def plot(self, ref_pcl, target_pcl, ids, valid):
-        ref_pts = ref_pcl.grid_pts[ids].cpu().numpy()
-        trg_pts = target_pcl.pts[valid].cpu().numpy()
+    def plot(self, x, ref_img, ref_depth, target_img):
+        R, t = lie_se3_to_SE3(x[:3].cpu(), x[3:].cpu())
+        warped_img = synth_view(ref_img.unsqueeze(0).unsqueeze(0).cpu().float(), ref_depth.unsqueeze(0).float().cpu(), R.float(),
+                                t.unsqueeze(1).float(), self.intrinsics.float().cpu()).squeeze()
 
-        fig = plt.figure()
-        ax = fig.gca(projection='3d')
-        ax.set_xlabel('x')
-        ax.set_ylabel('y')
-        ax.set_zlabel('z')
-        ax.scatter(ref_pts[::4, 0], ref_pts[::4, 1], ref_pts[::4, 2], c='b')
-        ax.scatter(trg_pts[::4, 0], trg_pts[::4, 1], trg_pts[::4, 2], c='r')
-        # plot point connection
-        for a, b in zip(ref_pts[::4], trg_pts[::4]):
-            ax.plot(np.array((a[0], b[0])), np.array((a[1], b[1])), np.array((a[2], b[2])), ':', color='c', linewidth=0.5)
+        fig, ax = plt.subplots(1,3)
+        ax[0].imshow(ref_img.cpu())
+        ax[0].set_title('reference')
+        ax[1].imshow(target_img.cpu())
+        ax[1].set_title('target')
+        ax[2].imshow(warped_img.cpu())
+        ax[2].set_title('estimated')
+        for a in ax:
+            a.axis('off')
         plt.show()
 
     @staticmethod
