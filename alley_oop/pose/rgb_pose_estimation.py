@@ -51,8 +51,6 @@ class RGBPoseEstimator(torch.nn.Module):
         return residuals
 
     def jacobian(self, x, ref_img, ref_pcl, trg_img, mask=None):
-        #Do we need the warped img ?
-        x = torch.tensor(x, dtype=ref_img.dtype, device=ref_img.device) if not torch.is_tensor(x) else x
         J_img = self._image_jacobian(trg_img.unsqueeze(0).unsqueeze(0)).squeeze()
         J = J_img.unsqueeze(1) @ self.j_wt(ref_pcl.pts)
         J = J[self.valid]
@@ -124,9 +122,6 @@ class RGBPoseEstimator(torch.nn.Module):
 
     def _warp_img(self, img:torch.Tensor, pcl:PointCloud, T:torch.Tensor):
         assert T.shape == (4,4)
-        K = torch.eye(4, dtype=T.dtype, device=T.device)
-        K[:3,:3] = self.intrinsics
-
         # transform and project
         # Note that, we implicitly perform nearest neighbour interpolation which is not a continuous function. This
         # requires careful choice of optimization parameters and (and step parameter for automatic estimation of the Jacobian)
