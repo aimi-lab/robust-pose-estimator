@@ -28,7 +28,7 @@ class RotEstimatorTester(unittest.TestCase):
         # generate dummy intrinsics and dummy images
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        R_true = torch.tensor(R.from_euler('xyz', (0.0, 0.0, 1), degrees=True).as_matrix()).double()
+        R_true = torch.tensor(R.from_euler('xyz', (0.0, 0.0, 2), degrees=True).as_matrix()).double()
         t_true = torch.tensor([0, 0.0, 1.0]).double()
         T_true = torch.eye(4).double()
         T_true[:3, :3] = R_true
@@ -40,8 +40,7 @@ class RotEstimatorTester(unittest.TestCase):
         ref_pcl.from_depth(depth, intrinsics)
         target_pcl = ref_pcl.transform_cpy(T_true)
 
-        estimator = ICPEstimator(depth.shape[:2], intrinsics, res_thr=1e-1, association_mode='projective',
-                                 dist_thr=100 / 15).to(device)
+        estimator = ICPEstimator(depth.shape[:2], intrinsics, res_thr=1e-1, association_mode='projective').to(device)
         with torch.no_grad():
             T, cost = estimator.estimate_lm(depth.to(device), target_pcl.to(device))
 

@@ -76,21 +76,46 @@ class ICPEstimator(torch.nn.Module):
         cost = self.cost_fun(self.residual_fun(x, ref_pcl, target_pcl, mask))
         return lie_se3_to_SE3(x[:3], x[3:], homogenous=True), cost
 
-    def plot(self, ref_pcl, target_pcl, ids, valid):
-        ref_pts = ref_pcl.grid_pts[ids].cpu().numpy()
-        trg_pts = target_pcl.pts[valid].cpu().numpy()
+    def plot(self, x, ref_pcl, target_pcl, downsample=1):
+        ref_pcl = ref_pcl.transform_cpy(lie_se3_to_SE3(x[:3], x[3:], homogenous=True))
+        ref_pts = ref_pcl.pts.cpu().numpy()
+        trg_pts = target_pcl.pts.cpu().numpy()
 
         fig = plt.figure()
         ax = fig.gca(projection='3d')
         ax.set_xlabel('x')
         ax.set_ylabel('y')
         ax.set_zlabel('z')
-        ax.scatter(ref_pts[::4, 0], ref_pts[::4, 1], ref_pts[::4, 2], c='b')
-        ax.scatter(trg_pts[::4, 0], trg_pts[::4, 1], trg_pts[::4, 2], c='r')
+        ax.scatter(ref_pts[::downsample, 0], ref_pts[::downsample, 1], ref_pts[::downsample, 2], c='b')
+        ax.scatter(trg_pts[::downsample, 0], trg_pts[::downsample, 1], trg_pts[::downsample, 2], c='r')
         # plot point connection
-        for a, b in zip(ref_pts[::4], trg_pts[::4]):
+        for a, b in zip(ref_pcl.grid_pts[self.src_grid_ids].cpu().numpy()[::downsample],
+                        target_pcl.pts[self.trg_ids].cpu().numpy()[::downsample]):
             ax.plot(np.array((a[0], b[0])), np.array((a[1], b[1])), np.array((a[2], b[2])), ':', color='c', linewidth=0.5)
         plt.show()
+
+    def plot_correspondence(self, x, ref_img, ref_depth, target_img):
+        from alley_oop.interpol.synth_view import synth_view
+        R, t = lie_se3_to_SE3(x[:3].cpu(), x[3:].cpu())
+        warped_img = synth_view(ref_img.unsqueeze(0).unsqueeze(0).cpu().float(), ref_depth.unsqueeze(0).float().cpu(),
+                                R.float(),
+                                t.unsqueeze(1).float(), self.intrinsics.float().cpu()).squeeze()
+        ref_img1 = ref_img.clone()
+        ref_img1[self.src_grid_ids[0][0], self.src_grid_ids[1][0]] = 1
+        trg_ids = torch.where(self.trg_ids.reshape(self.img_shape))
+        target_img1 = target_img.clone()
+        target_img1[trg_ids[0][0], trg_ids[1][0]] = 1
+        fig, ax = plt.subplots(1, 3)
+        ax[0].imshow(ref_img1.cpu())
+        ax[0].set_title('reference')
+        ax[1].imshow(target_img1.cpu())
+        ax[1].set_title('target')
+        ax[2].imshow(warped_img.cpu())
+        ax[2].set_title('estimated')
+        for a in ax:
+            a.axis('off')
+        plt.show()
+
 
     @staticmethod
     def j_3d(points3d): #ToDo precomputing n^T @ J_3d might speed up things
@@ -127,7 +152,6 @@ class ICPEstimator(torch.nn.Module):
         valid_normal = batched_dot_product(src_pcl.grid_normals[ids], target_pcl.normals[valid]) > self.normal_thr
         valid[valid.clone()] &= valid_dist & valid_normal
         ids = points_2d.long()[valid][:, 1], points_2d.long()[valid][:, 0]
-
         return ids, valid
 
     def check_association(self, src_pcl: PointCloud):
