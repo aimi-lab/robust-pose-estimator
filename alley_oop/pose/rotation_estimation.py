@@ -5,6 +5,7 @@ from alley_oop.geometry.lie_3d import lie_so3_to_SO3, lie_hatmap
 import warnings
 from alley_oop.interpol.warping import HomographyWarper
 from typing import Tuple
+import matplotlib.pyplot as plt
 
 
 class RotationEstimator(torch.nn.Module):
@@ -15,53 +16,54 @@ class RotationEstimator(torch.nn.Module):
     It estimates the camera rotation between two images (assuming rotation only) using efficient second-order minimization
 """
 
-    def __init__(self, img_shape: Tuple, intrinsics: torch.Tensor, n_iter: int=10000, res_thr: float=0.0001):
+    def __init__(self, img_shape: Tuple, intrinsics: torch.Tensor, n_iter: int=100, Ftol: float=1e-5, xtol: float=1e-8):
         super(RotationEstimator, self).__init__()
         assert len(img_shape) == 2
         assert intrinsics.shape == (3,3)
         self.n_iter = n_iter
-        self.res_thr = res_thr
-        self.intrinsics = torch.nn.Parameter(intrinsics)
+        self.Ftol = Ftol
+        self.xtol = xtol
+        self.K = torch.nn.Parameter(intrinsics)
+        self.K_inv = torch.nn.Parameter(torch.linalg.inv(intrinsics))
         self.warper = HomographyWarper(img_shape[0], img_shape[1], normalized_coordinates=False)
         self.batch_proj_jac = torch.nn.Parameter((self._batch_jw(img_shape, intrinsics) @ self._j_rot()))
         self.d = torch.nn.Parameter(torch.empty(0))  # dummy device store
 
     def estimate(self, ref_img: torch.Tensor, target_img:torch.Tensor, mask: torch.Tensor=None):
         """ estimate rotation using efficient second-order optimization"""
-        R_lr = torch.eye(3).to(self.d.device)
+        x = torch.zeros(3, device=self.d.device, dtype=ref_img.dtype)
         residuals = None
         warped_img = None
         converged = False
+        last_cost = torch.inf
+        last_valid_pts = 0
+        last_x = x
         for i in range(self.n_iter):
             # compute residuals f(x)
-            warped_img = self._warp_img(ref_img, R_lr, self.intrinsics)
+            warped_img = self._warp_img(ref_img, x)
             J = self._ems_jacobian(warped_img, target_img)
             residuals = ((warped_img - target_img)).reshape(-1, 1)
             if mask is not None:
                 residuals = mask.reshape(-1,1)*residuals
-            if (residuals**2).mean() < self.res_thr:
-                converged = True
-                break
+            cost = self.cost_fun(residuals)
             # compute update parameter x0
             x0 = torch.linalg.lstsq(J, residuals).solution
-            # update rotation estimate
-            R_lr = R_lr @ lie_so3_to_SO3(x0.squeeze())
-            # print("residuals: ", (residuals ** 2).mean().item())
-            # print("x0: ", x0.numpy().squeeze())
-            # import matplotlib.pyplot as plt
-            # fig, ax = plt.subplots(2, 3)
-            # ax[0,0].imshow(target_img)
-            # ax[0,1].imshow(warped_img)
-            # ax[0,2].imshow(residuals.reshape((128,160)), vmin=-1, vmax=1)
-            #
-            # ax[1, 0].imshow(J_pinv[0,...].reshape((128, 160)))
-            # ax[1, 1].imshow(J_pinv[1,...].reshape((128, 160)))
-            # ax[1, 2].imshow(J_pinv[2,...].reshape((128, 160)))
-            # plt.show()
 
+            if cost < self.Ftol:
+                converged = True
+                break
+            if torch.linalg.norm(x0, ord=2) < self.xtol * (self.xtol + torch.linalg.norm(x, ord=2)):
+                converged = True
+                break
+            # update rotation estimate
+            x += x0.squeeze()
         if not converged:
             warnings.warn(f"EMS not converged after {self.n_iter}", RuntimeWarning)
-        return R_lr, residuals, warped_img
+        return lie_so3_to_SO3(x), residuals, warped_img
+
+    @staticmethod
+    def cost_fun(residuals):
+        return (residuals ** 2).mean()
 
     @staticmethod
     def _image_jacobian(img:torch.Tensor):
@@ -138,15 +140,26 @@ class RotationEstimator(torch.nn.Module):
         J = J_img @ self.batch_proj_jac
         return J.squeeze(1)
 
-    def _warp_img(self, img:torch.Tensor, R:torch.Tensor, K:torch.Tensor):
-        assert R.shape == (3,3)
-        assert K.shape == (3,3)
-        homography = (K @ R@ torch.linalg.inv(K))
-        if homography.ndim == 2:
-            homography = homography.unsqueeze(0)
+    def _warp_img(self, img:torch.Tensor, x:torch.Tensor):
+        assert x.shape == (3,)
+        R = lie_so3_to_SO3(x)
+        H_inv = (self.K @ R.T @ self.K_inv)  # Note that the torch warper somehow defines the homography as the inverse from OpenCV
+        if H_inv.ndim == 2:
+            H_inv = H_inv.unsqueeze(0)
         if img.ndim == 2:
             img = img.unsqueeze(0).unsqueeze(0)
-        return self.warper(img, torch.linalg.inv(homography)).squeeze() #ToDo why do we have to invert the homography to be consistent with opencv?
+        return self.warper(img, H_inv).squeeze()
 
+    def plot(self, x, ref_img, target_img, residuals, J_pinv):
+        warped_img = self._warp_img(ref_img, x)
+        fig, ax = plt.subplots(2, 3)
+        ax[0,0].imshow(target_img)
+        ax[0,1].imshow(warped_img)
+        ax[0,2].imshow(residuals.reshape((128,160)), vmin=-1, vmax=1)
+
+        ax[1, 0].imshow(J_pinv[0,...].reshape((128, 160)))
+        ax[1, 1].imshow(J_pinv[1,...].reshape((128, 160)))
+        ax[1, 2].imshow(J_pinv[2,...].reshape((128, 160)))
+        plt.show()
 
 
