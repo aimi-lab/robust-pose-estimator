@@ -23,7 +23,8 @@ class RotationEstimator(torch.nn.Module):
         self.n_iter = n_iter
         self.Ftol = Ftol
         self.xtol = xtol
-        self.intrinsics = torch.nn.Parameter(intrinsics)
+        self.K = torch.nn.Parameter(intrinsics)
+        self.K_inv = torch.nn.Parameter(torch.linalg.inv(intrinsics))
         self.warper = HomographyWarper(img_shape[0], img_shape[1], normalized_coordinates=False)
         self.batch_proj_jac = torch.nn.Parameter((self._batch_jw(img_shape, intrinsics) @ self._j_rot()))
         self.d = torch.nn.Parameter(torch.empty(0))  # dummy device store
@@ -142,12 +143,12 @@ class RotationEstimator(torch.nn.Module):
     def _warp_img(self, img:torch.Tensor, x:torch.Tensor):
         assert x.shape == (3,)
         R = lie_so3_to_SO3(x)
-        homography = (self.intrinsics @ R @ torch.linalg.inv(self.intrinsics))
-        if homography.ndim == 2:
-            homography = homography.unsqueeze(0)
+        H_inv = (self.K @ R.T @ self.K_inv)  # Note that the torch warper somehow defines the homography as the inverse from OpenCV
+        if H_inv.ndim == 2:
+            H_inv = H_inv.unsqueeze(0)
         if img.ndim == 2:
             img = img.unsqueeze(0).unsqueeze(0)
-        return self.warper(img, torch.linalg.inv(homography)).squeeze()
+        return self.warper(img, H_inv).squeeze()
 
     def plot(self, x, ref_img, target_img, residuals, J_pinv):
         warped_img = self._warp_img(ref_img, x)
