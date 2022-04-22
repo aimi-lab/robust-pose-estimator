@@ -127,11 +127,7 @@ def create_img_coords_t(
         y: int = 720,
         x: int = 1280,
         b: int = 1,
-        ref_type: type = torch.Tensor,
-                       ):
-
-    # determine library given input type
-    #lib = get_lib_type(ref_type)
+        ) -> torch.Tensor:
 
     # create 2-D coordinates
     x_mesh = torch.linspace(0, x-1, x).repeat(b, y, 1) + .5
@@ -144,7 +140,8 @@ def create_img_coords_t(
 def create_img_coords_np(
         y: int = 720,
         x: int = 1280,
-        step: int = 1):
+        step: int = 1
+        ) -> np.ndarray:
 
     x_coords = np.arange(0, x, step) + .5
     y_coords = np.arange(0, y, step) + .5
