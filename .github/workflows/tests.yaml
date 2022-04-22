@@ -43,8 +43,7 @@ jobs:
           python3 -m pip install codecov
           python3 -m pip install coveralls
       - name: Run unit tests
-        with:
-          run: python3 -m coverage run tests/unit_test_all.py
+        run: python3 -m coverage run tests/unit_test_all.py
       - name: Slack notification
         uses: 8398a7/action-slack@v3
         with:
