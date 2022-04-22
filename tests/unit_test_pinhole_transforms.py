@@ -60,7 +60,7 @@ class PinholeTransformTester(unittest.TestCase):
 
             self.tvec = dof[:3][:, None]
 
-            opts = reverse_project(self.ipts, self.kmat, rmat=np.eye(3), tvec=np.zeros([3, 1]), depth=dept)
+            opts = reverse_project(self.ipts, self.kmat, rmat=np.eye(3), tvec=np.zeros([3, 1]), dpth=dept)
 
             npts = forward_project(opts, kmat=self.kmat, rmat=self.rmat, tvec=self.tvec)
 
@@ -78,7 +78,7 @@ class PinholeTransformTester(unittest.TestCase):
         npos = np.abs(anch - rmat @ anch)
 
         dept = dist * np.ones(np.multiply(*self.resolution))[np.newaxis]
-        opts = reverse_project(self.ipts, self.kmat, rmat=np.eye(3), tvec=np.zeros([3, 1]), depth=dept)
+        opts = reverse_project(self.ipts, self.kmat, rmat=np.eye(3), tvec=np.zeros([3, 1]), dpth=dept)
 
         npts = forward_project(opts, kmat=self.kmat, rmat=rmat.T, tvec=npos[:, None])
 
