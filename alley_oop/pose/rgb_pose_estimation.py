@@ -77,11 +77,11 @@ class RGBPoseEstimator(torch.nn.Module):
                                 t.unsqueeze(1).float(), self.intrinsics.float().cpu()).squeeze()
 
         fig, ax = plt.subplots(1,3)
-        ax[0].imshow(ref_img.cpu())
+        ax[0].imshow(ref_img.cpu(), vmin=0, vmax=1)
         ax[0].set_title('reference')
-        ax[1].imshow(target_img.cpu())
+        ax[1].imshow(target_img.cpu(), vmin=0, vmax=1)
         ax[1].set_title('target')
-        ax[2].imshow(warped_img.cpu())
+        ax[2].imshow(warped_img.cpu(), vmin=0, vmax=1)
         ax[2].set_title('estimated')
         for a in ax:
             a.axis('off')
