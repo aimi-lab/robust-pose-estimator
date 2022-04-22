@@ -42,8 +42,7 @@ jobs:
           python3 -m pip install -r requirements.txt
           python3 -m pip install codecov
           python3 -m pip install coveralls
-      - name: Run headless unit tests
-        uses: GabrielBB/xvfb-action@v1
+      - name: Run unit tests
         with:
           run: python3 -m coverage run tests/unit_test_all.py
       - name: Slack notification
