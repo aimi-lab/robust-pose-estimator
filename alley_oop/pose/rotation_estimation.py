@@ -5,6 +5,7 @@ from alley_oop.geometry.lie_3d import lie_so3_to_SO3, lie_hatmap
 import warnings
 from alley_oop.interpol.warping import HomographyWarper
 from typing import Tuple
+import matplotlib.pyplot as plt
 
 
 class RotationEstimator(torch.nn.Module):
@@ -34,7 +35,7 @@ class RotationEstimator(torch.nn.Module):
         converged = False
         for i in range(self.n_iter):
             # compute residuals f(x)
-            warped_img = self._warp_img(ref_img, R_lr, self.intrinsics)
+            warped_img = self._warp_img(ref_img, R_lr)
             J = self._ems_jacobian(warped_img, target_img)
             residuals = ((warped_img - target_img)).reshape(-1, 1)
             if mask is not None:
@@ -46,19 +47,6 @@ class RotationEstimator(torch.nn.Module):
             x0 = torch.linalg.lstsq(J, residuals).solution
             # update rotation estimate
             R_lr = R_lr @ lie_so3_to_SO3(x0.squeeze())
-            # print("residuals: ", (residuals ** 2).mean().item())
-            # print("x0: ", x0.numpy().squeeze())
-            # import matplotlib.pyplot as plt
-            # fig, ax = plt.subplots(2, 3)
-            # ax[0,0].imshow(target_img)
-            # ax[0,1].imshow(warped_img)
-            # ax[0,2].imshow(residuals.reshape((128,160)), vmin=-1, vmax=1)
-            #
-            # ax[1, 0].imshow(J_pinv[0,...].reshape((128, 160)))
-            # ax[1, 1].imshow(J_pinv[1,...].reshape((128, 160)))
-            # ax[1, 2].imshow(J_pinv[2,...].reshape((128, 160)))
-            # plt.show()
-
         if not converged:
             warnings.warn(f"EMS not converged after {self.n_iter}", RuntimeWarning)
         return R_lr, residuals, warped_img
@@ -138,15 +126,25 @@ class RotationEstimator(torch.nn.Module):
         J = J_img @ self.batch_proj_jac
         return J.squeeze(1)
 
-    def _warp_img(self, img:torch.Tensor, R:torch.Tensor, K:torch.Tensor):
+    def _warp_img(self, img:torch.Tensor, R:torch.Tensor):
         assert R.shape == (3,3)
-        assert K.shape == (3,3)
-        homography = (K @ R@ torch.linalg.inv(K))
+        homography = (self.intrinsics @ R@ torch.linalg.inv(self.intrinsics))
         if homography.ndim == 2:
             homography = homography.unsqueeze(0)
         if img.ndim == 2:
             img = img.unsqueeze(0).unsqueeze(0)
         return self.warper(img, torch.linalg.inv(homography)).squeeze()
 
+    def plot(self, x, ref_img, target_img, residuals, J_pinv):
+        warped_img = self._warp_img(ref_img, lie_so3_to_SO3(x))
+        fig, ax = plt.subplots(2, 3)
+        ax[0,0].imshow(target_img)
+        ax[0,1].imshow(warped_img)
+        ax[0,2].imshow(residuals.reshape((128,160)), vmin=-1, vmax=1)
+
+        ax[1, 0].imshow(J_pinv[0,...].reshape((128, 160)))
+        ax[1, 1].imshow(J_pinv[1,...].reshape((128, 160)))
+        ax[1, 2].imshow(J_pinv[2,...].reshape((128, 160)))
+        plt.show()
 
 
