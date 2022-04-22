@@ -1,12 +1,11 @@
 import unittest
 import numpy as np
 from pathlib import Path
-
-from alley_oop.pose.icp_estimation import ICPEstimator
 import cv2
 import torch
+
+from alley_oop.pose.icp_estimation import ICPEstimator
 from scipy.spatial.transform import Rotation as R
-from alley_oop.geometry.lie_3d import lie_SE3_to_se3
 from alley_oop.geometry.point_cloud import PointCloud
 
 class IcpEstimationTester(unittest.TestCase):
