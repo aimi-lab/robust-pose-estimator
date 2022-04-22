@@ -45,7 +45,7 @@ class RGBPoseEstimator(torch.nn.Module):
 
     def residual_fun(self, x, ref_img, ref_pcl, trg_img, trg_mask=None): #ToDo add src_mask
         x = torch.tensor(x, dtype=ref_img.dtype, device=ref_img.device) if not torch.is_tensor(x) else x
-        T_est = lie_se3_to_SE3(x[:3], x[3:], homogenous=True)
+        T_est = lie_se3_to_SE3(x)
         self.warped_img, self.valid = self._warp_img(ref_img, ref_pcl, T_est)
         residuals = self.warped_img - trg_img.view(-1)[self.valid]
         if trg_mask is not None:
@@ -69,10 +69,10 @@ class RGBPoseEstimator(torch.nn.Module):
 
         x = x_list[-1]
         cost = self.cost_fun(self.residual_fun(x, ref_img, ref_pcl, target_img, trg_mask))
-        return lie_se3_to_SE3(x[:3], x[3:], homogenous=True), cost
+        return lie_se3_to_SE3(x), cost
 
     def plot(self, x, ref_img, ref_depth, target_img):
-        R, t = lie_se3_to_SE3(x[:3].cpu(), x[3:].cpu())
+        R, t = lie_se3_to_SE3(x.cpu())
         warped_img = synth_view(ref_img.unsqueeze(0).unsqueeze(0).cpu().float(), ref_depth.unsqueeze(0).float().cpu(), R.float(),
                                 t.unsqueeze(1).float(), self.intrinsics.float().cpu()).squeeze()
 
