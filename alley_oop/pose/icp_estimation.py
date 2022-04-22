@@ -16,14 +16,15 @@ class ICPEstimator(torch.nn.Module):
     It estimates the camera rotation and translation between a scene and a current depth map
 """
 
-    def __init__(self, img_shape: Tuple, intrinsics: torch.Tensor, n_iter: int=20, res_thr: float=0.001,
+    def __init__(self, img_shape: Tuple, intrinsics: torch.Tensor, n_iter: int=20, Ftol: float=0.001, xtol: float=1e-8,
                  dist_thr: float=200.0/15, normal_thr: float=0.94, association_mode='projective'):
         """
 
         :param img_shape: height and width of images to process
         :param intrinsics: camera intrinsics
         :param n_iter: max number of iterations of the optimizer
-        :param res_thr: cost function threshold
+        :param Ftol: cost function threshold
+        :param xtol: variable change threshold
         :param dist_thr: euclidean distance threshold to accept/reject point correspondences
         :param normal_thr: angular difference threshold of normals to accept/reject point correspondences
         :param association_mode: projective or euclidean correspondence in ICP
@@ -35,7 +36,8 @@ class ICPEstimator(torch.nn.Module):
         self.associate = self.dist_association if association_mode == 'euclidean' else self.projective_association
         self.img_shape = img_shape
         self.n_iter = n_iter
-        self.res_thr = res_thr
+        self.Ftol = Ftol
+        self.xtol = xtol
         self.dist_thr = dist_thr
         self.normal_thr = normal_thr
         self.intrinsics = torch.nn.Parameter(intrinsics)
@@ -70,8 +72,8 @@ class ICPEstimator(torch.nn.Module):
         ref_pcl = PointCloud()
         ref_pcl.from_depth(ref_depth, self.intrinsics)
 
-        x_list, eps = lsq_lma(torch.zeros(6).to(ref_depth.device).to(ref_depth.dtype),self.residual_fun, self.jacobian,
-                              args=(ref_pcl, target_pcl,mask,), max_iter=self.n_iter, tol=self.res_thr)
+        x_list, eps = lsq_lma(torch.zeros(6).to(ref_depth.device).to(ref_depth.dtype), self.residual_fun, self.jacobian,
+                              args=(ref_pcl, target_pcl,mask,), max_iter=self.n_iter, tol=self.Ftol, xtol=self.xtol)
         x = x_list[-1]
         cost = self.cost_fun(self.residual_fun(x, ref_pcl, target_pcl, mask))
         return lie_se3_to_SE3(x[:3], x[3:], homogenous=True), cost

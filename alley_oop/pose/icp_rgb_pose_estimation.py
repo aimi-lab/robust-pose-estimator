@@ -14,7 +14,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
     It estimates the camera rotation and translation
 """
 
-    def __init__(self, img_shape: Tuple, intrinsics: torch.Tensor, icp_weight: float=10.0, n_iter: int=20, res_thr: float=0.001,
+    def __init__(self, img_shape: Tuple, intrinsics: torch.Tensor, icp_weight: float=10.0, n_iter: int=20, Ftol: float=0.001, xtol: float=1e-8,
                  dist_thr: float=200.0/15, normal_thr: float=0.94, association_mode='projective'):
         """
 
@@ -22,7 +22,8 @@ class RGBICPPoseEstimator(torch.nn.Module):
         :param intrinsics: camera intrinsics
         :param icp_weight: weight for ICP term in linear combination of losses (0 -> RGB only)
         :param n_iter: max number of iterations of the optimizer
-        :param res_thr: cost function threshold
+        :param Ftol: cost function threshold
+        :param xtol: variable change threshold
         :param dist_thr: euclidean distance threshold to accept/reject point correspondences
         :param normal_thr: angular difference threshold of normals to accept/reject point correspondences
         :param association_mode: projective or euclidean correspondence in ICP
@@ -34,7 +35,8 @@ class RGBICPPoseEstimator(torch.nn.Module):
         assert icp_weight >= 0.0
         self.icp_weight = icp_weight
         self.n_iter = n_iter
-        self.res_thr = res_thr
+        self.Ftol = Ftol
+        self.xtol = xtol
 
     def estimate_gn(self, ref_img: torch.Tensor, ref_depth: torch.Tensor, target_img: torch.Tensor, target_pcl:PointCloud,
                     ref_mask: torch.tensor=None,
@@ -59,20 +61,19 @@ class RGBICPPoseEstimator(torch.nn.Module):
 
             # Todo try several optimizer methods, this may be synchronized with CPU (cholesky, QR etc)
             x0 = torch.linalg.lstsq(A,b).solution
-            x -= x0
 
             #self.rgb_estimator.plot(x, ref_img, ref_depth, target_img)
             #self.icp_estimator.plot_correspondence(x, ref_img, ref_depth, target_img)
             #self.icp_estimator.plot(x, ref_pcl, target_pcl)
 
             cost = self.icp_weight*self.icp_estimator.cost_fun(icp_residuals) + self.rgb_estimator.cost_fun(rgb_residuals)
-            if cost < self.res_thr:
+            if cost < self.Ftol:
                 converged = True
                 break
-            if torch.linalg.norm(x0,ord=2) < xtol*(xtol + torch.linalg.norm(x,ord=2)):
+            if torch.linalg.norm(x0,ord=2) < self.xtol*(self.xtol + torch.linalg.norm(x,ord=2)):
                 converged = True
                 break
-
+            x -= x0
         if not converged:
             warnings.warn(f"not converged after {self.n_iter}", RuntimeWarning)
 

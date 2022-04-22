@@ -18,20 +18,22 @@ class RGBPoseEstimator(torch.nn.Module):
     It estimates the camera rotation and translation between a scene and a current depth map
 """
 
-    def __init__(self, img_shape: Tuple, intrinsics: torch.Tensor, n_iter: int=10000, res_thr: float=0.00001):
+    def __init__(self, img_shape: Tuple, intrinsics: torch.Tensor, n_iter: int=10000, Ftol: float=0.00001, xtol: float=1e-8):
         """
 
         :param img_shape: height and width of images to process
         :param intrinsics: camera intrinsics
         :param n_iter: max number of iterations of the optimizer
-        :param res_thr: cost function threshold
+        :param Ftol: cost function threshold
+        :param xtol: variable change threshold
         """
         super(RGBPoseEstimator, self).__init__()
         assert len(img_shape) == 2
         assert intrinsics.shape == (3,3)
         self.img_shape = img_shape
         self.n_iter = n_iter
-        self.res_thr = res_thr
+        self.Ftol = Ftol
+        self.xtol = xtol
         self.intrinsics = torch.nn.Parameter(intrinsics)
         self.d = torch.nn.Parameter(torch.empty(0))  # dummy device store
         self.trg_ids = None
@@ -63,7 +65,7 @@ class RGBPoseEstimator(torch.nn.Module):
         ref_pcl = PointCloud()
         ref_pcl.from_depth(ref_depth, self.intrinsics)
         x_list, eps = lsq_lma(torch.zeros(6).to(ref_depth.device).to(ref_depth.dtype), self.residual_fun, self.jacobian,
-                              args=(ref_img, ref_pcl, target_img, trg_mask,), max_iter=self.n_iter, tol=self.res_thr)
+                              args=(ref_img, ref_pcl, target_img, trg_mask,), max_iter=self.n_iter, tol=self.Ftol, xtol=self.xtol)
 
         x = x_list[-1]
         cost = self.cost_fun(self.residual_fun(x, ref_img, ref_pcl, target_img, trg_mask))

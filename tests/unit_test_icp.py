@@ -40,7 +40,7 @@ class RotEstimatorTester(unittest.TestCase):
         ref_pcl.from_depth(depth, intrinsics)
         target_pcl = ref_pcl.transform_cpy(T_true)
 
-        estimator = ICPEstimator(depth.shape[:2], intrinsics, res_thr=1e-1, association_mode='projective').to(device)
+        estimator = ICPEstimator(depth.shape[:2], intrinsics, Ftol=1e-1, association_mode='projective').to(device)
         with torch.no_grad():
             T, cost = estimator.estimate_lm(depth.to(device), target_pcl.to(device))
 

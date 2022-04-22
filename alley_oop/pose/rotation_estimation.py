@@ -16,12 +16,13 @@ class RotationEstimator(torch.nn.Module):
     It estimates the camera rotation between two images (assuming rotation only) using efficient second-order minimization
 """
 
-    def __init__(self, img_shape: Tuple, intrinsics: torch.Tensor, n_iter: int=10000, res_thr: float=0.0001):
+    def __init__(self, img_shape: Tuple, intrinsics: torch.Tensor, n_iter: int=100, Ftol: float=1e-5, xtol: float=1e-8):
         super(RotationEstimator, self).__init__()
         assert len(img_shape) == 2
         assert intrinsics.shape == (3,3)
         self.n_iter = n_iter
-        self.res_thr = res_thr
+        self.Ftol = Ftol
+        self.xtol = xtol
         self.intrinsics = torch.nn.Parameter(intrinsics)
         self.warper = HomographyWarper(img_shape[0], img_shape[1], normalized_coordinates=False)
         self.batch_proj_jac = torch.nn.Parameter((self._batch_jw(img_shape, intrinsics) @ self._j_rot()))
@@ -33,6 +34,9 @@ class RotationEstimator(torch.nn.Module):
         residuals = None
         warped_img = None
         converged = False
+        last_cost = torch.inf
+        last_valid_pts = 0
+        last_x = x
         for i in range(self.n_iter):
             # compute residuals f(x)
             warped_img = self._warp_img(ref_img, x)
@@ -40,16 +44,25 @@ class RotationEstimator(torch.nn.Module):
             residuals = ((warped_img - target_img)).reshape(-1, 1)
             if mask is not None:
                 residuals = mask.reshape(-1,1)*residuals
-            if (residuals**2).mean() < self.res_thr:
-                converged = True
-                break
+            cost = self.cost_fun(residuals)
             # compute update parameter x0
             x0 = torch.linalg.lstsq(J, residuals).solution
+
+            if cost < self.Ftol:
+                converged = True
+                break
+            if torch.linalg.norm(x0, ord=2) < self.xtol * (self.xtol + torch.linalg.norm(x, ord=2)):
+                converged = True
+                break
             # update rotation estimate
             x += x0.squeeze()
         if not converged:
             warnings.warn(f"EMS not converged after {self.n_iter}", RuntimeWarning)
         return lie_so3_to_SO3(x), residuals, warped_img
+
+    @staticmethod
+    def cost_fun(residuals):
+        return (residuals ** 2).mean()
 
     @staticmethod
     def _image_jacobian(img:torch.Tensor):
