@@ -29,13 +29,13 @@ class RotationEstimator(torch.nn.Module):
 
     def estimate(self, ref_img: torch.Tensor, target_img:torch.Tensor, mask: torch.Tensor=None):
         """ estimate rotation using efficient second-order optimization"""
-        R_lr = torch.eye(3).to(self.d.device)
+        x = torch.zeros(3, device=self.d.device, dtype=ref_img.dtype)
         residuals = None
         warped_img = None
         converged = False
         for i in range(self.n_iter):
             # compute residuals f(x)
-            warped_img = self._warp_img(ref_img, R_lr)
+            warped_img = self._warp_img(ref_img, x)
             J = self._ems_jacobian(warped_img, target_img)
             residuals = ((warped_img - target_img)).reshape(-1, 1)
             if mask is not None:
@@ -46,10 +46,10 @@ class RotationEstimator(torch.nn.Module):
             # compute update parameter x0
             x0 = torch.linalg.lstsq(J, residuals).solution
             # update rotation estimate
-            R_lr = R_lr @ lie_so3_to_SO3(x0.squeeze())
+            x += x0.squeeze()
         if not converged:
             warnings.warn(f"EMS not converged after {self.n_iter}", RuntimeWarning)
-        return R_lr, residuals, warped_img
+        return lie_so3_to_SO3(x), residuals, warped_img
 
     @staticmethod
     def _image_jacobian(img:torch.Tensor):
@@ -126,9 +126,10 @@ class RotationEstimator(torch.nn.Module):
         J = J_img @ self.batch_proj_jac
         return J.squeeze(1)
 
-    def _warp_img(self, img:torch.Tensor, R:torch.Tensor):
-        assert R.shape == (3,3)
-        homography = (self.intrinsics @ R@ torch.linalg.inv(self.intrinsics))
+    def _warp_img(self, img:torch.Tensor, x:torch.Tensor):
+        assert x.shape == (3,)
+        R = lie_so3_to_SO3(x)
+        homography = (self.intrinsics @ R @ torch.linalg.inv(self.intrinsics))
         if homography.ndim == 2:
             homography = homography.unsqueeze(0)
         if img.ndim == 2:
@@ -136,7 +137,7 @@ class RotationEstimator(torch.nn.Module):
         return self.warper(img, torch.linalg.inv(homography)).squeeze()
 
     def plot(self, x, ref_img, target_img, residuals, J_pinv):
-        warped_img = self._warp_img(ref_img, lie_so3_to_SO3(x))
+        warped_img = self._warp_img(ref_img, x)
         fig, ax = plt.subplots(2, 3)
         ax[0,0].imshow(target_img)
         ax[0,1].imshow(warped_img)
