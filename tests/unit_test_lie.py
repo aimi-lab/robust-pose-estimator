@@ -59,33 +59,18 @@ class Lie3DTester(unittest.TestCase):
         for p in arr:
             
             # convert 3-vector to rotation matrix
-            rmat, tvec = lie_se3_to_SE3(wvec=p[:3], uvec=p[3:])
+            pmat = lie_se3_to_SE3(pvec=p)
 
             # check if rotation matrix is SO3
-            rval = is_SO3(rmat)
+            rval = is_SO3(pmat[:3, :3])
             self.assertTrue(rval)
 
             # convert rotation matrix to 3-vector
-            wvec, uvec = lie_SE3_to_se3(rmat, tvec)
+            pvec = lie_SE3_to_se3(pmat)
 
             # assertion
-            self.assertTrue(np.allclose(p[:3], wvec, atol=10e-11))
-            self.assertTrue(np.allclose(p[3:], uvec, atol=10e-11))
-
-        for p in arr:
-            # convert 3-vector to rotation matrix
-            hmat = lie_se3_to_SE3(wvec=p[:3], uvec=p[3:], homogenous=True)
-
-            # check if rotation matrix is SO3
-            rval = is_SO3(hmat[:3,:3])
-            self.assertTrue(rval)
-
-            # convert rotation matrix to 3-vector
-            wvec, uvec = lie_SE3_to_se3(hmat[:3,:3], hmat[:3,3])
-
-            # assertion
-            self.assertTrue(np.allclose(p[:3], wvec, atol=10e-11))
-            self.assertTrue(np.allclose(p[3:], uvec, atol=10e-11))
+            self.assertTrue(np.allclose(p[:3], pvec[:3], atol=10e-11))
+            self.assertTrue(np.allclose(p[3:], pvec[3:], atol=10e-11))
 
 
     def test_se3_conversions_torch(self):
@@ -95,55 +80,44 @@ class Lie3DTester(unittest.TestCase):
         for p in arr:
             
             # convert 3-vector to rotation matrix
-            rmat, tvec = lie_se3_to_SE3(wvec=p[:3], uvec=p[3:])
+            pmat = lie_se3_to_SE3(pvec=p)
 
             # check if rotation matrix is SO3
-            rval = is_SO3(rmat)
+            rval = is_SO3(pmat[:3, :3])
             self.assertTrue(rval)
 
             # convert rotation matrix to 3-vector
-            wvec, uvec = lie_SE3_to_se3(rmat, tvec)
+            pvec = lie_SE3_to_se3(pmat)
 
             # assertion
-            self.assertTrue(np.allclose(p[:3], wvec, atol=10e-11))
-            self.assertTrue(np.allclose(p[3:], uvec, atol=10e-11))
-
-        for p in arr:
-            # convert 3-vector to rotation matrix
-            hmat = lie_se3_to_SE3(wvec=p[:3], uvec=p[3:], homogenous=True)
-
-            # check if rotation matrix is SO3
-            rval = is_SO3(hmat[:3,:3])
-            self.assertTrue(rval)
-
-            # convert rotation matrix to 3-vector
-            wvec, uvec = lie_SE3_to_se3(hmat[:3,:3], hmat[:3,3])
-
-            # assertion
-            self.assertTrue(np.allclose(p[:3], wvec, atol=10e-11))
-            self.assertTrue(np.allclose(p[3:], uvec, atol=10e-11))
+            self.assertTrue(np.allclose(p[:3], pvec[:3], atol=10e-11))
+            self.assertTrue(np.allclose(p[3:], pvec[3:], atol=10e-11))
 
     def test_zero_so3(self):
 
-        rmat = lie_so3_to_SO3(np.zeros(3))
+        for lib in [np, torch]:
 
-        self.assertTrue(np.sum(rmat - np.eye(3)) == 0, 'Zero angles do not yield identity matrix')
+            rmat = lie_so3_to_SO3(lib.zeros(3))
 
-        rmat, tvec = lie_se3_to_SE3(wvec=np.zeros(3), uvec=np.zeros(3))
+            self.assertTrue(lib.sum(rmat - lib.eye(3)) == 0, 'Zero angles do not yield identity matrix')
 
-        self.assertTrue(np.sum((rmat - np.eye(3))**2) == 0, 'Zeros in Lie angle 3-vector do not yield identity matrix')
-        self.assertTrue(np.sum(tvec**2) == 0, 'Zeros in Lie translation 3-vector are not zeros')
+            pmat = lie_se3_to_SE3(pvec=lib.zeros(6))
+
+            self.assertTrue(lib.sum((pmat[:3, :3] - lib.eye(3))**2) == 0, 'Zeros in Lie angle 3-vector do not yield identity matrix')
+            self.assertTrue(lib.sum(pmat[:3,-1]**2) == 0, 'Zeros in Lie translation 3-vector are not zeros')
 
     def test_zero_SO3(self):
 
-        rvec = lie_SO3_to_so3(rmat=np.eye(3))
+        for lib in [np, torch]:
 
-        self.assertFalse(rvec.any(), 'Identity rotation matrix does not yield zero vector')
+            rvec = lie_SO3_to_so3(rmat=lib.eye(3))
 
-        rvec, uvec = lie_SE3_to_se3(rmat=np.eye(3), tvec=np.zeros(3))
+            self.assertFalse(rvec.any(), 'Identity rotation matrix does not yield zero vector')
 
-        self.assertFalse(rvec.any(), 'Identity rotation matrix does not yield zero vector')
-        self.assertFalse(uvec.any(), 'Zeros in translation 3-vector do not yield zeros')
+            pvec = lie_SE3_to_se3(pmat=lib.eye(4))
+
+            self.assertFalse(pvec[:3].any(), 'Identity rotation matrix does not yield zero vector')
+            self.assertFalse(pvec[3:].any(), 'Zeros in translation 3-vector do not yield zeros')
 
     def test_all(self):
 

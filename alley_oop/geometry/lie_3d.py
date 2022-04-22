@@ -78,26 +78,23 @@ def lie_SO3_to_so3(
 
 
 def lie_se3_to_SE3(
-        wvec: Union[np.ndarray, torch.Tensor] = None,
-        uvec: Union[np.ndarray, torch.Tensor] = None,
+        pvec: Union[np.ndarray, torch.Tensor] = None,
         tol: float = 10e-12,
-        homogenous: bool = False
     ) -> Union[np.ndarray, torch.Tensor]:
     """
     create rotation matrix in SO(3) and translation vector R^3 from Lie algebra equivalents
     
-    :param wvec: Lie angle 3-vector
-    :param uvec: Lie translation 3-vector
+    :param pvec: concatenated Lie angle 3-vector and Lie translation 3-vector
     :return: rotation matrix in SO(3), translation vector R^3
     """
 
-    lib = get_lib(wvec)
+    lib = get_lib(pvec)
 
     # define identity matrix in advance to account for torch device
-    eye_3 = lib.eye(3).to(wvec.device) if lib == torch else lib.eye(3)
+    eye_3 = lib.eye(3).to(pvec.device) if lib == torch else lib.eye(3)
 
     # compute scale from vector norm
-    theta = (wvec.T @ wvec)**.5
+    theta = (pvec[:3].T @ pvec[:3])**.5
 
     # Taylor coefficients
     a_term = lib.sin(theta)
@@ -105,7 +102,7 @@ def lie_se3_to_SE3(
     c_term = (1-a_term)
 
     # normalize vector
-    wvec_norm = wvec / theta if theta > tol else wvec
+    wvec_norm = pvec[:3] / theta if theta > tol else pvec[:3]
 
     # construct hat-map which is so(3)
     wmat = lie_hatmap(wvec_norm)
@@ -113,32 +110,27 @@ def lie_se3_to_SE3(
     rmat = eye_3 + a_term * wmat + b_term * wmat @ wmat
     vmat = eye_3 + b_term * wmat + c_term * wmat @ wmat
 
-    tvec = vmat @ uvec
-    if not homogenous:
-        return rmat, tvec
-    else:
-        hmat = lib.eye(4, dtype=wvec.dtype).to(wvec.device) if lib == torch else lib.eye(4, dtype=wvec.dtype)
-        hmat[:3,:3] = rmat
-        hmat[:3,3] = tvec
-        return hmat
+    tvec = vmat @ pvec[3:]
+
+    pmat = lib.hstack([rmat, tvec[..., None]])
+
+    return pmat
 
 
 def lie_SE3_to_se3(
-        rmat: Union[np.ndarray, torch.Tensor] = None, 
-        tvec: Union[np.ndarray, torch.Tensor] = None,
+        pmat: Union[np.ndarray, torch.Tensor] = None, 
         tol: float = 10e-12,
     ) -> Union[np.ndarray, torch.Tensor]:
     """
     create rotation matrix in SO(3) and translation vector R^3 from Lie algebra equivalents
     
-    :param rmat: rotation matrix in SO(3)
-    :param tvec: translation vector R^3
-    :return: Lie angle 3-vector, Lie translation 3-vector
+    :param pmat: concatenated rotation matrix in SO(3) and translation vector R^3
+    :return: concatenated Lie angle 3-vector and Lie translation 3-vector
     """
 
-    lib = get_lib(rmat)
+    lib = get_lib(pmat)
 
-    wvec = lie_SO3_to_so3(rmat)
+    wvec = lie_SO3_to_so3(pmat[:3, :3])
 
     # compute scale from vector norm
     theta = (wvec.T @ wvec)**.5
@@ -155,11 +147,13 @@ def lie_SE3_to_se3(
 
     if b_term != 0:
         vmat_inv = lib.eye(3) - .5*wmat + (1-a_term/(2*b_term)) * wmat @ wmat
-        uvec = vmat_inv @ tvec
+        uvec = vmat_inv @ pmat[:3, -1]
     else:
         uvec = lib.zeros(3)
 
-    return wvec, uvec
+    pvec = lib.hstack([wvec, uvec])
+
+    return pvec
 
 
 def lie_hatmap(
