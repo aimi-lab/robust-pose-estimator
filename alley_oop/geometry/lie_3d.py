@@ -23,7 +23,7 @@ def lie_so3_to_SO3(
     lib = get_lib(wvec)
     
     # define identity matrix in advance to account for torch device
-    eye_3 = lib.eye(3).to(wvec.device) if lib == torch else lib.eye(3)
+    eye_3 = lib.eye(3, dtype=wvec.dtype).to(wvec.device) if lib == torch else lib.eye(3, dtype=wvec.dtype)
 
     # check if vector of zeros
     if not wvec.any():
@@ -91,7 +91,7 @@ def lie_se3_to_SE3(
     lib = get_lib(pvec)
 
     # define identity matrix in advance to account for torch device
-    eye_3 = lib.eye(3).to(pvec.device) if lib == torch else lib.eye(3)
+    eye_3 = lib.eye(3, dtype=pvec.dtype).to(pvec.device) if lib == torch else lib.eye(3, dtype=pvec.dtype)
 
     # compute scale from vector norm
     theta = (pvec[:3].T @ pvec[:3])**.5
@@ -115,7 +115,9 @@ def lie_se3_to_SE3(
 
     tvec = vmat @ pvec[3:]
 
-    pmat = lib.hstack([rmat, tvec[..., None]])
+    pmat = lib.eye(4, dtype=pvec.dtype).to(pvec.device) if lib == torch else lib.eye(4, dtype=pvec.dtype)
+    pmat[:3, :3] = rmat
+    pmat[:3, -1] = tvec
 
     return pmat
 
