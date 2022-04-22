@@ -1,5 +1,5 @@
 import torch
-from alley_oop.geometry.lie_3d import lie_se3_to_SE3
+from alley_oop.geometry.lie_3d import lie_se3_to_SE3, lie_SE3_to_se3
 from alley_oop.geometry.point_cloud import PointCloud
 from typing import Tuple
 import warnings
@@ -39,12 +39,13 @@ class RGBICPPoseEstimator(torch.nn.Module):
         self.xtol = xtol
 
     def estimate_gn(self, ref_img: torch.Tensor, ref_depth: torch.Tensor, target_img: torch.Tensor, target_pcl:PointCloud,
-                    ref_mask: torch.tensor=None,
-                    target_mask: torch.tensor=None, xtol=1e-4):
+                    ref_mask: torch.tensor=None, target_mask: torch.tensor=None, init_pose: torch.Tensor=None):
         """ Minimize combined energy using Gauss-Newton and solving the normal equations."""
         ref_pcl = PointCloud()
         ref_pcl.from_depth(ref_depth, self.icp_estimator.intrinsics)
         x = torch.zeros(6, dtype=ref_img.dtype, device=ref_img.device)
+        if init_pose is not None:
+            x[:3], x[3:] = lie_SE3_to_se3(init_pose[:3,:3], init_pose[:3,3])
         cost = None
         converged = False
         for i in range(self.n_iter):
