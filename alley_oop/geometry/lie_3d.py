@@ -96,10 +96,9 @@ def lie_se3_to_SE3(
     # compute scale from vector norm
     theta = (pvec[:3].T @ pvec[:3])**.5
 
-    # Taylor coefficients
+    # Taylor coefficients for rotation
     a_term = lib.sin(theta)
     b_term = (1-lib.cos(theta))
-    c_term = (1-a_term)
 
     # normalize vector
     wvec_norm = pvec[:3] / theta if theta > tol else pvec[:3]
@@ -108,7 +107,11 @@ def lie_se3_to_SE3(
     wmat = lie_hatmap(wvec_norm)
     
     rmat = eye_3 + a_term * wmat + b_term * wmat @ wmat
-    vmat = eye_3 + b_term * wmat + c_term * wmat @ wmat
+
+    # Taylor coefficients for translation (theta terms do not cancel out as for rotation)
+    c_term = (1 - a_term / theta) if theta**2 > tol else theta**2/6-theta**4/120
+    b_term2 = b_term/theta if theta**2 > tol else (0.5*theta - theta**3/24 + theta**5/720)
+    vmat = eye_3 + b_term2 * wmat + c_term * wmat @ wmat
 
     tvec = vmat @ pvec[3:]
 
@@ -135,9 +138,8 @@ def lie_SE3_to_se3(
     # compute scale from vector norm
     theta = (wvec.T @ wvec)**.5
 
-    # Taylor coefficients
-    a_term = lib.sin(theta)
-    b_term = (1-lib.cos(theta))
+    # Taylor 1 - A/(2B) -> directly compute value because thetas do not cancel out as for rotation
+    mul_term = 1- (theta*lib.sin(theta)/(2*(1-lib.cos(theta)))) if theta > tol else theta**2/12+theta**4/720
 
     # normalize vector
     wvec_norm = wvec / theta if theta > tol else wvec
@@ -145,11 +147,8 @@ def lie_SE3_to_se3(
     # construct hat-map which is so(3)
     wmat = lie_hatmap(wvec_norm)
 
-    if b_term != 0:
-        vmat_inv = lib.eye(3) - .5*wmat + (1-a_term/(2*b_term)) * wmat @ wmat
-        uvec = vmat_inv @ pmat[:3, -1]
-    else:
-        uvec = lib.zeros(3)
+    vmat_inv = lib.eye(3) - .5*theta*wmat + mul_term * wmat @ wmat
+    uvec = vmat_inv @ pmat[:3, -1]
 
     pvec = lib.hstack([wvec, uvec])
 
