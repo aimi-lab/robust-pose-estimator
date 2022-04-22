@@ -58,7 +58,7 @@ class ICPEstimator(torch.nn.Module):
             #self.plot(ref_pcl_world_c, target_pcl, ids, valid)
             if len(self.src_grid_ids[0]) == 0:
                 warnings.warn(f"no projective correspondences found", RuntimeWarning)
-                return lie_se3_to_SE3(x0[:3], x0[3:], homogenous=True), self.cost_fun(residuals)
+                return lie_se3_to_SE3(x0), self.cost_fun(residuals)
             if self.cost_fun(residuals) < self.res_thr:
                 converged = True
                 break
@@ -70,7 +70,7 @@ class ICPEstimator(torch.nn.Module):
 
         if not converged:
             warnings.warn(f"not converged after {self.n_iter}", RuntimeWarning)
-        return lie_se3_to_SE3(x0[:3], x0[3:], homogenous=True), self.cost_fun(residuals)
+        return lie_se3_to_SE3(x0), self.cost_fun(residuals)
 
     @staticmethod
     def cost_fun(residuals):
@@ -78,7 +78,7 @@ class ICPEstimator(torch.nn.Module):
 
     def residual_fun(self, x, ref_pcl, target_pcl, mask=None):
         xt = torch.tensor(x).double().to(ref_pcl.pts.device) if not torch.is_tensor(x) else x
-        T_est = lie_se3_to_SE3(xt[:3], xt[3:], homogenous=True)
+        T_est = lie_se3_to_SE3(xt)
         target_pcl_current_c = target_pcl.transform_cpy(torch.linalg.inv(T_est))  # transform into current frame
         self.src_grid_ids, self.trg_ids = self.associate(ref_pcl, target_pcl_current_c, mask)
         # compute residuals
@@ -89,7 +89,7 @@ class ICPEstimator(torch.nn.Module):
 
     def jacobian(self, x, ref_pcl, target_pcl, mask=None):
         xt = torch.tensor(x).double() if not torch.is_tensor(x) else x
-        T_est = lie_se3_to_SE3(xt[:3], xt[3:], homogenous=True)
+        T_est = lie_se3_to_SE3(xt)
         ref_pcl_world_c = ref_pcl.transform_cpy(T_est)
         return (target_pcl.normals[self.trg_ids].unsqueeze(1) @ self.j_3d(
             ref_pcl_world_c.grid_pts[self.src_grid_ids])).squeeze()
@@ -102,7 +102,7 @@ class ICPEstimator(torch.nn.Module):
         x_list, eps = lsq_lma(torch.zeros(6).to(ref_depth.device).to(ref_depth.dtype),self.residual_fun, self.jacobian, args=(ref_pcl, target_pcl,mask,))
         x = x_list[-1]
         cost = self.cost_fun(self.residual_fun(x, ref_pcl, target_pcl, mask))
-        return lie_se3_to_SE3(x[:3], x[3:], homogenous=True), cost
+        return lie_se3_to_SE3(x), cost
 
     def plot(self, ref_pcl, target_pcl, ids, valid):
         ref_pts = ref_pcl.grid_pts[ids].cpu().numpy()
