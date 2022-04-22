@@ -30,7 +30,7 @@ class PointCloud(torch.nn.Module):
         rmat = extrinsics[:3,:3]
         tvec = extrinsics[:3, 3, None]
         img_pts = create_img_coords_t(depth.shape[0], depth.shape[1]).to(depth.dtype).to(depth.device)
-        self.pts = torch.nn.Parameter(reverse_project(img_pts, intrinsics, rmat, tvec, depth=depth).T)
+        self.pts = torch.nn.Parameter(reverse_project(img_pts, intrinsics, rmat, tvec, dpth=depth).T)
         self.grid_shape = depth.shape
         self.estimate_normals()
 

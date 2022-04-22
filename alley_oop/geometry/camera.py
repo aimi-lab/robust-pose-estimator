@@ -11,7 +11,7 @@ class PinholeCamera(object):
         return forward_project(points3d, self.intrinsics)
 
     def project3d(self, points2d, depth):
-        return reverse_project(points2d, self.intrinsics, depth=depth)
+        return reverse_project(points2d, self.intrinsics, dpth=depth)
 
     def render(self, points3d, points_rgb, shape):
         img_pts, depth = forward_project(points3d, self.intrinsics, inhomogenize_opt=True)
