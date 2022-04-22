@@ -81,7 +81,7 @@ if __name__ == '__main__':
             elif str(dname).lower().endswith('exr'):
                 fexr = load_exr(str(dname))
                 dept = exr2gry(fexr)
-                opts = reverse_project(ipts, kmat, rmat, tvec, depth=dept)
+                opts = reverse_project(ipts, kmat, rmat, tvec, dpth=dept)
 
             # compute residuals in z dimension (point-wise comparison too expensive)
             zpts = surf_interpol(pcld, opts, method='bilinear', fill_val=float('NaN'))
