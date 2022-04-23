@@ -18,7 +18,7 @@ class PinholeTransformTester(unittest.TestCase):
     def setUp(self):
 
         # settings
-        self.plot_opt = True
+        self.plot_opt = False
 
         # intrinsics
         self.resolution = (180, 180)

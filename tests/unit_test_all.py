@@ -19,8 +19,9 @@ for test_class in test_classes:
     obj = test_class()
     obj.setUp()
 
-    # switch off plots for headless
+    # switch off plots for headless tests
     obj.plt_opt = False
+    obj.plot_opt = False
 
     obj.test_all()
 

@@ -16,7 +16,7 @@ class GrayscaleTester(unittest.TestCase):
     def setUp(self):
 
         # settings
-        self.plot_opt = True
+        self.plot_opt = False
 
         self.ball_img = imageio.imread(Path.cwd() / 'tests' / 'test_data' / 'bball.jpeg')
         self.porc_img = imageio.imread(Path.cwd() / 'tests' / 'test_data' / '000000l.png')
