@@ -82,10 +82,10 @@ def lie_se3_to_SE3(
         tol: float = 10e-12,
     ) -> Union[np.ndarray, torch.Tensor]:
     """
-    create rotation matrix in SO(3) and translation vector R^3 from Lie algebra equivalents
+    create 4x4 projection matrix in SE(3) from Lie input vector
     
     :param pvec: concatenated Lie angle 3-vector and Lie translation 3-vector
-    :return: rotation matrix in SO(3), translation vector R^3
+    :return: projection matrix in SE(3), translation vector R^3
     """
 
     lib = get_lib(pvec)
@@ -127,7 +127,7 @@ def lie_SE3_to_se3(
         tol: float = 10e-12,
     ) -> Union[np.ndarray, torch.Tensor]:
     """
-    create rotation matrix in SO(3) and translation vector R^3 from Lie algebra equivalents
+    create projection vector in se(3) from SE(3) projection matrix
     
     :param pmat: concatenated rotation matrix in SO(3) and translation vector R^3
     :return: concatenated Lie angle 3-vector and Lie translation 3-vector
