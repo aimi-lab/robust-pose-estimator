@@ -4,6 +4,7 @@ from typing import Union
 from alley_oop.utils.rgb2gray import rgb2gray_t
 from alley_oop.geometry.pinhole_transforms import create_img_coords_t, reverse_project
 
+
 class FrameClass:
     """
         Class containing image, depth and normals
@@ -48,3 +49,11 @@ class FrameClass:
     @property
     def shape(self):
         return self.img.shape[-2:]
+
+    def plot(self):
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots(1,3)
+        ax[0].imshow(self.img.cpu().squeeze(0).permute(1,2,0).numpy())
+        ax[1].imshow(self.img_gray.cpu().squeeze(0).permute(1, 2, 0).numpy())
+        ax[2].imshow(self.depth.cpu().squeeze(0).permute(1, 2, 0).numpy())
+        plt.show()
