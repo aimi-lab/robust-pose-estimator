@@ -8,6 +8,8 @@ import torch
 from scipy.spatial.transform import Rotation as R
 from alley_oop.geometry.lie_3d import lie_SE3_to_se3
 from alley_oop.interpol.synth_view import synth_view
+from alley_oop.utils.pfm_handler import load_pfm
+
 
 class RGBEstimatorTester(unittest.TestCase):
 
@@ -20,24 +22,27 @@ class RGBEstimatorTester(unittest.TestCase):
 
     def test_estimator(self):
         # load test data
-        scale = 16
-        disparity = cv2.imread(str(Path.cwd() / 'tests' / 'test_data' / '000000l.pfm'), cv2.IMREAD_UNCHANGED)
-        h, w = (int(disparity.shape[0]/scale), int(disparity.shape[1]/scale))
-        disparity = cv2.resize(disparity, (w, h))/scale
-        depth = torch.tensor(4289.756 / disparity).double()
-        img = torch.tensor(cv2.resize(cv2.imread(str(Path.cwd() / 'tests' / 'test_data' / '000000l.png'), cv2.IMREAD_GRAYSCALE),
+        scale = 4
+        disparity, _ = load_pfm(str(Path.cwd() / 'tests' / 'test_data' / '0006.pfm'))
+        h, w = (int(disparity.shape[0] / scale), int(disparity.shape[1] / scale))
+        disparity = cv2.resize(disparity, (w, h))
+        # background is very far, make it appear closer
+        disparity[disparity < 20] = 20
+
+        depth = torch.tensor(1050.0 / disparity).double()
+        img = torch.tensor(cv2.resize(cv2.imread(str(Path.cwd() / 'tests' / 'test_data' / '0006.png'), cv2.IMREAD_GRAYSCALE),
                                        (w, h))).float() / 255.0
 
         # generate dummy intrinsics and dummy images
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        R_true = torch.tensor(R.from_euler('xyz', (0.0, 2.0, 20.0), degrees=True).as_matrix()).double()
-        t_true = torch.tensor([0.0, 5.0, 30.0]).double()
+        R_true = torch.tensor(R.from_euler('xyz', (0.0, 0.0, 3.0), degrees=True).as_matrix()).double()
+        t_true = torch.tensor([0.0, 0.0, 1.0]).double()
         T_true = torch.eye(4).double()
         T_true[:3, :3] = R_true
         T_true[:3, 3] = t_true
-        intrinsics = torch.tensor([[1035.3/scale, 0, 596.955/scale],
-                                   [0, 1035.3/scale, 488.41/scale],
+        intrinsics = torch.tensor([[1050.0 / scale, 0, 479.5 / scale],
+                                   [0, 1050.0 / scale, 269.5 / scale],
                                    [0, 0, 1]]).double()
 
         target_img = synth_view(img.unsqueeze(0).unsqueeze(0), depth.unsqueeze(0).float(), R_true.float(),

@@ -37,7 +37,7 @@ class RotEstimatorTester(unittest.TestCase):
         mask = (img2cv != 0) # need to have a valid mask, otherwise gradients are ill-defined
 
         with torch.no_grad():
-            estimator = RotationEstimator(img1.shape, intrinsics, res_thr=1e-5).to(device)
+            estimator = RotationEstimator(img1.shape, intrinsics).to(device)
             R, residuals, warped_img = estimator.estimate(img1.to(device), img2cv.to(device), mask=mask.to(device))
 
         # assertion
