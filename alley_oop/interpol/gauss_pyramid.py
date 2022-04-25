@@ -13,9 +13,9 @@ class GaussPyramid(torch.nn.Module):
         self._kernel_size = kwargs['kernel_size'] if 'kernel_size' in kwargs else 5
         self._kernel_std = kwargs['kernel_std'] if 'kernel_std' in kwargs else 1.08
         self._kernel_scale = kwargs['kernel_scale'] if 'kernel_scale' in kwargs else 36
-        self._top_level = torch.as_tensor(kwargs['img'], dtype=self.dtype) if 'img' in kwargs else None
+        self._top_level = torch.nn.Parameter(torch.as_tensor(kwargs['img'], dtype=self.dtype) if 'img' in kwargs else None)
         self._ds_step = kwargs['ds_step'] if 'ds_step' in kwargs else 2
-        self._top_instrinsics = kwargs['intrinsics'] if 'intrinsics' in kwargs else torch.eye(3)
+        self._top_instrinsics = torch.nn.Parameter(kwargs['intrinsics'] if 'intrinsics' in kwargs else torch.eye(3))
 
         self.gauss_kernel = self.gauss_2d(size=self._kernel_size, std=self._kernel_std, scale=self._kernel_scale)
         self.levels = []
