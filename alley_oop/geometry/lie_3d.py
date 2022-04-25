@@ -148,8 +148,8 @@ def lie_SE3_to_se3(
 
     # construct hat-map which is so(3)
     wmat = lie_hatmap(wvec_norm)
-
-    vmat_inv = lib.eye(3) - .5*theta*wmat + mul_term * wmat @ wmat
+    Eye = lib.eye(3, dtype=wmat.dtype).to(wmat.device) if lib == torch else lib.eye(3, dtype=wmat.dtype)
+    vmat_inv = Eye - .5*theta*wmat + mul_term * wmat @ wmat
     uvec = vmat_inv @ pmat[:3, -1]
 
     pvec = lib.hstack([wvec, uvec])
