@@ -1,6 +1,7 @@
 import torch
 from alley_oop.geometry.normals import normals_from_regular_grid
 from alley_oop.geometry.pinhole_transforms import create_img_coords_t, reverse_project
+from alley_oop.pose.frame_class import FrameClass
 
 
 class PointCloud(torch.nn.Module):
@@ -39,7 +40,7 @@ class PointCloud(torch.nn.Module):
             self.normals = torch.nn.Parameter(normals.view(-1,3))
 
     def set_colors(self, colors):
-        self.colors = torch.nn.Parameter(colors.reshape(-1))
+        self.colors = torch.nn.Parameter(colors.reshape(-1, 3))
 
     @property
     def grid_pts(self):
@@ -73,7 +74,8 @@ class PointCloud(torch.nn.Module):
         ipts = np.vstack([x_mesh.flatten(), y_mesh.flatten()]).T
         interp = NDInterpolator(points_2d, colors, dist_thr=10, default_value=0)
         interp.fit(ipts, self.grid_shape)
-        return interp.predict(colors), interp.predict(self.pts[:,2])
+        img = torch.stack([interp.predict(colors[:, i]) for i in range(3)])
+        return FrameClass(img[None,:], interp.predict(self.pts[:,2])[None,None,:], intrinsics=intrinsics).to(intrinsics.device)
 
 
 from scipy.interpolate.interpnd import _ndim_coords_from_arrays
