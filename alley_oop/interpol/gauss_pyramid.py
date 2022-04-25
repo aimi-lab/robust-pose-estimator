@@ -17,7 +17,7 @@ class GaussPyramid(torch.nn.Module):
         self._ds_step = kwargs['ds_step'] if 'ds_step' in kwargs else 2
         self._top_instrinsics = torch.nn.Parameter(kwargs['intrinsics'] if 'intrinsics' in kwargs else torch.eye(3))
 
-        self.gauss_kernel = self.gauss_2d(size=self._kernel_size, std=self._kernel_std, scale=self._kernel_scale)
+        self.gauss_kernel = torch.nn.Parameter(self.gauss_2d(size=self._kernel_size, std=self._kernel_std, scale=self._kernel_scale))
         self.levels = []
         self.intrinsics_levels = []
 
