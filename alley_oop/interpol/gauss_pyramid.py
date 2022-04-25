@@ -25,8 +25,8 @@ class GaussPyramid(torch.nn.Module):
         """ create Gaussian image pyramid """
 
         # re-initialization
-        self._top_level = self._top_level if img is None else torch.as_tensor(img, dtype=self.dtype)
-        self._top_instrinsics = self._top_instrinsics if intrinsics is None else torch.as_tensor(intrinsics, dtype=self.dtype)
+        self._top_level = torch.nn.Parameter(self._top_level if img is None else torch.as_tensor(img, dtype=self.dtype))
+        self._top_instrinsics = torch.nn.Parameter(self._top_instrinsics if intrinsics is None else torch.as_tensor(intrinsics, dtype=self.dtype))
         self.levels = [self._top_level]
         self.intrinsics_levels = [self._top_instrinsics]
 
