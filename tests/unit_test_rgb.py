@@ -52,7 +52,6 @@ class RGBEstimatorTester(unittest.TestCase):
         with torch.no_grad():
             T, cost = estimator.estimate_lm(img.double().to(device), depth.to(device), target_img.double().to(device), trg_mask=mask.to(device))
         # assertion
-        print(T, T_true)
         self.assertTrue(np.allclose(T[:3,:3].cpu(), R_true.cpu(), atol=1e-1))
         self.assertTrue(np.allclose(T[:3,3].cpu(), t_true.cpu(), atol=5))
         self.assertTrue(np.allclose(cost.cpu(),0.0, atol=1e-2))
