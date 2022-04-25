@@ -27,7 +27,7 @@ class RotationEstimator(torch.nn.Module):
         self.K = torch.nn.Parameter(intrinsics)
         self.K_inv = torch.nn.Parameter(torch.linalg.inv(intrinsics))
         self.warper = HomographyWarper(img_shape[0], img_shape[1], normalized_coordinates=False)
-        self.batch_proj_jac = torch.nn.Parameter((self._batch_jw(img_shape, intrinsics) @ self._j_rot()))
+        self.batch_proj_jac = torch.nn.Parameter((self._batch_jw(img_shape, intrinsics) @ self._j_rot().to(intrinsics.dtype).to(intrinsics.device)))
         self.d = torch.nn.Parameter(torch.empty(0))  # dummy device store
 
     def estimate(self, ref_frame:FrameClass, target_frame:FrameClass, mask: torch.Tensor=None):
@@ -69,8 +69,8 @@ class RotationEstimator(torch.nn.Module):
     def _image_jacobian(img:torch.Tensor):
         sobel = [[-0.125, -0.25, -0.125], [0, 0, 0], [0.125, 0.25, 0.125]]
         batch, channels, h, w= img.shape
-        sobel_kernely = torch.tensor(sobel, dtype=torch.float32).unsqueeze(0).expand(1, channels, 3, 3).to(img.device)
-        sobel_kernelx = torch.tensor(sobel, dtype=torch.float32).unsqueeze(0).expand(1, channels, 3, 3).transpose(2,3).to(img.device)
+        sobel_kernely = torch.tensor(sobel, dtype=img.dtype).unsqueeze(0).expand(1, channels, 3, 3).to(img.device)
+        sobel_kernelx = torch.tensor(sobel, dtype=img.dtype).unsqueeze(0).expand(1, channels, 3, 3).transpose(2,3).to(img.device)
         x_grad = pad(conv2d(img, sobel_kernelx, stride=1, padding='valid', groups=channels)[...,1:-1,1:-1], (2,2,2,2)).reshape(batch, channels, -1)
         y_grad = pad(conv2d(img, sobel_kernely, stride=1, padding='valid', groups=channels)[...,1:-1,1:-1], (2,2,2,2)).reshape(batch, channels, -1)
         jacobian = torch.stack((x_grad, y_grad), dim=-1)
@@ -84,8 +84,8 @@ class RotationEstimator(torch.nn.Module):
             """
         assert K.shape == (3,3)
         u, v = torch.meshgrid(torch.arange(img_shape[-1]), torch.arange(img_shape[-2]))
-        u = u.T.reshape(-1)
-        v = v.T.reshape(-1)
+        u = u.T.reshape(-1).to(K.device)
+        v = v.T.reshape(-1).to(K.device)
 
         # intrinsics
         cu = K[0,2]
@@ -93,7 +93,7 @@ class RotationEstimator(torch.nn.Module):
         f = K[0,0]
 
         # fast
-        J2 = torch.zeros((img_shape[-1] * img_shape[-2], 2, 9))
+        J2 = torch.zeros((img_shape[-1] * img_shape[-2], 2, 9)).to(K.device)
         J2[:, 0, 0] = u -cu
         J2[:, 0, 1] = v -cv
         J2[:, 0, 2] = f
@@ -110,7 +110,7 @@ class RotationEstimator(torch.nn.Module):
         J2[:, 1, 7] = -1/f*(v-cv)**2
         J2[:, 1, 8] = -(v-cv)
 
-        return J2
+        return J2.to(K.dtype)
 
     @staticmethod
     def _j_rot():
