@@ -26,6 +26,8 @@ class PyramidPoseEstimator(torch.nn.Module):
         model.transform(torch.linalg.inv(self.last_pose))
         # render view of model from last camera pose
         model_frame = model.render(self.pyramid._top_instrinsics)
+        frame.plot()
+        model_frame.plot()
         # apply gaussian pyramid to current and rendered images
         frame_pyr, intrinsics_pyr = self.pyramid(frame)
         model_frame_pyr, _ = self.pyramid(model_frame)
@@ -75,8 +77,8 @@ disparity = cv2.resize(disparity, (w, h))
 rand_background = 17 + 6 * np.random.rand(int((disparity < 20).sum()))
 disparity[disparity < 20] = rand_background
 depth = torch.tensor(1050.0 / disparity).double()
-img = torch.tensor(cv2.resize(cv2.imread(str(Path.cwd() /'../..' / 'tests' / 'test_data' / '000000l.png')),
-                               (w, h))).float() / 255.0
+img = torch.tensor(cv2.cvtColor(cv2.resize(cv2.imread(str(Path.cwd() /'../..' / 'tests' / 'test_data' / '0006.png')),
+                               (w, h)), cv2.COLOR_RGB2BGR)).float() / 255.0
 
 # generate dummy intrinsics and dummy images
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
