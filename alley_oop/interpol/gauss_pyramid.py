@@ -98,6 +98,6 @@ class FrameGaussPyramid(GaussPyramid):
         self.level_frame = [self._top_level_frame]
         img_pyr, _ = super().forward(self._top_level_frame.img)
         depth_pyr, _ = super().forward(self._top_level_frame.depth)
-        for img, depth, intrinsics in zip(img_pyr, depth_pyr, self.intrinsics_levels):
+        for img, depth, intrinsics in zip(img_pyr[1:], depth_pyr[1:], self.intrinsics_levels[1:]):
             self.level_frame.append(FrameClass(img, depth, intrinsics=intrinsics))
         return self.level_frame, self.intrinsics_levels
