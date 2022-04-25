@@ -7,10 +7,12 @@ from tests.unit_test_rot_estimation import RotEstimatorTester
 from tests.unit_test_lie import Lie3DTester
 from tests.unit_test_gauss_pyramid import GaussPyramidTester
 from tests.unit_test_grayscale import GrayscaleTester
+from tests.unit_test_icp_estimation import IcpEstimationTester
+from tests.unit_test_rgb_estimation import RGBEstimatorTester
 
 test_classes = [
     PoseTester, NormalsTester, PinholeTransformTester, PhotoLossTest, Lie3DTester, QuaternionConversionTester,
-    RotEstimatorTester, GaussPyramidTester, GrayscaleTester
+    RotEstimatorTester, GaussPyramidTester, GrayscaleTester, IcpEstimationTester, RGBEstimatorTester
                 ]
 
 for test_class in test_classes:
