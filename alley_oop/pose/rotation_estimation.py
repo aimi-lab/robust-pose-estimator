@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from torch.nn.functional import conv2d, pad
 from alley_oop.geometry.lie_3d import lie_so3_to_SO3, lie_hatmap
+from alley_oop.pose.frame_class import FrameClass
 import warnings
 from alley_oop.interpol.warping import HomographyWarper
 from typing import Tuple
@@ -29,8 +30,10 @@ class RotationEstimator(torch.nn.Module):
         self.batch_proj_jac = torch.nn.Parameter((self._batch_jw(img_shape, intrinsics) @ self._j_rot()))
         self.d = torch.nn.Parameter(torch.empty(0))  # dummy device store
 
-    def estimate(self, ref_img: torch.Tensor, target_img:torch.Tensor, mask: torch.Tensor=None):
+    def estimate(self, ref_frame:FrameClass, target_frame:FrameClass, mask: torch.Tensor=None):
         """ estimate rotation using efficient second-order optimization"""
+        ref_img = ref_frame.img_gray
+        target_img = target_frame.img_gray
         x = torch.zeros(3, device=self.d.device, dtype=ref_img.dtype)
         residuals = None
         warped_img = None
@@ -41,7 +44,7 @@ class RotationEstimator(torch.nn.Module):
             J = self._ems_jacobian(warped_img, target_img)
             residuals = ((warped_img - target_img)).reshape(-1, 1)
             if mask is not None:
-                residuals = mask.reshape(-1,1)*residuals
+                residuals = mask.view(-1,1)*residuals
             cost = self.cost_fun(residuals)
             # compute update parameter x0
             x0 = torch.linalg.lstsq(J, residuals).solution
@@ -56,7 +59,7 @@ class RotationEstimator(torch.nn.Module):
             x += x0.squeeze()
         if not converged:
             warnings.warn(f"EMS not converged after {self.n_iter}", RuntimeWarning)
-        return lie_so3_to_SO3(x), residuals, warped_img
+        return lie_so3_to_SO3(x), residuals
 
     @staticmethod
     def cost_fun(residuals):
@@ -65,8 +68,6 @@ class RotationEstimator(torch.nn.Module):
     @staticmethod
     def _image_jacobian(img:torch.Tensor):
         sobel = [[-0.125, -0.25, -0.125], [0, 0, 0], [0.125, 0.25, 0.125]]
-        if img.ndim < 4:
-            img = img.unsqueeze(1)
         batch, channels, h, w= img.shape
         sobel_kernely = torch.tensor(sobel, dtype=torch.float32).unsqueeze(0).expand(1, channels, 3, 3).to(img.device)
         sobel_kernelx = torch.tensor(sobel, dtype=torch.float32).unsqueeze(0).expand(1, channels, 3, 3).transpose(2,3).to(img.device)
@@ -124,13 +125,13 @@ class RotationEstimator(torch.nn.Module):
 
     def _ems_jacobian(self, img1:torch.Tensor, img2:torch.Tensor):
         """ Jacobian for efficient least squares (Jimg1 + Jimg2)/2 * Jproj in R^(h*w)x2"""
-        assert img1.ndim == 2
-        assert img2.ndim == 2
-        h,w = img1.shape
-        assert h == img2.shape[0]
-        assert w == img2.shape[1]
+        assert img1.ndim == 4
+        assert img2.ndim == 4
+        h,w = img1.shape[-2:]
+        assert h == img2.shape[-2]
+        assert w == img2.shape[-1]
 
-        J_img = self._image_jacobian(torch.stack((img1, img2)))
+        J_img = self._image_jacobian(torch.cat((img1, img2)))
 
         J_img = (J_img[0] + J_img[1])/2
         J_img = J_img.reshape(h*w,1,2).squeeze(0)
@@ -140,12 +141,8 @@ class RotationEstimator(torch.nn.Module):
     def _warp_img(self, img:torch.Tensor, x:torch.Tensor):
         assert x.shape == (3,)
         R = lie_so3_to_SO3(x)
-        H_inv = (self.K @ R.T @ self.K_inv)  # Note that the torch warper somehow defines the homography as the inverse from OpenCV
-        if H_inv.ndim == 2:
-            H_inv = H_inv.unsqueeze(0)
-        if img.ndim == 2:
-            img = img.unsqueeze(0).unsqueeze(0)
-        return self.warper(img, H_inv).squeeze()
+        H_inv = (self.K @ R.T @ self.K_inv).unsqueeze(0)  # Note that the torch warper somehow defines the homography as the inverse from OpenCV
+        return self.warper(img, H_inv)
 
     def plot(self, x, ref_img, target_img, residuals, J_pinv):
         warped_img = self._warp_img(ref_img, x)
