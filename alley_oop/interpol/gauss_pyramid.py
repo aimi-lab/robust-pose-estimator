@@ -1,6 +1,7 @@
 import torch
 from torch.nn.functional import conv2d, pad
 from typing import List
+from alley_oop.pose.frame_class import FrameClass
 
 
 class GaussPyramid(torch.nn.Module):
@@ -42,7 +43,7 @@ class GaussPyramid(torch.nn.Module):
         channels = x.shape[1]
         padnum = self._kernel_size // 2
         padded = pad(x, (padnum, padnum, padnum, padnum), mode=border_mode, value=border_value)
-        gsconv = conv2d(padded, self.gauss_kernel, stride=1, padding='same', groups=channels)[..., padnum:-padnum, padnum:-padnum]
+        gsconv = conv2d(padded, self.gauss_kernel.repeat((channels,1,1,1)), stride=1, padding='same', groups=channels)[..., padnum:-padnum, padnum:-padnum]
         downsp = gsconv[..., 0::self._ds_step, 0::self._ds_step]
 
         return downsp
@@ -79,3 +80,24 @@ class GaussPyramid(torch.nn.Module):
     @property
     def top_instrinsics(self):
         return self._top_instrinsics
+
+
+class FrameGaussPyramid(GaussPyramid):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.dtype = torch.float64
+        self._top_level_frame = kwargs['frame'] if 'frame' in kwargs else None
+        self.level_frame = []
+
+    def forward(self, frame:FrameClass=None, intrinsics:torch.tensor=None):
+        # re-initialization
+        self._top_level_frame = frame if frame is not None else self._top_level_frame
+        assert self._top_level_frame is not None
+
+        self.level_frame = [self._top_level_frame]
+        img_pyr, _ = super().forward(self._top_level_frame.img)
+        depth_pyr, _ = super().forward(self._top_level_frame.depth)
+        for img, depth, intrinsics in zip(img_pyr, depth_pyr, self.intrinsics_levels):
+            self.level_frame.append(FrameClass(img, depth, intrinsics=intrinsics))
+        return self.level_frame, self.intrinsics_levels
