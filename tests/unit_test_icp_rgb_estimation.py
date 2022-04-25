@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 from pathlib import Path
 
-from alley_oop.pose.icp_rgb_pose_estimation import RGBICPPoseEstimator
+from alley_oop.pose.icp_rgb_pose_estimation import RGBICPPoseEstimator, FrameClass
 from alley_oop.geometry.point_cloud import PointCloud
 import cv2
 import torch
@@ -26,7 +26,7 @@ class RGBICPPoseEstimatorTester(unittest.TestCase):
         h, w = (int(disparity.shape[0]/scale), int(disparity.shape[1]/scale))
         disparity = cv2.resize(disparity, (w, h))/scale
         depth = torch.tensor(4289.756 / disparity).double()
-        img = torch.tensor(cv2.resize(cv2.imread(str(Path.cwd() / 'tests' / 'test_data' / '000000l.png'), cv2.IMREAD_GRAYSCALE),
+        img = torch.tensor(cv2.resize(cv2.imread(str(Path.cwd() / 'tests' / 'test_data' / '000000l.png')),
                                        (w, h))).float() / 255.0
 
         # generate dummy intrinsics and dummy images
@@ -40,15 +40,19 @@ class RGBICPPoseEstimatorTester(unittest.TestCase):
         intrinsics = torch.tensor([[1035.3/scale, 0, 596.955/scale],
                                    [0, 1035.3/scale, 488.41/scale],
                                    [0, 0, 1]]).double()
+        img = img.permute(2, 0, 1).unsqueeze(0)
+        ref_frame = FrameClass(img.double(), depth.unsqueeze(0).unsqueeze(0), intrinsics=intrinsics)
+        target_img = synth_view(ref_frame.img.float(), ref_frame.depth.float(), R_true.float(),
+                                t_true.unsqueeze(1).float(), intrinsics.float())
+        mask = (target_img[0, 0] != 0)
+        target_frame = FrameClass(target_img.double(), depth.unsqueeze(0).unsqueeze(0), intrinsics=intrinsics)
         ref_pcl = PointCloud()
         ref_pcl.from_depth(depth, intrinsics)
         target_pcl = ref_pcl.transform_cpy(T_true)
-        target_img = synth_view(img.unsqueeze(0).unsqueeze(0), depth.unsqueeze(0).float(), R_true.float(),
-                          t_true.unsqueeze(1).float(), intrinsics.float()).squeeze()
-        mask = (target_img != 0)
-        estimator = RGBICPPoseEstimator(img.shape[:2], intrinsics, icp_weight=0.001, n_iter=100).to(device)
+
+        estimator = RGBICPPoseEstimator(img.shape[-2:], intrinsics, icp_weight=0.001, n_iter=100).to(device)
         with torch.no_grad():
-            T, cost = estimator.estimate_gn(img.double().to(device), depth.to(device), target_img.double().to(device),
+            T, cost = estimator.estimate_gn(ref_frame.to(device), target_frame.to(device),
                                       target_pcl.to(device), target_mask=mask)
         # assertion
         self.assertTrue(np.allclose(T[:3,:3].cpu(), R_true.cpu(), atol=1e-1))
