@@ -32,11 +32,11 @@ class PointCloud(torch.nn.Module):
         tvec = extrinsics[:3, 3, None]
         img_pts = create_img_coords_t(depth.shape[-2], depth.shape[-1]).to(depth.dtype).to(depth.device)
         self.pts = torch.nn.Parameter(reverse_project(img_pts, intrinsics, rmat, tvec, dpth=depth).T)
-        self.grid_shape = depth.shape
+        self.grid_shape = depth.shape[-2:]
         if normals is None:
             self.estimate_normals()
         else:
-            self.normals = torch.nn.Parameter(normals)
+            self.normals = torch.nn.Parameter(normals.view(-1,3))
 
     def set_colors(self, colors):
         self.colors = torch.nn.Parameter(colors.reshape(-1))
@@ -44,12 +44,12 @@ class PointCloud(torch.nn.Module):
     @property
     def grid_pts(self):
         assert self.grid_shape is not None
-        return self.pts.reshape((*self.grid_shape, 3))
+        return self.pts.view((*self.grid_shape, 3))
 
     @property
     def grid_normals(self):
         assert self.grid_shape is not None
-        return self.normals.reshape((*self.grid_shape, 3))
+        return self.normals.view((*self.grid_shape, 3))
 
     def render(self, intrinsics):
         from alley_oop.geometry.pinhole_transforms import forward_project
