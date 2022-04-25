@@ -4,7 +4,6 @@ from typing import Union
 from alley_oop.utils.rgb2gray import rgb2gray_t
 from alley_oop.geometry.pinhole_transforms import create_img_coords_t, reverse_project
 
-
 class FrameClass:
     """
         Class containing image, depth and normals
@@ -21,9 +20,9 @@ class FrameClass:
         assert img.ndim == 4
         assert depth.ndim == 4
 
-        self.img = img
-        self.img_gray = rgb2gray_t(img, ax0=1)
-        self.depth = depth
+        self.img = img.contiguous()
+        self.img_gray = rgb2gray_t(img, ax0=1).contiguous()
+        self.depth = depth.contiguous()
 
         if normals is not None:
             assert normals.ndim == 4
@@ -37,7 +36,7 @@ class FrameClass:
             normals = normals_from_regular_grid(pts.view((*self.depth.shape[-2:], 3)))
             # pad normals
             pad = torch.nn.ReplicationPad2d((0, 1, 0, 1))
-            self.normals = pad(normals.permute(2, 1, 0))
+            self.normals = pad(normals.permute(2, 1, 0)).contiguous()
 
     def to(self, dev_or_type: Union[torch.device, torch.dtype]):
         self.img = self.img.to(dev_or_type)
