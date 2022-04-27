@@ -12,7 +12,7 @@ from alley_oop.fusion.surfel_map import SurfelMap
 from alley_oop.utils.rgb2gray import rgb2gray_t
 from alley_oop.geometry.normals import normals_from_regular_grid
 from alley_oop.interpol.synth_view import synth_view
-from alley_oop.interpol.synth_depth import synth_depth
+#from alley_oop.interpol.synth_depth import synth_depth
 
 
 class SurfelMapTest(unittest.TestCase):
