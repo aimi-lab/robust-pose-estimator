@@ -71,9 +71,10 @@ class SurfelMapTest(unittest.TestCase):
         self.global_dept = self.gtruth_dept[..., 4*gap:, 4*gap:]
         self.global_normals = self.gtruth_normals[4*gap+1:, 4*gap+1:]
 
-        # unordered, not unique global points
+        # break uniqueness and order in global points
         placeholder = self.global_opts
-        self.global_opts = torch.cat((placeholder[:, :gap], self.global_opts), dim=-1)
+        shuffle_idx = torch.randperm(self.global_opts.shape[1])
+        self.global_opts = torch.cat((placeholder[:, :gap], self.global_opts[:, shuffle_idx]), dim=-1)
 
         # pseudo pose deviation
         torch.manual_seed(3008)
