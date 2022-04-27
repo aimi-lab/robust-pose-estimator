@@ -67,9 +67,9 @@ class SurfelMapTest(unittest.TestCase):
         self.target_dept = self.gtruth_dept[..., gap:-gap, gap:-gap]
         self.target_normals = self.gtruth_normals[gap+1:-gap-1, gap+1:-gap-1, :]
         self.global_opts = self.gtruth_opts.reshape(3, *grid_shape)[..., 2*gap:, 2*gap:].reshape(3, -1)
-        self.global_gray = self.gtruth_gray[..., 4*gap:, 4*gap:]
-        self.global_dept = self.gtruth_dept[..., 4*gap:, 4*gap:]
-        self.global_normals = self.gtruth_normals[4*gap+1:, 4*gap+1:]
+        self.global_gray = self.gtruth_gray[..., 2*gap:, 2*gap:]
+        self.global_dept = self.gtruth_dept[..., 2*gap:, 2*gap:]
+        self.global_normals = self.gtruth_normals[2*gap+1:, 2*gap+1:]
 
         # break uniqueness and order in global points
         placeholder = self.global_opts
@@ -85,7 +85,7 @@ class SurfelMapTest(unittest.TestCase):
         surf_map = SurfelMap(dept=self.global_dept, gray=self.global_gray, normals=self.global_normals, pmat=torch.eye(4), kmat=self.kmat)
         surf_map.fuse(opts=self.mockup_opts, gray=self.target_gray, normals=self.target_normals, pmat=torch.eye(4))
 
-        self.assertTrue(surf_map.opts.numel() > self.global_opts.numel(), 'Surfel map points too little')
+        self.assertTrue(surf_map.opts.numel() > self.global_opts.numel(), 'Number of surfel map points too little')
 
         if self.plt_opt:
             from mayavi import mlab
