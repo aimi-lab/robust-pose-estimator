@@ -130,7 +130,7 @@ class SurfelMap(object):
         didx = abs(opts[2, midx] - self.opts[2, vidx]) < d_thresh
 
         # 2. normals constraint (20 degrees threshold)
-        nidx = (normals.T.reshape(-1, 3)[midx] @ self.normals[:, vidx]) > n_thresh
+        nidx = batched_dot_product(normals.T.reshape(-1, 3)[midx], self.normals.T[vidx]) < n_thresh
 
         # 3. confidence constraint
 
