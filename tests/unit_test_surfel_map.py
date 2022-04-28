@@ -1,6 +1,6 @@
 import unittest
 from pathlib import Path
-import numpy as np
+
 import torch
 import imageio
 import matplotlib.pyplot as plt
@@ -84,9 +84,14 @@ class SurfelMapTest(unittest.TestCase):
         ipts = create_img_coords_t(y=self.target_dept.shape[-2], x=self.target_dept.shape[-1])
         self.mockup_opts = reverse_project(ipts=ipts, kmat=self.kmat, rmat=self.pmat[:3, :3], tvec=self.pmat[:3, -1][:, None], dpth=self.target_dept)
 
-        surf_map = SurfelMap(dept=self.global_dept, gray=self.global_gray, normals=self.global_normals, pmat=torch.eye(4), kmat=self.kmat)
-        surf_map.fuse(opts=self.mockup_opts, gray=self.target_gray, normals=self.target_normals, pmat=torch.eye(4))
+        # initialize surfel map
+        surf_map = SurfelMap(opts=self.global_opts, dept=self.global_dept, gray=self.global_gray, normals=self.global_normals, pmat=torch.eye(4), kmat=self.kmat)
+        surf_map.img_shape = self.target_gray.shape[-2:]
 
+        # update surfel map
+        surf_map.fuse(dept=self.target_dept, gray=self.target_gray, normals=self.target_normals, pmat=torch.eye(4))
+
+        # test assertions
         self.assertTrue(surf_map.opts.numel() > self.global_opts.numel(), 'Number of surfel map points too little')
 
         if self.plt_opt:
