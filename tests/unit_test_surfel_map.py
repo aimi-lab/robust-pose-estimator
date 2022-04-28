@@ -65,18 +65,19 @@ class SurfelMapTest(unittest.TestCase):
         self.target_opts = self.gtruth_opts.reshape(3, *grid_shape)[..., gap:-gap, gap:-gap].reshape(3, -1)
         self.target_gray = self.gtruth_gray[..., gap:-gap, gap:-gap]
         self.target_dept = self.gtruth_dept[..., gap:-gap, gap:-gap]
-        self.target_normals = self.gtruth_normals[gap+1:-gap-1, gap+1:-gap-1, :]
+        self.target_normals = self.gtruth_normals[gap:-gap+1, gap:-gap+1, :]
         self.global_opts = self.gtruth_opts.reshape(3, *grid_shape)[..., 2*gap:, 2*gap:].reshape(3, -1)
-        self.global_gray = self.gtruth_gray[..., 2*gap:, 2*gap:].reshape(-1)
-        self.global_dept = self.gtruth_dept[..., 2*gap:, 2*gap:].reshape(-1)
+        self.global_gray = self.gtruth_gray[..., 2*gap:, 2*gap:].reshape(-1)[None, :]
+        self.global_dept = self.gtruth_dept[..., 2*gap:, 2*gap:].reshape(-1)[None, :]
         self.global_normals = self.gtruth_normals[2*gap-1:, 2*gap-1:].reshape(3, -1)
 
         # break uniqueness and order in global points
         shuffle_idx = torch.randperm(self.global_opts.shape[1])
-        self.global_opts = torch.cat((self.global_opts[:, :gap], self.global_opts[:, shuffle_idx]), dim=-1)
-        self.global_gray = torch.cat((self.global_gray[:gap], self.global_gray[shuffle_idx]), dim=-1)
-        self.global_dept = torch.cat((self.global_dept[:gap], self.global_dept[shuffle_idx]), dim=-1)
-        self.global_normals = torch.cat((self.global_normals[:, :gap], self.global_normals[:, shuffle_idx]), dim=-1)
+        noise = torch.randn((3, gap))*1e-3
+        self.global_opts = torch.cat((self.global_opts[:, :gap]+noise, self.global_opts[:, shuffle_idx]), dim=-1)
+        self.global_gray = torch.cat((self.global_gray[:, :gap], self.global_gray[:, shuffle_idx]), dim=-1)
+        self.global_dept = torch.cat((self.global_dept[:, :gap], self.global_dept[:, shuffle_idx]), dim=-1)
+        self.global_normals = torch.cat((self.global_normals[:, :gap]+noise, self.global_normals[:, shuffle_idx]), dim=-1)
 
         # pseudo pose deviation
         torch.manual_seed(3008)

@@ -41,15 +41,15 @@ class SurfelMap(object):
         self.radi = torch.Tensor()
         if self.dept.numel() > 0 and self.normals.numel() == self.dept.numel():
             self.radi = (self.disp[:, 2] * 2**.5) / (self.flen * abs(self.normals[:, 2]))
-        elif self.dept.numel() > 0:
-            self.radi = torch.ones(self.dept.numel())
+        elif self.opts.numel() > 0:
+            self.radi = torch.ones((1, self.opts.shape[1]))
 
         # initiliaze confidence
         gamma = self.dept.flatten()/torch.max(self.dept)
         self.conf = torch.exp(-.5 * gamma**2 / .6**2)
 
         # upsample value
-        self.upscale = 2
+        self.upscale = 1    # TODO: enable value other than 1
 
         # intialize tick as timestamp
         self.tick = 0
@@ -60,83 +60,110 @@ class SurfelMap(object):
         ipts = create_img_coords_t(y=self.img_shape[-2]*self.upscale, x=self.img_shape[-1]*self.upscale)
         dept = torch.nn.functional.upsample(dept, scale_factor=self.upscale, mode='bilinear', align_corners=None)
         opts = reverse_project(ipts=ipts, dpth=dept, rmat=self.pmat[:3, :3], tvec=self.pmat[:3, -1][..., None], kmat=self.kmat)
-        normals = normals_from_regular_grid(opts.reshape((self.img_shape[0]*self.upscale, self.img_shape[1]*self.upscale, 3)))
 
-        radi = (opts[:, 2] * 2**.5) / (self.flen * abs(normals[:, 2]))
+        if normals is None:
+            # TODO: ensure normals have same length as opts etc.
+            normals = normals_from_regular_grid(opts.reshape((self.img_shape[0]*self.upscale, self.img_shape[1]*self.upscale, 3)))
         
-        # find correspondence by projecting surfels to current frame
-        midx, vidx = self.match_surfels_by_projection(pmat=pmat)
-        fidx = self.filter_by_comparison(opts=opts, normals=normals, midx=midx, vidx=vidx)
+        # enforce channel x samples shape
+        normals = normals.reshape(3, -1)
+        gray = gray.flatten()[None, :]
+        dept = dept.flatten()[None, :]
 
-        pcor, ncor, gcor, rcor = opts[fidx], normals[fidx], gray[fidx], radi[fidx]
+        # initialize global points
+        global_ipts = forward_project(self.opts, kmat=self.kmat, rmat=pmat[:3, :3], tvec=pmat[:3, -1][:, None])
+        bidx = (global_ipts[0, :] >= 0) & (global_ipts[1, :] >= 0) & (global_ipts[0, :] < self.img_shape[0]) & (global_ipts[1, :] < self.img_shape[1])
+
+        # find correspondence by projecting surfels to current frame
+        midx = self.get_match_indices(global_ipts[:, bidx])           # image border constraints
+        fidx = self.filter_points_by_comparison(opts=opts, normals=normals, midx=midx, vidx=bidx)
+        #fidx = self.remove_duplicates(opts=opts, pmat=pmat, vidx=fidx)     
+        midx = self.get_match_indices(global_ipts[:, bidx][:, fidx])  # filter constraints
+
+        # compute radii
+        radi = (opts[2, :] * 2**.5) / (self.flen * abs(normals[2, :]))[None, :]
+
+        # select corresponding elements
+        ocor, ncor, gcor, rcor = opts[:, midx], normals[:, midx], gray[:, midx], radi[:, midx]
 
         # assign confidence
-        gamma = pcor[:, 2]/torch.max(pcor[:, 2])
+        gamma = ocor[2, :]/torch.max(ocor[2, :])
         cora = torch.exp(-.5 * gamma**2 / .6**2)
 
-        # update existing points, normals and confidences
-        self.disp[vidx] = self.conf*self.disp[vidx] + cora*pcor / (self.conf + cora)
-        self.gray[vidx] = self.conf*self.gray[vidx] + cora*gcor / (self.conf + cora)
-        self.radi[vidx] = self.conf*self.radi[vidx] + cora*rcor / (self.conf + cora)
-        self.normals[vidx] = self.conf*self.normals[vidx] + cora*ncor / (self.conf + cora)
-        self.conf[vidx] = self.conf + cora
+        # update existing points, intensities, normals, radii and confidences
+        self.opts[:, bidx][:, fidx] = self.conf[bidx][fidx]*self.opts[:, bidx][:, fidx] + cora*ocor / (self.conf[bidx][fidx] + cora)
+        self.gray[:, bidx][:, fidx] = self.conf[bidx][fidx]*self.gray[:, bidx][:, fidx] + cora*gcor / (self.conf[bidx][fidx] + cora)
+        self.radi[:, bidx][:, fidx] = self.conf[bidx][fidx]*self.radi[:, bidx][:, fidx] + cora*rcor / (self.conf[bidx][fidx] + cora)
+        self.normals[:, bidx][:, fidx] = self.conf[bidx][fidx]*self.normals[:, bidx][:, fidx] + cora*ncor / (self.conf[bidx][fidx] + cora)
+        self.conf[bidx][fidx] = self.conf[bidx][fidx] + cora
+
+        # concatenate unmatched points, intensities, normals, radii and confidences
+        mask = torch.ones(opts.shape[1], dtype=bool)
+        mask[midx.unique()] = False
+        self.opts = torch.cat((self.opts, opts[:, mask]), dim=-1)
+        self.gray = torch.cat((self.gray, gray[:, mask]), dim=-1)
+        self.radi = torch.cat((self.radi, radi[:, mask]), dim=-1)
+        self.normals = torch.cat((self.normals, normals[:, mask]), dim=-1)
+
         self.tick = self.tick + 1
 
-        # concatenate unmatched points, normals and confidences
-        self.disp = torch.cat((self.disp, opts[~fidx]), dim=-1)
-        self.gray = torch.cat((self.gray, gcor[~fidx]), dim=-1)
-        self.radi = torch.cat((self.radi, radi[~fidx]), dim=-1)
-        self.normals = torch.cat((self.normals, normals[~fidx]), dim=-1)
-
-    def match_surfels_by_projection(
+    def get_match_indices(
         self,
-        pmat: torch.Tensor = None,
+        ipts: torch.Tensor = None,
         ):
 
-        #target_ipts = create_img_coords_t(y=self.img_shape[-2]*upsample_factor, x=self.img_shape[-1]*upsample_factor)
-        #target_ipts = torch.dstack(torch.meshgrid(torch.arange(self.img_shape[-2]), torch.arange(self.img_shape[-1])))
-        global_ipts = forward_project(self.opts, kmat=self.kmat, rmat=pmat[:3, :3], tvec=pmat[:3, -1][:, None])
+        # quantize points (while considering super-sampling factor)
+        ipts_quantized = torch.round(ipts*self.upscale)
 
-        # 0. exclude points outside field-of-view
-        vidx = (global_ipts[0, :] >= 0) & (global_ipts[1, :] >= 0) & (global_ipts[0, :] < self.img_shape[0]) & (global_ipts[1, :] < self.img_shape[1])
+        # get point correspondence from indexing as flattened 2D indices
+        midx = ipts_quantized[1, :] * self.img_shape[0] * self.upscale + ipts_quantized[0, :]
 
-        # quantize points (while considering super-sampling factor 4)
-        global_ipts_quantized = torch.round(global_ipts[:, vidx]*self.upscale)
-
-        # flatten points
-        ivec = torch.arange(self.img_shape[-2]*self.img_shape[-1]*self.upscale**2)
-        gvec = global_ipts_quantized[1, :] * self.img_shape[0] * self.upscale + global_ipts_quantized[0, :]
-
-        # get correspondence from indexing as flattened 2D indices
-        midx = ivec[gvec.long()]
-
-        # associate global_ipts and target_ipts: H x W x Candidates
-        #y = midx % (self.img_shape[1] * upsample_factor)
-        #x = midx // (self.img_shape[1] * upsample_factor)
-
-        return midx, vidx
+        return midx.long()
     
-    def filter_by_comparison(
+    def filter_points_by_comparison(
         self,
         opts: torch.Tensor = None,
         normals: torch.Tensor = None,
         midx: torch.Tensor = None,
         vidx: torch.Tensor = None,
         d_thresh: float = 1, 
-        n_thresh: float = 1,
+        n_thresh: float = 20,
         ):
 
         # 1. depth distance constraint
         didx = abs(opts[2, midx] - self.opts[2, vidx]) < d_thresh
 
         # 2. normals constraint (20 degrees threshold)
-        nidx = batched_dot_product(normals.T.reshape(-1, 3)[midx], self.normals.T[vidx]) < n_thresh
+        nidx = batched_dot_product(normals.T[midx], self.normals.T[vidx]) < n_thresh/180*torch.pi
 
         # 3. confidence constraint
+        #TODO
 
-        # 4. euclidean distance constraint
-
-
+        # 4. combine constraints
         fidx = vidx[vidx.clone()] & didx & nidx
 
         return fidx
+
+    def remove_duplicates(
+        self,
+        opts: torch.Tensor,
+        pmat: torch.Tensor,
+        vidx: torch.Tensor,
+        ):
+        """
+        #TODO
+        """
+        
+        # identify duplicates to enforce unique correspondence assignment 
+        global_ipts = forward_project(self.opts, kmat=self.kmat, rmat=pmat[:3, :3], tvec=pmat[:3, -1][:, None])
+        global_ipts_quantized = torch.round(global_ipts[:, vidx]*self.upscale)
+        gvec = global_ipts_quantized[1, :] * self.img_shape[0] * self.upscale + global_ipts_quantized[0, :]
+        oidx, bins = torch.unique(gvec, sorted=True, return_counts=True)
+        duplicates = oidx[bins > 1]
+
+        global_opts = self.opts[:, vidx]
+        for d in duplicates:
+            cidx = gvec == d
+            candidates  = global_opts[:, cidx]
+            dist = torch.sum((opts[:, d.long()][:, None] - candidates)**2, dim=0)**.5
+            global_opts.pop()
