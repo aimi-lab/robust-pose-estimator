@@ -20,7 +20,7 @@ class SurfelMapTest(unittest.TestCase):
 
     def setUp(self):
 
-        self.plt_opt = True
+        self.plt_opt = False
 
         self.kmat = torch.eye(3)
         self.pmat = torch.eye(4)
@@ -55,7 +55,7 @@ class SurfelMapTest(unittest.TestCase):
         self.gtruth_opts = reverse_project(ipts=ipts, kmat=self.kmat, rmat=torch.eye(3), tvec=torch.zeros(3, 1), dpth=self.gtruth_dept)
 
         # compute normals
-        self.gtruth_normals = normals_from_regular_grid(self.gtruth_opts.reshape((*grid_shape, 3)))
+        self.gtruth_normals = normals_from_regular_grid(self.gtruth_opts.T.reshape((*grid_shape, 3)))
 
         # separate into global map and target_map
         gap = 100
@@ -80,8 +80,21 @@ class SurfelMapTest(unittest.TestCase):
         # pseudo pose deviation
         torch.manual_seed(3008)
         self.pmat = lie_se3_to_SE3(pvec=torch.randn(6)*1e-6)
-        ipts = create_img_coords_t(y=self.target_dept.shape[-2], x=self.target_dept.shape[-1])
-        self.mockup_opts = reverse_project(ipts=ipts, kmat=self.kmat, rmat=self.pmat[:3, :3], tvec=self.pmat[:3, -1][:, None], dpth=self.target_dept)
+        #ipts = create_img_coords_t(y=self.target_dept.shape[-2], x=self.target_dept.shape[-1])
+        #self.mockup_opts = reverse_project(ipts=ipts, kmat=self.kmat, rmat=self.pmat[:3, :3], tvec=self.pmat[:3, -1][:, None], dpth=self.target_dept)
+
+        if self.plt_opt:
+            # plot test data to validate if it serves as proper input
+            from mayavi import mlab
+            from alley_oop.utils.mlab_plot import mlab_rgbd
+            ds = 8
+            gpts = self.global_opts.cpu().numpy()[:, ::ds]
+            gimg = self.global_gray.T[0, ...].cpu().numpy()[::ds]#self.global_gray.cpu().numpy()[:, ::ds] #torch.ones(self.global_opts.shape[1]).cpu().numpy()[::ds]#
+            tpts = self.target_opts.cpu().numpy()[:, ::ds]
+            timg = self.target_gray.permute(0, 2, 3, 1)[0, ...].cpu().numpy().reshape(-1, 1)[::ds]
+            fig = mlab.figure(bgcolor=(.5, .5, .5))
+            mlab_rgbd(gpts, colors=gimg, size=.05, show_opt=False, fig=fig)
+            mlab_rgbd(tpts, colors=timg, size=.05, show_opt=True, fig=fig)
 
         # initialize surfel map
         surf_map = SurfelMap(opts=self.global_opts, dept=self.global_dept, gray=self.global_gray, normals=self.global_normals, pmat=torch.eye(4), kmat=self.kmat)
@@ -91,19 +104,24 @@ class SurfelMapTest(unittest.TestCase):
         surf_map.fuse(dept=self.target_dept, gray=self.target_gray, normals=self.target_normals, pmat=torch.eye(4))
 
         # test assertions
-        self.assertTrue(surf_map.opts.numel() > self.global_opts.numel(), 'Number of surfel map points too little')
+        self.assertTrue(surf_map.opts.shape[1] > self.global_opts.shape[1], 'Number of surfel map points too little')
+        self.assertTrue(surf_map.opts.shape[1] < self.global_opts.shape[1]+self.target_opts.shape[1], 'Number of surfel map points too large')
+
+        # pass existing data to surfel map
+        point_num = surf_map.opts.shape[1]
+        surf_map.fuse(dept=self.target_dept, gray=self.target_gray, normals=self.target_normals, pmat=torch.eye(4))
+
+        #self.assertTrue(surf_map.opts.shape[1] == point_num, 'Number of surfel map points changed when passing known frame')
 
         if self.plt_opt:
+            # plot resulting surfel map
             from mayavi import mlab
             from alley_oop.utils.mlab_plot import mlab_rgbd
             ds = 8
-            gpts = self.global_opts.cpu().numpy()[:, ::ds]
-            gimg = self.global_gray.permute(0, 2, 3, 1)[0, ...].cpu().numpy().reshape(-1, 1)[::ds]
-            tpts = self.mockup_opts.cpu().numpy()[:, ::ds]
-            timg = self.target_gray.permute(0, 2, 3, 1)[0, ...].cpu().numpy().reshape(-1, 1)[::ds]
+            spts = surf_map.opts.cpu().numpy()[:, ::ds]
+            simg = torch.ones(surf_map.opts.shape[1])[:, ::ds]#surf_map.gray.T[0, ...].cpu().numpy()[::ds]#self.global_gray.cpu().numpy()[:, ::ds] #torch.ones(self.global_opts.shape[1]).cpu().numpy()[::ds]#
             fig = mlab.figure(bgcolor=(.5, .5, .5))
-            mlab_rgbd(gpts, colors=gimg, size=.05, show_opt=False, fig=fig)
-            mlab_rgbd(tpts, colors=timg, size=.05, show_opt=True, fig=fig)
+            mlab_rgbd(spts, colors=simg, size=.05, show_opt=True, fig=fig)
 
     def plot_img_comparison(self):
 
@@ -120,8 +138,27 @@ class SurfelMapTest(unittest.TestCase):
             axs[1].set_title('after transformation')
             plt.show()
 
-    def test_all(self):
+    def test_projection_match(self):
+        
+        # prepare data
+        shuffle_idx = torch.randperm(480*640)
+        nois = torch.randn(shuffle_idx.shape[0])*1e-1
+        gpts = create_img_coords_t(y=480, x=640) - .5   # take 0.5 shift in coords generation into account
+        ipts = gpts[:, shuffle_idx] + nois
 
+        # create surfel map and find index correspondences
+        surf_map = SurfelMap()
+        surf_map.img_shape = torch.Size((480, 640))
+        midx = surf_map.get_match_indices(ipts)
+
+        # assertion
+        self.assertEqual(len(midx), len(shuffle_idx), 'Number of correspondences deviates from ground truth')
+        self.assertTrue(torch.allclose(midx, shuffle_idx), 'Index correspondences do not match with shuffled ground truth')
+        self.assertTrue(torch.allclose(gpts[:, midx]+nois, ipts), 'Corresponding points vary in numerical coordinates')
+
+    def test_all(self):
+        
+        self.test_projection_match()
         self.test_point_fusion()
 
 

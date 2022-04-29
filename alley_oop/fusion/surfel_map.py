@@ -116,7 +116,7 @@ class SurfelMap(object):
         ipts_quantized = torch.round(ipts*self.upscale)
 
         # get point correspondence from indexing as flattened 2D indices
-        midx = ipts_quantized[1, :] * self.img_shape[0] * self.upscale + ipts_quantized[0, :]
+        midx = ipts_quantized[1, :] * self.img_shape[1] * self.upscale + ipts_quantized[0, :]
 
         return midx.long()
     
