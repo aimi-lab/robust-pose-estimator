@@ -24,14 +24,15 @@ class PyramidPoseEstimator(torch.nn.Module):
     def estimate(self, frame:FrameClass, model):
         # transform model to last camera pose coordinates
         model.transform(torch.linalg.inv(self.last_pose))
-        # render view of model from last camera pose
-        model_frame = model.render(self.pyramid._top_instrinsics)
         frame.plot()
-        model_frame.plot()
         # apply gaussian pyramid to current and rendered images
         frame_pyr, intrinsics_pyr = self.pyramid(frame)
-        model_frame_pyr, _ = self.pyramid(model_frame)
+
         if self.last_frame_pyr is not None:
+            # render view of model from last camera pose
+            model_frame = model.render(self.pyramid._top_instrinsics)
+            model_frame_pyr, _ = self.pyramid(model_frame)
+            model_frame.plot()
             # compute SO(3) pre-alignment from previous image to current image
             rot_estimator = RotationEstimator(frame_pyr[2].shape, intrinsics_pyr[2],
                                                self.config['rot']['n_iter'], self.config['rot']['Ftol']).to(self.device)
@@ -83,8 +84,8 @@ img = torch.tensor(cv2.cvtColor(cv2.resize(cv2.imread(str(Path.cwd() /'../..' / 
 # generate dummy intrinsics and dummy images
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-R_true = torch.tensor(R.from_euler('xyz', (0.0, 2.0, 20.0), degrees=True).as_matrix()).double()
-t_true = torch.tensor([0.0, 5.0, 30.0]).double()
+R_true = torch.tensor(R.from_euler('xyz', (0.0, 0.0, 5.0), degrees=True).as_matrix()).double()
+t_true = torch.tensor([0.0, 0.0, 0.0]).double()
 T_true = torch.eye(4).double()
 T_true[:3, :3] = R_true
 T_true[:3, 3] = t_true
