@@ -75,7 +75,7 @@ class PointCloud(torch.nn.Module):
         interp = NDInterpolator(points_2d, colors, dist_thr=10, default_value=0)
         interp.fit(ipts, self.grid_shape)
         img = torch.stack([interp.predict(colors[:, i]) for i in range(3)])
-        return FrameClass(img[None,:], interp.predict(self.pts[:,2])[None,None,:], intrinsics=intrinsics).to(intrinsics.device)
+        return FrameClass(img[None,:], interp.predict(self.pts[valid][:,2])[None,None,:], intrinsics=intrinsics).to(intrinsics.device)
 
 
 from scipy.interpolate.interpnd import _ndim_coords_from_arrays
