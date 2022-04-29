@@ -77,6 +77,14 @@ class PointCloud(torch.nn.Module):
         img = torch.stack([interp.predict(colors[:, i]) for i in range(3)])
         return FrameClass(img[None,:], interp.predict(self.pts[valid][:,2])[None,None,:], intrinsics=intrinsics).to(intrinsics.device)
 
+    def pcl2open3d(self):
+        import open3d
+        pcd = open3d.geometry.PointCloud()
+        #pcd.normals = open3d.utility.Vector3dVector(self.normals.cpu().numpy())
+        pcd.points = open3d.utility.Vector3dVector(self.pts.cpu().numpy())
+        pcd.colors = open3d.utility.Vector3dVector(self.colors.cpu().numpy())
+        return pcd
+
 
 from scipy.interpolate.interpnd import _ndim_coords_from_arrays
 from scipy.interpolate import NearestNDInterpolator
