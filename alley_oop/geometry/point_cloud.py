@@ -40,7 +40,7 @@ class PointCloud(torch.nn.Module):
             self.normals = torch.nn.Parameter(normals.view(-1,3))
 
     def set_colors(self, colors):
-        self.colors = torch.nn.Parameter(colors.reshape(-1, 3))
+        self.colors = torch.nn.Parameter(colors.squeeze().permute(1,2,0).reshape(-1, 3))
 
     @property
     def grid_pts(self):
@@ -68,8 +68,8 @@ class PointCloud(torch.nn.Module):
         colors = self.colors[valid]
 
         import numpy as np
-        x_coords = np.arange(0, self.grid_shape[1])
-        y_coords = np.arange(0, self.grid_shape[0])
+        x_coords = np.arange(0, self.grid_shape[1]) + 0.5
+        y_coords = np.arange(0, self.grid_shape[0]) + 0.5
         x_mesh, y_mesh = np.meshgrid(x_coords, y_coords)
         ipts = np.vstack([x_mesh.flatten(), y_mesh.flatten()]).T
         interp = NDInterpolator(points_2d, colors, dist_thr=10, default_value=0)
