@@ -141,20 +141,30 @@ class SurfelMapTest(unittest.TestCase):
     def test_projection_match(self):
         
         # prepare data
+        nois = torch.randn(480*640)*1e-1
         shuffle_idx = torch.randperm(480*640)
-        nois = torch.randn(shuffle_idx.shape[0])*1e-1
-        gpts = create_img_coords_t(y=480, x=640) - .5   # take 0.5 shift in coords generation into account
-        ipts = gpts[:, shuffle_idx] + nois
+        gpts = create_img_coords_t(y=480, x=640) - .5 #+ nois    # take 0.5 shift in coords generation into account
+        ipts = torch.cat((gpts[:, shuffle_idx], gpts[:, :20]), dim=-1)   # attach identical points to mimic correspondence duplicates
 
         # create surfel map and find index correspondences
         surf_map = SurfelMap()
         surf_map.img_shape = torch.Size((480, 640))
+        surf_map.opts = ipts
+        surf_map.conf = torch.ones((1, ipts.shape[1]))
         midx = surf_map.get_match_indices(ipts)
 
+        # find matching index without duplicate removal as an alternative
+        aidx = torch.fliplr(midx.unique(sorted=False)[None, :])[0]
+
+        kidx = surf_map.remove_duplicates(gpts, midx=midx)
+
+        midx = surf_map.get_match_indices(ipts[:, kidx])
+
         # assertion
-        self.assertEqual(len(midx), len(shuffle_idx), 'Number of correspondences deviates from ground truth')
+        self.assertEqual(len(aidx), len(shuffle_idx), 'Number of unique correspondences deviates from ground truth')
+        self.assertTrue(torch.allclose(aidx, shuffle_idx), 'Index correspondences do not match with shuffled ground truth')
         self.assertTrue(torch.allclose(midx, shuffle_idx), 'Index correspondences do not match with shuffled ground truth')
-        self.assertTrue(torch.allclose(gpts[:, midx]+nois, ipts), 'Corresponding points vary in numerical coordinates')
+        self.assertTrue(torch.allclose(gpts[:, midx], ipts[:, kidx]), 'Corresponding points vary in numerical coordinates')
 
     def test_all(self):
         

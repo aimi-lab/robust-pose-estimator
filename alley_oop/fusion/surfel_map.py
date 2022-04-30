@@ -9,7 +9,7 @@ from alley_oop.utils.pytorch import batched_dot_product
 class SurfelMap(object):
     def __init__(self, *args, **kwargs):
         """ 
-        https://reality.cs.ucl.ac.uk/projects/kinect/keller13realtime.pdf 
+        https://reality.cs.ucl.ac.uk/projects/kinect/keller13realtime.pdf
         http://thomaswhelan.ie/Whelan16ijrr.pdf
         """
         super().__init__()
@@ -31,8 +31,6 @@ class SurfelMap(object):
             # rotate, translate and forward-project points
             npts = forward_project(self.opts, kmat=self.kmat, rmat=self.pmat[:3, :3], tvec=self.pmat[:3, -1][..., None], inhomogenize_opt=True)
             self.dept = img_map_torch(img=npts[2].reshape(self.img_shape), npts=npts, mode='bilinear')
-        elif self.img_shape is None and self.dept.numel() == 0 and self.opts.numel() == 0:
-            raise BaseException('Image shape must be provided if depth or objects are missing')
 
         # initiliaze focal length
         self.flen = (self.kmat[0, 0] + self.kmat[1, 1]) / 2
@@ -44,9 +42,11 @@ class SurfelMap(object):
         elif self.opts.numel() > 0:
             self.radi = torch.ones((1, self.opts.shape[1]))
 
-        # initiliaze confidence
-        gamma = self.dept.flatten()/torch.max(self.dept)
-        self.conf = torch.exp(-.5 * gamma**2 / .6**2)
+        # initialize confidence
+        self.conf = torch.Tensor()
+        if self.opts.numel() > 0:
+            gamma = self.opts[2].flatten()/torch.max(self.opts[2])
+            self.conf = torch.exp(-.5 * gamma**2 / .6**2)[None ,:]
 
         # upsample value
         self.upscale = 1    # TODO: enable value other than 1
@@ -55,6 +55,9 @@ class SurfelMap(object):
         self.tick = 0
             
     def fuse(self, dept: torch.Tensor, gray: torch.Tensor, normals: torch.Tensor = None, pmat: torch.Tensor = None):
+        
+        # update image shape
+        self.img_shape = gray.shape[-2:] if self.img_shape is None else self.img_shape
 
         # compute opts considering upsampling
         ipts = create_img_coords_t(y=self.img_shape[-2]*self.upscale, x=self.img_shape[-1]*self.upscale)
@@ -70,40 +73,53 @@ class SurfelMap(object):
         gray = gray.flatten()[None, :]
         dept = dept.flatten()[None, :]
 
-        # initialize global points
+        # project all surfels to current image frame
         global_ipts = forward_project(self.opts, kmat=self.kmat, rmat=pmat[:3, :3], tvec=pmat[:3, -1][:, None])
-        bidx = (global_ipts[0, :] >= 0) & (global_ipts[1, :] >= 0) & (global_ipts[0, :] < self.img_shape[0]) & (global_ipts[1, :] < self.img_shape[1])
+        bidx = (global_ipts[0, :] >= 0) & (global_ipts[1, :] >= 0) & (global_ipts[0, :] < self.img_shape[1]) & (global_ipts[1, :] < self.img_shape[0])
+        
+        # test global point projection
+        #midx = self.get_match_indices(global_ipts[:, 100:])  
+        #gpts = global_ipts[:, 100:][:, midx]
+        #timg = img_map_torch(img=gpts[2].reshape(self.img_shape)[None, None, ...], npts=gpts)
+        #import matplotlib.pyplot as plt
+        #plt.imshow(timg.cpu().numpy()[0,0, ...])
+        #plt.show()
 
         # find correspondence by projecting surfels to current frame
         midx = self.get_match_indices(global_ipts[:, bidx])           # image border constraints
         fidx = self.filter_points_by_comparison(opts=opts, normals=normals, midx=midx, vidx=bidx)
-        #fidx = self.remove_duplicates(opts=opts, pmat=pmat, vidx=fidx)     
+        kidx = self.remove_duplicates(opts=opts, vidx=fidx)     
         midx = self.get_match_indices(global_ipts[:, bidx][:, fidx])  # filter constraints
 
         # compute radii
         radi = (opts[2, :] * 2**.5) / (self.flen * abs(normals[2, :]))[None, :]
 
-        # select corresponding elements
-        ocor, ncor, gcor, rcor = opts[:, midx], normals[:, midx], gray[:, midx], radi[:, midx]
+        # compute confidence
+        gamma = opts[2, :]/torch.max(opts[2, :])
+        conf = torch.exp(-.5 * gamma**2 / .6**2)[None, :]
 
-        # assign confidence
-        gamma = ocor[2, :]/torch.max(ocor[2, :])
-        cora = torch.exp(-.5 * gamma**2 / .6**2)
+        # select corresponding elements
+        ocor, ncor, gcor, rcor, ccor = opts[:, midx], normals[:, midx], gray[:, midx], radi[:, midx], conf[:, midx]
 
         # update existing points, intensities, normals, radii and confidences
-        self.opts[:, bidx][:, fidx] = self.conf[bidx][fidx]*self.opts[:, bidx][:, fidx] + cora*ocor / (self.conf[bidx][fidx] + cora)
-        self.gray[:, bidx][:, fidx] = self.conf[bidx][fidx]*self.gray[:, bidx][:, fidx] + cora*gcor / (self.conf[bidx][fidx] + cora)
-        self.radi[:, bidx][:, fidx] = self.conf[bidx][fidx]*self.radi[:, bidx][:, fidx] + cora*rcor / (self.conf[bidx][fidx] + cora)
-        self.normals[:, bidx][:, fidx] = self.conf[bidx][fidx]*self.normals[:, bidx][:, fidx] + cora*ncor / (self.conf[bidx][fidx] + cora)
-        self.conf[bidx][fidx] = self.conf[bidx][fidx] + cora
+        conf_idx = self.conf[:, bidx][:, fidx][:, midx]
+        self.opts[:, bidx][:, fidx][:, midx] = conf_idx*self.opts[:, bidx][:, fidx] + ccor*ocor / (conf_idx + ccor)
+        self.gray[:, bidx][:, fidx][:, midx] = conf_idx*self.gray[:, bidx][:, fidx] + ccor*gcor / (conf_idx + ccor)
+        self.radi[:, bidx][:, fidx][:, midx] = conf_idx*self.radi[:, bidx][:, fidx] + ccor*rcor / (conf_idx + ccor)
+        self.normals[:, bidx][:, fidx][:, midx] = conf_idx*self.normals[:, bidx][:, fidx] + ccor*ncor / (conf_idx + ccor)
+        self.conf[:, bidx][:, fidx][:, midx] = conf_idx + ccor
 
         # concatenate unmatched points, intensities, normals, radii and confidences
         mask = torch.ones(opts.shape[1], dtype=bool)
         mask[midx.unique()] = False
+        ratio = mask.sum()/len(mask)
+        print(ratio)
+
         self.opts = torch.cat((self.opts, opts[:, mask]), dim=-1)
         self.gray = torch.cat((self.gray, gray[:, mask]), dim=-1)
         self.radi = torch.cat((self.radi, radi[:, mask]), dim=-1)
         self.normals = torch.cat((self.normals, normals[:, mask]), dim=-1)
+        self.conf = torch.cat((self.conf, conf[:, mask]), dim=-1)
 
         self.tick = self.tick + 1
 
@@ -131,15 +147,12 @@ class SurfelMap(object):
         ):
 
         # 1. depth distance constraint
-        didx = abs(opts[2, midx] - self.opts[2, vidx]) < d_thresh
+        didx = abs(opts[2] - self.opts[2, vidx][midx]) < d_thresh
 
-        # 2. normals constraint (20 degrees threshold)
+        # 2. normals angle deviation constraint (20 degrees threshold by default)
         nidx = batched_dot_product(normals.T[midx], self.normals.T[vidx]) < n_thresh/180*torch.pi
 
-        # 3. confidence constraint
-        #TODO
-
-        # 4. combine constraints
+        # combine constraints
         fidx = vidx[vidx.clone()] & didx & nidx
 
         return fidx
@@ -147,23 +160,31 @@ class SurfelMap(object):
     def remove_duplicates(
         self,
         opts: torch.Tensor,
-        pmat: torch.Tensor,
-        vidx: torch.Tensor,
+        midx: torch.Tensor,
+        vidx: torch.Tensor = None,
         ):
         """
-        #TODO
+        remove points mapping to the same pixel location to enforce unique correspondence assignment 
         """
         
-        # identify duplicates to enforce unique correspondence assignment 
-        global_ipts = forward_project(self.opts, kmat=self.kmat, rmat=pmat[:3, :3], tvec=pmat[:3, -1][:, None])
-        global_ipts_quantized = torch.round(global_ipts[:, vidx]*self.upscale)
-        gvec = global_ipts_quantized[1, :] * self.img_shape[0] * self.upscale + global_ipts_quantized[0, :]
-        oidx, bins = torch.unique(gvec, sorted=True, return_counts=True)
-        duplicates = oidx[bins > 1]
+        # identify duplicates 
+        a = torch.unique(midx, return_inverse=True, sorted=False, return_counts=True)
+        oidx = a[0][a[1]]
+        bins = a[2][a[1]]
+        duplicates = oidx[bins > 1].long()
 
-        global_opts = self.opts[:, vidx]
+        vidx = torch.ones(self.opts.shape[1], dtype=bool) if vidx is None else vidx
+        kidx = torch.ones(self.opts.shape[1], dtype=bool)
         for d in duplicates:
-            cidx = gvec == d
-            candidates  = global_opts[:, cidx]
-            dist = torch.sum((opts[:, d.long()][:, None] - candidates)**2, dim=0)**.5
-            global_opts.pop()
+            # 3. confidence constraint
+            candidates = self.conf[:, vidx][:, midx == d]
+            # 4. euclidean distance constraint (if necessary)
+            if torch.sum(candidates == torch.min(candidates)) > 1:
+                candidates = torch.sum((opts[:, d][:, None] - self.opts[:, vidx][:, midx == d])**2, dim=0)**.5
+            if torch.sum(candidates == torch.min(candidates)) > 1:
+                candidates = torch.arange(len(candidates))
+            mask = torch.ones(self.opts.shape[1], dtype=bool)
+            mask[torch.where(midx==d)[0][torch.argmin(candidates)]] = False
+            kidx[(midx == d) & mask] = 0
+
+        return kidx
