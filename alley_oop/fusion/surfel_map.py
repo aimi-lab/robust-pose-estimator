@@ -89,7 +89,7 @@ class SurfelMap(object):
         midx = self.get_match_indices(global_ipts[:, bidx])           # image border constraints
         fidx = self.filter_points_by_comparison(opts=opts, normals=normals, midx=midx, vidx=bidx)
         kidx = self.remove_duplicates(opts=opts, vidx=fidx)     
-        midx = self.get_match_indices(global_ipts[:, bidx][:, fidx])  # filter constraints
+        midx = self.get_match_indices(global_ipts[:, bidx][:, fidx][:, kidx])  # filter constraints
 
         # compute radii
         radi = (opts[2, :] * 2**.5) / (self.flen * abs(normals[2, :]))[None, :]
@@ -149,13 +149,8 @@ class SurfelMap(object):
         # 1. depth distance constraint
         didx = abs(opts[2] - self.opts[2, vidx][midx]) < d_thresh
 
-<<<<<<< HEAD
-        # 2. normals angle deviation constraint (20 degrees threshold by default)
-        nidx = batched_dot_product(normals.T[midx], self.normals.T[vidx]) < n_thresh/180*torch.pi
-=======
         # 2. normals constraint (20 degrees threshold)
         nidx = batched_dot_product(normals.T[midx], self.normals.T[vidx]) > torch.cos(n_thresh/180*torch.pi)
->>>>>>> 854c0155c37580a14289134cd8491295fd21bda9
 
         # combine constraints
         fidx = vidx[vidx.clone()] & didx & nidx
