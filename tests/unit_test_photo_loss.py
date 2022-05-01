@@ -13,7 +13,7 @@ class PhotoLossTest(unittest.TestCase):
 
     def setUp(self):
 
-        self.plt_opt = False
+        self.plot_opt = False
 
         self.kmat = numpy.eye(3)
         self.rmat = numpy.eye(3)
@@ -42,7 +42,7 @@ class PhotoLossTest(unittest.TestCase):
             self.nimg = synth_view(self.rimg, 1./self.disp, rmat=self.rmat, tvec=self.tvec, kmat0=self.kmat, mode='bilinear')
 
             # plot result
-            if self.plt_opt:
+            if self.plot_opt:
                 self.plot_img_comparison()
 
             # assertion

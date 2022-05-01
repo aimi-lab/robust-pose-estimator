@@ -20,7 +20,7 @@ class SurfelMapTest(unittest.TestCase):
 
     def setUp(self):
 
-        self.plt_opt = True
+        self.plot_opt = True
 
         self.kmat = torch.eye(3)
         self.pmat = torch.eye(4)
@@ -82,7 +82,7 @@ class SurfelMapTest(unittest.TestCase):
         torch.manual_seed(3008)
         self.pmat = lie_se3_to_SE3(pvec=torch.randn(6)*1e-6)
         
-        if self.plt_opt:
+        if self.plot_opt:
             # plot test data to validate if it serves as proper input
             from mayavi import mlab
             from alley_oop.utils.mlab_plot import mlab_rgbd
@@ -114,7 +114,7 @@ class SurfelMapTest(unittest.TestCase):
         surf_map.fuse(dept=self.target_dept, gray=self.target_gray, normals=self.target_normals, pmat=torch.eye(4))
         #self.assertTrue(surf_map.opts.shape[1] == point_num, 'Number of surfel map points changed when passing known frame')
 
-        if self.plt_opt:
+        if self.plot_opt:
             # plot resulting surfel map
             from mayavi import mlab
             from alley_oop.utils.mlab_plot import mlab_rgbd

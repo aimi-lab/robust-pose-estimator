@@ -13,7 +13,7 @@ class PoseTester(unittest.TestCase):
 
     def setUp(self):
 
-        self.plt_opt = False
+        self.plot_opt = False
     
     def test_feat_pose(self):
         
@@ -51,7 +51,7 @@ class PoseTester(unittest.TestCase):
                     self.assertTrue(refer_mse < 1**-3, msg='failed for angle %s at dim %s' % (a, dim))
                     self.assertTrue(query_mse < 1**-3, msg='failed for angle %s at dim %s' % (a, dim))
                 except AssertionError as e:
-                    if self.plt_opt:
+                    if self.plot_opt:
                         fig = plt.figure(figsize=(12, 12))
                         ax = fig.add_subplot(projection='3d')
                         ax.scatter(refer[0], refer[1], refer[2], color='b', marker='x', label='refer')
