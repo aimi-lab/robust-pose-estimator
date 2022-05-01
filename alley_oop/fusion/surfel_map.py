@@ -49,7 +49,7 @@ class SurfelMap(object):
             self.conf = torch.exp(-.5 * gamma**2 / .6**2)[None ,:]
 
         # upsample value
-        self.upscale = 1    # TODO: enable value other than 1
+        self.upscale = kwargs['upscale'] if 'opts' in kwargs else 1   # TODO: enable value other than 1
 
         # intialize tick as timestamp
         self.tick = 0
@@ -61,6 +61,7 @@ class SurfelMap(object):
 
         # compute opts considering upsampling
         ipts = create_img_coords_t(y=self.img_shape[-2]*self.upscale, x=self.img_shape[-1]*self.upscale)
+        ipts[:2, :] -= .5
         dept = torch.nn.functional.upsample(dept, scale_factor=self.upscale, mode='bilinear', align_corners=None)
         opts = reverse_project(ipts=ipts, dpth=dept, rmat=self.pmat[:3, :3], tvec=self.pmat[:3, -1][..., None], kmat=self.kmat)
 
@@ -75,21 +76,13 @@ class SurfelMap(object):
 
         # project all surfels to current image frame
         global_ipts = forward_project(self.opts, kmat=self.kmat, rmat=pmat[:3, :3], tvec=pmat[:3, -1][:, None])
-        bidx = (global_ipts[0, :] >= 0) & (global_ipts[1, :] >= 0) & (global_ipts[0, :] < self.img_shape[1]) & (global_ipts[1, :] < self.img_shape[0])
-        
-        # test global point projection
-        #midx = self.get_match_indices(global_ipts[:, 100:])  
-        #gpts = global_ipts[:, 100:][:, midx]
-        #timg = img_map_torch(img=gpts[2].reshape(self.img_shape)[None, None, ...], npts=gpts)
-        #import matplotlib.pyplot as plt
-        #plt.imshow(timg.cpu().numpy()[0,0, ...])
-        #plt.show()
+        bidx = (global_ipts[0, :] >= 0) & (global_ipts[1, :] >= 0) & (global_ipts[0, :] < self.img_shape[1]-1) & (global_ipts[1, :] < self.img_shape[0]-1)
 
         # find correspondence by projecting surfels to current frame
-        midx = self.get_match_indices(global_ipts[:, bidx])           # image border constraints
-        fidx = self.filter_points_by_comparison(opts=opts, normals=normals, midx=midx, vidx=bidx)
-        kidx = self.remove_duplicates(opts=opts, vidx=fidx)     
-        midx = self.get_match_indices(global_ipts[:, bidx][:, fidx][:, kidx])  # filter constraints
+        midx = self.get_match_indices(global_ipts[:, bidx])                     # image border constraints
+        fidx = bidx#self.filter_corresponding_points(opts=opts, normals=normals, midx=midx, vidx=bidx)
+        kidx = self.get_unique_correspondence_mask(opts=opts, vidx=fidx, midx=midx)
+        midx = self.get_match_indices(global_ipts[:, fidx][:, kidx])   # filter constraints
 
         # compute radii
         radi = (opts[2, :] * 2**.5) / (self.flen * abs(normals[2, :]))[None, :]
@@ -102,12 +95,12 @@ class SurfelMap(object):
         ocor, ncor, gcor, rcor, ccor = opts[:, midx], normals[:, midx], gray[:, midx], radi[:, midx], conf[:, midx]
 
         # update existing points, intensities, normals, radii and confidences
-        conf_idx = self.conf[:, bidx][:, fidx][:, midx]
-        self.opts[:, bidx][:, fidx][:, midx] = conf_idx*self.opts[:, bidx][:, fidx] + ccor*ocor / (conf_idx + ccor)
-        self.gray[:, bidx][:, fidx][:, midx] = conf_idx*self.gray[:, bidx][:, fidx] + ccor*gcor / (conf_idx + ccor)
-        self.radi[:, bidx][:, fidx][:, midx] = conf_idx*self.radi[:, bidx][:, fidx] + ccor*rcor / (conf_idx + ccor)
-        self.normals[:, bidx][:, fidx][:, midx] = conf_idx*self.normals[:, bidx][:, fidx] + ccor*ncor / (conf_idx + ccor)
-        self.conf[:, bidx][:, fidx][:, midx] = conf_idx + ccor
+        conf_idx = self.conf[:, bidx][:, kidx]
+        self.opts[:, bidx][:, kidx] = conf_idx*self.opts[:, bidx][:, kidx] + ccor*ocor / (conf_idx + ccor)
+        self.gray[:, bidx][:, kidx] = conf_idx*self.gray[:, bidx][:, kidx] + ccor*gcor / (conf_idx + ccor)
+        self.radi[:, bidx][:, kidx] = conf_idx*self.radi[:, bidx][:, kidx] + ccor*rcor / (conf_idx + ccor)
+        self.normals[:, bidx][:, kidx] = conf_idx*self.normals[:, bidx][:, kidx] + ccor*ncor / (conf_idx + ccor)
+        self.conf[:, bidx][:, kidx] = conf_idx + ccor
 
         # concatenate unmatched points, intensities, normals, radii and confidences
         mask = torch.ones(opts.shape[1], dtype=bool)
@@ -136,7 +129,7 @@ class SurfelMap(object):
 
         return midx.long()
     
-    def filter_points_by_comparison(
+    def filter_corresponding_points(
         self,
         opts: torch.Tensor = None,
         normals: torch.Tensor = None,
@@ -157,34 +150,56 @@ class SurfelMap(object):
 
         return fidx
 
-    def remove_duplicates(
+    def get_unique_correspondence_mask(
         self,
         opts: torch.Tensor,
         midx: torch.Tensor,
         vidx: torch.Tensor = None,
+        normals: torch.Tensor = None,
+        d_thresh: float = 1,
+        n_thresh: float = 20,
         ):
         """
-        remove points mapping to the same pixel location to enforce unique correspondence assignment 
+        yields indices of points mapping to the same pixel location to enforce unique correspondence assignment 
         """
-        
-        # identify duplicates 
-        a = torch.unique(midx, return_inverse=True, sorted=False, return_counts=True)
-        oidx = a[0][a[1]]
-        bins = a[2][a[1]]
-        duplicates = oidx[bins > 1].long()
 
+        # parameter init
         vidx = torch.ones(self.opts.shape[1], dtype=bool) if vidx is None else vidx
-        kidx = torch.ones(self.opts.shape[1], dtype=bool)
+        normals = torch.ones(self.opts.shape)
+        angle_threshold = torch.cos(torch.tensor(n_thresh)/180*torch.pi)
+
+        # identify duplicates 
+        oidx, bins = torch.unique(midx, sorted=False, return_counts=True)
+        duplicates = oidx[bins>1]
+
+        kidx = torch.ones(self.opts[:, vidx].shape[1], dtype=bool)
+        # TODO vectorize for-loop
         for d in duplicates:
+            # 1. depth distance constraint
+            candidates = abs(opts[2, d] - self.opts[2, vidx][midx == d]) < d_thresh
+            # 2. normals constraint (20 degrees threshold)
+            if torch.sum(candidates == torch.min(candidates)) > 1:
+                candidates = batched_dot_product(normals[:, d][:, None].T, self.normals[:, vidx][:, midx==d].T) > angle_threshold
             # 3. confidence constraint
-            candidates = self.conf[:, vidx][:, midx == d]
+            if torch.sum(candidates == torch.min(candidates)) > 1:
+                candidates = self.conf[:, vidx][:, midx == d]
             # 4. euclidean distance constraint (if necessary)
             if torch.sum(candidates == torch.min(candidates)) > 1:
                 candidates = torch.sum((opts[:, d][:, None] - self.opts[:, vidx][:, midx == d])**2, dim=0)**.5
+            # pick first element if there is no unique candidate
             if torch.sum(candidates == torch.min(candidates)) > 1:
                 candidates = torch.arange(len(candidates))
-            mask = torch.ones(self.opts.shape[1], dtype=bool)
-            mask[torch.where(midx==d)[0][torch.argmin(candidates)]] = False
+            mask = torch.ones(self.opts[:, vidx].shape[1], dtype=bool)
+            mask[torch.where(midx==d)[0][torch.argmin(torch.as_tensor(candidates, dtype=torch.int))]] = False
             kidx[(midx == d) & mask] = 0
 
         return kidx
+
+    def _test_global_point_projection(self, global_ipts):
+
+        midx = self.get_match_indices(global_ipts[:, 100:])  
+        gpts = global_ipts[:, 100:][:, midx]
+        timg = img_map_torch(img=gpts[2].reshape(self.img_shape)[None, None, ...], npts=gpts)
+        import matplotlib.pyplot as plt
+        plt.imshow(timg.cpu().numpy()[0,0, ...])
+        plt.show()
