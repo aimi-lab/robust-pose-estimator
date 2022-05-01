@@ -16,8 +16,7 @@ def rgb2gray_t(
     
     """
 
-    vec = torch.Tensor(vec).to(rgb.device)
-    rgb = torch.tensor(rgb, dtype=vec.dtype)
+    vec = torch.Tensor(vec).to(rgb.dtype).to(rgb.device)
 
     if ax0 is None and rgb.shape[-1] == 3:
         gry = (rgb @ vec)[..., None]

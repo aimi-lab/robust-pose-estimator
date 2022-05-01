@@ -1,6 +1,7 @@
 import torch
 from alley_oop.geometry.lie_3d import lie_se3_to_SE3, lie_SE3_to_se3
 from alley_oop.geometry.point_cloud import PointCloud
+from alley_oop.pose.frame_class import FrameClass
 from typing import Tuple
 import warnings
 from alley_oop.pose.rgb_pose_estimation import RGBPoseEstimator
@@ -38,14 +39,14 @@ class RGBICPPoseEstimator(torch.nn.Module):
         self.Ftol = Ftol
         self.xtol = xtol
 
-    def estimate_gn(self, ref_img: torch.Tensor, ref_depth: torch.Tensor, target_img: torch.Tensor, target_pcl:PointCloud,
+    def estimate_gn(self, ref_frame: FrameClass, target_frame: FrameClass, target_pcl:PointCloud,
                     ref_mask: torch.tensor=None, target_mask: torch.tensor=None, init_pose: torch.Tensor=None):
         """ Minimize combined energy using Gauss-Newton and solving the normal equations."""
         ref_pcl = PointCloud()
-        ref_pcl.from_depth(ref_depth, self.icp_estimator.intrinsics)
-        x = torch.zeros(6, dtype=ref_img.dtype, device=ref_img.device)
+        ref_pcl.from_depth(ref_frame.depth, self.icp_estimator.intrinsics, normals=ref_frame.normals)
+        x = torch.zeros(6, dtype=ref_frame.depth.dtype, device=ref_frame.depth.device)
         if init_pose is not None:
-            x[:3], x[3:] = lie_SE3_to_se3(init_pose[:3,:3], init_pose[:3,3])
+            x = lie_SE3_to_se3(init_pose)
         cost = None
         converged = False
         for i in range(self.n_iter):
@@ -53,8 +54,8 @@ class RGBICPPoseEstimator(torch.nn.Module):
             icp_residuals = self.icp_estimator.residual_fun(x, ref_pcl, target_pcl, ref_mask)
             icp_jacobian = self.icp_estimator.jacobian(x, ref_pcl, target_pcl, ref_mask)
             # photometric
-            rgb_residuals = self.rgb_estimator.residual_fun(x, ref_img, ref_pcl, target_img, target_mask)
-            rgb_jacobian = self.rgb_estimator.jacobian(x, ref_img, ref_pcl, target_img, target_mask)
+            rgb_residuals = self.rgb_estimator.residual_fun(x, ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_mask)
+            rgb_jacobian = self.rgb_estimator.jacobian(x, ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_mask)
 
             # normal equations to be solved
             A = self.icp_weight*icp_jacobian.T @ icp_jacobian + rgb_jacobian.T @ rgb_jacobian
@@ -78,4 +79,4 @@ class RGBICPPoseEstimator(torch.nn.Module):
         if not converged:
             warnings.warn(f"not converged after {self.n_iter}", RuntimeWarning)
 
-        return lie_se3_to_SE3(x[:3], x[3:], homogenous=True), cost
+        return lie_se3_to_SE3(x), cost

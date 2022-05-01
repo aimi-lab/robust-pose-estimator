@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from torchimize.functions import lsq_lma
 from torch.nn.functional import conv2d, pad
 from alley_oop.interpol.synth_view import synth_view
-
+from alley_oop.pose.frame_class import FrameClass
 
 class RGBPoseEstimator(torch.nn.Module):
     """ this is an implementation of the geometric alignment in Elastic Fusion
@@ -53,28 +53,30 @@ class RGBPoseEstimator(torch.nn.Module):
         return residuals
 
     def jacobian(self, x, ref_img, ref_pcl, trg_img, trg_mask=None):
-        J_img = self._image_jacobian(trg_img.unsqueeze(0).unsqueeze(0)).squeeze()
+        J_img = self._image_jacobian(trg_img).squeeze()
         J = J_img.unsqueeze(1) @ self.j_wt(ref_pcl.pts)
         J = J[self.valid]
         if trg_mask is not None:
             J = J[trg_mask.view(-1)[self.valid]]
         return J.squeeze()
 
-    def estimate_lm(self, ref_img: torch.Tensor, ref_depth: torch.Tensor, target_img: torch.Tensor, trg_mask: torch.Tensor=None):
+    def estimate_lm(self, ref_frame: FrameClass, target_frame: FrameClass, trg_mask: torch.Tensor=None):
         """ Levenberg-Marquard estimation."""
         ref_pcl = PointCloud()
-        ref_pcl.from_depth(ref_depth, self.intrinsics)
-        x_list, eps = lsq_lma(torch.zeros(6).to(ref_depth.device).to(ref_depth.dtype), self.residual_fun, self.jacobian,
-                              args=(ref_img, ref_pcl, target_img, trg_mask,), max_iter=self.n_iter, tol=self.Ftol, xtol=self.xtol)
+        ref_pcl.from_depth(ref_frame.depth, self.intrinsics, normals=ref_frame.normals)
+        x_list, eps = lsq_lma(torch.zeros(6).to(ref_frame.depth.device).to(ref_frame.depth.dtype),
+                              self.residual_fun, self.jacobian,
+                              args=(ref_frame.img_gray, ref_pcl, target_frame.img_gray, trg_mask,),
+                              max_iter=self.n_iter, tol=self.Ftol, xtol=self.xtol)
 
         x = x_list[-1]
-        cost = self.cost_fun(self.residual_fun(x, ref_img, ref_pcl, target_img, trg_mask))
+        cost = self.cost_fun(self.residual_fun(x, ref_frame.img_gray, ref_pcl, target_frame.img_gray, trg_mask))
         return lie_se3_to_SE3(x), cost
 
     def plot(self, x, ref_img, ref_depth, target_img):
-        R, t = lie_se3_to_SE3(x.cpu())
-        warped_img = synth_view(ref_img.unsqueeze(0).unsqueeze(0).cpu().float(), ref_depth.unsqueeze(0).float().cpu(), R.float(),
-                                t.unsqueeze(1).float(), self.intrinsics.float().cpu()).squeeze()
+        T = lie_se3_to_SE3(x.cpu())
+        warped_img = synth_view(ref_img.cpu().float(), ref_depth.float().cpu(), T[:3,:3].float(),
+                                T[:3,3].unsqueeze(1).float(), self.intrinsics.float().cpu()).squeeze()
 
         fig, ax = plt.subplots(1,3)
         ax[0].imshow(ref_img.cpu(), vmin=0, vmax=1)
@@ -130,7 +132,7 @@ class RGBPoseEstimator(torch.nn.Module):
         pts = torch.vstack([pcl.pts.T, torch.ones(pcl.pts.shape[0], device=pcl.pts.device, dtype=pcl.pts.dtype)])
         img_pts = forward_project(pts, self.intrinsics, T[:3,:3], T[:3,3,None]).long().T
         # filter points that are not in the image
-        valid = (img_pts[:, 1] < img.shape[0]) & (img_pts[:, 0] < img.shape[1]) & (
+        valid = (img_pts[:, 1] < img.shape[-2]) & (img_pts[:, 0] < img.shape[-1]) & (
                     img_pts[:, 1] > 0) & (img_pts[:, 0] > 0)
-        ids = img_pts.long()[valid][:, 1], img_pts.long()[valid][:, 0]
+        ids = (0, 0, img_pts.long()[valid][:, 1], img_pts.long()[valid][:, 0])
         return img[ids], valid

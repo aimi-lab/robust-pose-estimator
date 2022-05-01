@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 from pathlib import Path
 
-from alley_oop.pose.rgb_pose_estimation import RGBPoseEstimator
+from alley_oop.pose.rgb_pose_estimation import RGBPoseEstimator, FrameClass
 import cv2
 import torch
 from scipy.spatial.transform import Rotation as R
@@ -30,7 +30,7 @@ class RGBEstimatorTester(unittest.TestCase):
         disparity[disparity < 20] = 20
 
         depth = torch.tensor(1050.0 / disparity).double()
-        img = torch.tensor(cv2.resize(cv2.imread(str(Path.cwd() / 'tests' / 'test_data' / '0006.png'), cv2.IMREAD_GRAYSCALE),
+        img = torch.tensor(cv2.resize(cv2.imread(str(Path.cwd() / 'tests' / 'test_data' / '0006.png')),
                                        (w, h))).float() / 255.0
 
         # generate dummy intrinsics and dummy images
@@ -44,13 +44,15 @@ class RGBEstimatorTester(unittest.TestCase):
         intrinsics = torch.tensor([[1050.0 / scale, 0, 479.5 / scale],
                                    [0, 1050.0 / scale, 269.5 / scale],
                                    [0, 0, 1]]).double()
-
-        target_img = synth_view(img.unsqueeze(0).unsqueeze(0), depth.unsqueeze(0).float(), R_true.float(),
-                          t_true.unsqueeze(1).float(), intrinsics.float()).squeeze()
-        mask = (target_img != 0)
-        estimator = RGBPoseEstimator(img.shape[:2], intrinsics).to(device)
+        img = img.permute(2, 0, 1).unsqueeze(0)
+        frame1 = FrameClass(img.double(), depth.unsqueeze(0).unsqueeze(0), intrinsics=intrinsics)
+        target_img = synth_view(frame1.img.float(), frame1.depth.float(), R_true.float(),
+                          t_true.unsqueeze(1).float(), intrinsics.float())
+        mask = (target_img[0,0] != 0)
+        frame2 = FrameClass(target_img.double(), depth.unsqueeze(0).unsqueeze(0), intrinsics=intrinsics)
+        estimator = RGBPoseEstimator(img.shape[-2:], intrinsics).to(device)
         with torch.no_grad():
-            T, cost = estimator.estimate_lm(img.double().to(device), depth.to(device), target_img.double().to(device), trg_mask=mask.to(device))
+            T, cost = estimator.estimate_lm(frame1.to(device), frame2.to(device), trg_mask=mask.to(device))
         # assertion
         self.assertTrue(np.allclose(T[:3,:3].cpu(), R_true.cpu(), atol=1e-1))
         self.assertTrue(np.allclose(T[:3,3].cpu(), t_true.cpu(), atol=5))
