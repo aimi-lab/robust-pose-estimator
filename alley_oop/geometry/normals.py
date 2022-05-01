@@ -9,6 +9,9 @@ from alley_oop.utils.lib_handling import get_lib
 def normals_from_regular_grid(oarr: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, torch.Tensor]:
     """
     compute normal for each point in a regular grid
+
+    #TODO pad normals to be consistent with input dimensions
+
     """
 
     assert len(oarr.shape) == 3, 'normal computation from regular grid requires 3 (x, y, z) dimensions'
