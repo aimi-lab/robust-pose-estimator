@@ -22,6 +22,8 @@ class SurfelMap(object):
         self.kmat = kwargs['kmat'] if 'kmat' in kwargs else torch.eye(3)    # intrinsics
         self.normals = kwargs['normals'] if 'normals' in kwargs else torch.Tensor()
         self.img_shape = kwargs['img_shape'] if 'img_shape' in kwargs else None
+        self.upscale = kwargs['upscale'] if 'opts' in kwargs else 1   # TODO: enable value other than 1
+        self.dbug_opt = False
 
         # calculate object points
         if self.dept.numel() > 0 and self.img_shape is not None:
@@ -49,7 +51,6 @@ class SurfelMap(object):
             self.conf = torch.exp(-.5 * gamma**2 / .6**2)[None ,:]
 
         # upsample value
-        self.upscale = kwargs['upscale'] if 'opts' in kwargs else 1   # TODO: enable value other than 1
 
         # intialize tick as timestamp
         self.tick = 0
@@ -105,8 +106,11 @@ class SurfelMap(object):
         # concatenate unmatched points, intensities, normals, radii and confidences
         mask = torch.ones(opts.shape[1], dtype=bool)
         mask[midx.unique()] = False
-        ratio = mask.sum()/len(mask)
-        print(ratio)
+
+        if self.dbug_opt:
+            # print ratio of added points vs resolution of current frame
+            ratio = mask.sum()/len(mask)
+            print(ratio)
 
         self.opts = torch.cat((self.opts, opts[:, mask]), dim=-1)
         self.gray = torch.cat((self.gray, gray[:, mask]), dim=-1)
@@ -195,11 +199,12 @@ class SurfelMap(object):
 
         return kidx
 
-    def _test_global_point_projection(self, global_ipts):
+    def _test_global_point_projection(self, global_ipts, vidx=None):
 
-        midx = self.get_match_indices(global_ipts[:, 100:])  
-        gpts = global_ipts[:, 100:][:, midx]
+        vidx = torch.ones(global_ipts.shape[1])
+        midx = self.get_match_indices(global_ipts[:, vidx])
+        gpts = global_ipts[:, vidx][:, midx]
         timg = img_map_torch(img=gpts[2].reshape(self.img_shape)[None, None, ...], npts=gpts)
         import matplotlib.pyplot as plt
-        plt.imshow(timg.cpu().numpy()[0,0, ...])
+        plt.imshow(timg.cpu().numpy()[0 ,0 , ...])
         plt.show()

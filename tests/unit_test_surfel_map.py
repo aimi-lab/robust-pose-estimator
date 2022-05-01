@@ -86,7 +86,7 @@ class SurfelMapTest(unittest.TestCase):
             # plot test data to validate if it serves as proper input
             from mayavi import mlab
             from alley_oop.utils.mlab_plot import mlab_rgbd
-            ds = 8
+            ds = 10
             gpts = self.global_opts.cpu().numpy()[:, ::ds]
             gimg = self.global_gray.T[0, ...].cpu().numpy()[::ds]#self.global_gray.cpu().numpy()[:, ::ds] #torch.ones(self.global_opts.shape[1]).cpu().numpy()[::ds]#
             tpts = self.target_opts.cpu().numpy()[:, ::ds]
@@ -118,7 +118,7 @@ class SurfelMapTest(unittest.TestCase):
             # plot resulting surfel map
             from mayavi import mlab
             from alley_oop.utils.mlab_plot import mlab_rgbd
-            ds = 8
+            ds = 1
             spts = surf_map.opts.cpu().numpy()[:, ::ds]
             simg = surf_map.gray.cpu().numpy()[:, ::ds].T
             fig = mlab.figure(bgcolor=(.5, .5, .5))
