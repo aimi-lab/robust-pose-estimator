@@ -24,9 +24,10 @@ class PyramidPoseEstimatorTester(unittest.TestCase):
         with torch.no_grad():
             config = {
                 'pyramid_levels': 3,
-                'rot': {'n_iter': 10, 'Ftol': 1e-3},
+                'rot': {'n_iter': 50, 'Ftol': 1e-3},
                 'icp_weight': 0.0000001,
-                'n_iter': [3, 4, 10]
+                'n_iter': [12, 13, 20],
+                'Ftol': [1e-2, 1e-2, 1e-2]
             }
             scale = 2
             disparity, _ = load_pfm(str(Path.cwd() / 'tests' / 'test_data' / '0006.pfm'))
