@@ -12,17 +12,19 @@ class FrameClass:
     def __init__(self, img: torch.Tensor, depth: torch.Tensor, normals: torch.Tensor=None, intrinsics: torch.Tensor=None):
         """
 
-        :param img: RGB image in range (0, 1) with shape Nx3xHxW
+        :param img: RGB image in range (0, 1) with shape Nx3xHxW or gray-scale Nx1xHxW
         :param depth: depth map in mm with shape Nx1xHxW
         :param normals: surface normals with shape Nx3xHxW (optional)
         :param intrinsics: camera intrinsics for normal computation (optional if normals provided)
         """
-
         assert img.ndim == 4
         assert depth.ndim == 4
-
         self.img = img.contiguous()
-        self.img_gray = rgb2gray_t(img, ax0=1).contiguous()
+
+        if img.shape[1] == 3:
+            self.img_gray = rgb2gray_t(self.img, ax0=1).contiguous()
+        else:
+            self.img_gray = self.img
         self.depth = depth.contiguous()
 
         if normals is not None:
