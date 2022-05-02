@@ -13,12 +13,11 @@ class GaussPyramid(torch.nn.Module):
         self._level_num = kwargs['level_num'] if 'level_num' in kwargs else 2
         self._kernel_size = kwargs['kernel_size'] if 'kernel_size' in kwargs else 5
         self._kernel_std = kwargs['kernel_std'] if 'kernel_std' in kwargs else 1.08
-        self._kernel_scale = kwargs['kernel_scale'] if 'kernel_scale' in kwargs else 36
         self._top_level = torch.nn.Parameter(torch.as_tensor(kwargs['img'], dtype=self.dtype) if 'img' in kwargs else None)
         self._ds_step = kwargs['ds_step'] if 'ds_step' in kwargs else 2
         self._top_instrinsics = torch.nn.Parameter(kwargs['intrinsics'] if 'intrinsics' in kwargs else torch.eye(3))
 
-        self.gauss_kernel = torch.nn.Parameter(self.gauss_2d(size=self._kernel_size, std=self._kernel_std, scale=self._kernel_scale))
+        self.gauss_kernel = torch.nn.Parameter(self.gauss_2d(size=self._kernel_size, std=self._kernel_std))
         self.levels = []
         self.intrinsics_levels = []
 
@@ -65,11 +64,11 @@ class GaussPyramid(torch.nn.Module):
 
         return w
 
-    def gauss_2d(self, size: int = 3, std: float = 1.0, scale: float = 1) -> torch.Tensor:
+    def gauss_2d(self, size: int = 3, std: float = 1.0) -> torch.Tensor:
         """ returns 2-D Gaussian kernel of dimensions: 1 x 1 x size x size """
 
         gkern1d = self.gauss_1d(size=size, std=std)
-        gkern2d = scale * torch.outer(gkern1d, gkern1d)[None, None, ...]
+        gkern2d = torch.outer(gkern1d, gkern1d)[None, None, ...]
 
         return gkern2d / gkern2d.sum()
 
