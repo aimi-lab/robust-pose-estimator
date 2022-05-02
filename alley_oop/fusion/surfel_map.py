@@ -28,7 +28,8 @@ class SurfelMap(object):
         # calculate object points
         if self.dept.numel() > 0 and self.img_shape is not None:
             ipts = create_img_coords_t(y=self.img_shape[-2], x=self.img_shape[-1])
-            self.opts = reverse_project(ipts=ipts, kmat=self.kmat, rmat=torch.eye(3), tvec=torch.zeros(3, 1), dpth=self.dept.reshape(self.img_shape))
+            self.opts = reverse_project(ipts=ipts, kmat=self.kmat.float(), rmat=torch.eye(3), tvec=torch.zeros(3, 1),
+                                        dpth=self.dept.reshape(self.img_shape).float()).to(self.dept.dtype)
         elif self.dept.numel() == 0 and self.opts.numel() > 0 and self.img_shape is not None:
             # rotate, translate and forward-project points
             npts = forward_project(self.opts, kmat=self.kmat, rmat=self.pmat[:3, :3], tvec=self.pmat[:3, -1][..., None], inhomogenize_opt=True)
