@@ -25,7 +25,7 @@ class SurfelMap(object):
         self.pmat = kwargs['pmat'] if 'pmat' in kwargs else torch.eye(4, dtype=dtype, device=self.device)  # extrinsics
         self.kmat = kwargs['kmat'] if 'kmat' in kwargs else torch.eye(3, dtype=dtype, device=self.device)     # intrinsics
         self.radi = kwargs['radi'] if 'radi' in kwargs else torch.Tensor().to(self.device)
-        self.normals = kwargs['normals'] if 'normals' in kwargs else torch.Tensor().to(self.device)
+        self.nrml = kwargs['normals'] if 'normals' in kwargs else torch.Tensor().to(self.device)
         self.img_shape = kwargs['img_shape'] if 'img_shape' in kwargs else None
         self.upscale = kwargs['upscale'] if 'upscale' in kwargs else 1   # TODO: enable value other than 1
         self.dbug_opt = False
@@ -46,8 +46,8 @@ class SurfelMap(object):
 
         # initialize radii
         if self.radi.numel() == 0:
-            if dept.numel() > 0 and self.normals.numel() == 3*dept.numel():
-                self.radi = ((dept.view(-1)) / (self.flen* 2**.5 * abs(self.normals[2,:]))).unsqueeze(0)
+            if dept.numel() > 0 and self.nrml.numel() == 3*dept.numel():
+                self.radi = ((dept.view(-1)) / (self.flen* 2**.5 * abs(self.nrml[2,:]))).unsqueeze(0)
             elif self.opts.numel() > 0:
                 self.radi = torch.ones((1, self.opts.shape[1])).to(self.device)
 
@@ -107,7 +107,7 @@ class SurfelMap(object):
         self.opts[:, bidx][:, kidx] = conf_idx*self.opts[:, bidx][:, kidx] + ccor*ocor / (conf_idx + ccor)
         self.gray[:, bidx][:, kidx] = conf_idx*self.gray[:, bidx][:, kidx] + ccor*gcor / (conf_idx + ccor)
         self.radi[:, bidx][:, kidx] = conf_idx*self.radi[:, bidx][:, kidx] + ccor*rcor / (conf_idx + ccor)
-        self.normals[:, bidx][:, kidx] = conf_idx*self.normals[:, bidx][:, kidx] + ccor*ncor / (conf_idx + ccor)
+        self.nrml[:, bidx][:, kidx] = conf_idx*self.nrml[:, bidx][:, kidx] + ccor*ncor / (conf_idx + ccor)
         self.conf[:, bidx][:, kidx] = conf_idx + ccor
 
         # concatenate unmatched points, intensities, normals, radii and confidences
@@ -122,7 +122,7 @@ class SurfelMap(object):
         self.opts = torch.cat((self.opts, opts[:, mask]), dim=-1)
         self.gray = torch.cat((self.gray, gray[:, mask]), dim=-1)
         self.radi = torch.cat((self.radi, radi[:, mask]), dim=-1)
-        self.normals = torch.cat((self.normals, normals[:, mask]), dim=-1)
+        self.nrml = torch.cat((self.nrml, normals[:, mask]), dim=-1)
         self.conf = torch.cat((self.conf, conf[:, mask]), dim=-1)
 
         self.tick = self.tick + 1
@@ -154,7 +154,7 @@ class SurfelMap(object):
         didx = abs(opts[2] - self.opts[2, vidx][midx]) < d_thresh
 
         # 2. normals constraint (20 degrees threshold)
-        nidx = batched_dot_product(normals.T[midx], self.normals.T[vidx]) > torch.cos(n_thresh/180*torch.pi)
+        nidx = batched_dot_product(normals.T[midx], self.nrml.T[vidx]) > torch.cos(n_thresh/180*torch.pi)
 
         # combine constraints
         fidx = vidx[vidx.clone()] & didx & nidx
@@ -190,7 +190,7 @@ class SurfelMap(object):
             candidates = abs(opts[2, d] - self.opts[2, vidx][midx == d]) < d_thresh
             # 2. normals constraint (20 degrees threshold)
             if torch.sum(candidates == torch.min(candidates)) > 1:
-                candidates = batched_dot_product(normals[:, d][:, None].T, self.normals[:, vidx][:, midx==d].T) > angle_threshold
+                candidates = batched_dot_product(normals[:, d][:, None].T, self.nrml[:, vidx][:, midx==d].T) > angle_threshold
             # 3. confidence constraint
             if torch.sum(candidates == torch.min(candidates)) > 1:
                 candidates = self.conf[:, vidx][:, midx == d]
@@ -205,6 +205,14 @@ class SurfelMap(object):
             kidx[(midx == d) & mask] = 0
 
         return kidx
+
+    @property
+    def normals(self):
+        return self.nrml
+
+    @normals.setter
+    def normals(self, normals):
+        self.nrml = normals
 
     def _test_global_point_projection(self, global_ipts, vidx=None):
 
@@ -221,12 +229,12 @@ class SurfelMap(object):
     def transform(self, transform):
         assert transform.shape == (4,4)
         self.opts = transform[:3,:3]@self.opts + transform[:3,3,None]
-        self.normals = transform[:3,:3] @ self.normals
+        self.nrml = transform[:3,:3] @ self.nrml
 
     def transform_cpy(self, transform):
         assert transform.shape == (4, 4)
         opts = transform[:3,:3]@self.opts + transform[:3,3,None]
-        normals = transform[:3,:3] @ self.normals
+        normals = transform[:3,:3] @ self.nrml
         return SurfelMap(opts=opts, normals=normals, kmat=self.kmat, gray=self.gray, img_shape=self.img_shape,
                          radi=self.radi).to(self.device)
 
@@ -238,7 +246,7 @@ class SurfelMap(object):
     @property
     def grid_normals(self):
         assert self.img_shape is not None
-        return self.normals.T.view((*self.img_shape, 3))
+        return self.nrml.T.view((*self.img_shape, 3))
 
     def render(self, intrinsics: torch.tensor=None, extrinsics: torch.tensor=None):
         ####
@@ -259,7 +267,7 @@ class SurfelMap(object):
     def pcl2open3d(self):
         import open3d
         pcd = open3d.geometry.PointCloud()
-        #pcd.normals = open3d.utility.Vector3dVector(self.normals.cpu().numpy())
+        #pcd.normals = open3d.utility.Vector3dVector(self.nrml.cpu().numpy())
         pcd.points = open3d.utility.Vector3dVector(self.opts.T.cpu().numpy())
         rgb = self.gray.unsqueeze(1).repeat((1,3))
         pcd.colors = open3d.utility.Vector3dVector(rgb.cpu().numpy())
@@ -267,7 +275,7 @@ class SurfelMap(object):
 
     def to(self, d: Union[torch.device, torch.dtype]):
         self.radi = self.radi.to(d)
-        self.normals = self.normals.to(d)
+        self.nrml = self.nrml.to(d)
         self.gray = self.gray.to(d)
         self.kmat = self.kmat.to(d)
         self.opts = self.opts.to(d)
