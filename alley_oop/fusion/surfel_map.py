@@ -214,16 +214,6 @@ class SurfelMap(object):
     def normals(self, normals):
         self.nrml = normals
 
-    def _test_global_point_projection(self, global_ipts, vidx=None):
-
-        vidx = torch.ones(global_ipts.shape[1])
-        midx = self.get_match_indices(global_ipts[:, vidx])
-        gpts = global_ipts[:, vidx][:, midx]
-        timg = img_map_torch(img=gpts[2].reshape(self.img_shape)[None, None, ...], npts=gpts)
-        import matplotlib.pyplot as plt
-        plt.imshow(timg.cpu().numpy()[0 ,0 , ...])
-        plt.show()
-
     ########################
 
     def transform(self, transform):

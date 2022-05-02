@@ -11,6 +11,7 @@ from alley_oop.geometry.lie_3d import lie_se3_to_SE3
 from alley_oop.fusion.surfel_map import SurfelMap
 from alley_oop.utils.rgb2gray import rgb2gray_t
 from alley_oop.geometry.normals import normals_from_regular_grid
+from alley_oop.interpol.img_mappings import img_map_torch
 
 
 class SurfelMapTest(unittest.TestCase):
@@ -20,7 +21,7 @@ class SurfelMapTest(unittest.TestCase):
 
     def setUp(self):
 
-        self.plot_opt = True
+        self.plot_opt = False
 
         self.kmat = torch.eye(3)
         self.pmat = torch.eye(4)
@@ -142,6 +143,16 @@ class SurfelMapTest(unittest.TestCase):
             axs[1].imshow(self.nimg)
             axs[1].set_title('after transformation')
             plt.show()
+
+    def plot_global_point_projection(self, global_ipts, vidx=None):
+
+        vidx = torch.ones(global_ipts.shape[1])
+        midx = self.get_match_indices(global_ipts[:, vidx])
+        gpts = global_ipts[:, vidx][:, midx]
+        timg = img_map_torch(img=gpts[2].reshape(self.img_shape)[None, None, ...], npts=gpts)
+        import matplotlib.pyplot as plt
+        plt.imshow(timg.cpu().numpy()[0 ,0 , ...])
+        plt.show()
 
     def test_projection_match(self):
         
