@@ -33,8 +33,9 @@ class SurfelMap(object):
                                         dpth=self.dept.reshape(self.img_shape).float()).to(self.dept.dtype)
         elif self.dept.numel() == 0 and self.opts.numel() > 0 and self.img_shape is not None:
             # rotate, translate and forward-project points
-            npts = forward_project(self.opts, kmat=self.kmat, rmat=self.pmat[:3, :3], tvec=self.pmat[:3, -1][..., None], inhomogenize_opt=True)
-            self.dept = img_map_torch(img=npts[2].reshape(self.img_shape), npts=npts, mode='bilinear')
+            npts = forward_project(self.opts.float(), kmat=self.kmat.float(), rmat=self.pmat[:3, :3],
+                                   tvec=self.pmat[:3, -1][..., None], inhomogenize_opt=True).to(self.opts.dtype)
+            self.dept = img_map_torch(img=npts[2].reshape((1,1,*self.img_shape)), npts=npts, mode='bilinear')
 
         # initiliaze focal length
         self.flen = (self.kmat[0, 0] + self.kmat[1, 1]) / 2
