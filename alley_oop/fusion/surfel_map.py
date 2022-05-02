@@ -1,4 +1,5 @@
 import torch
+from typing import Union
 
 from alley_oop.geometry.pinhole_transforms import forward_project, reverse_project, create_img_coords_t
 from alley_oop.interpol.img_mappings import img_map_torch
@@ -6,7 +7,7 @@ from alley_oop.geometry.normals import normals_from_regular_grid
 from alley_oop.utils.pytorch import batched_dot_product
 
 
-class SurfelMap(torch.nn.Module):
+class SurfelMap(object):
     def __init__(self, *args, **kwargs):
         """ 
         https://reality.cs.ucl.ac.uk/projects/kinect/keller13realtime.pdf
@@ -17,21 +18,24 @@ class SurfelMap(torch.nn.Module):
         # consider input arguments
         self.opts = kwargs['opts'] if 'opts' in kwargs else torch.Tensor()
         dept = kwargs['dept'] if 'dept' in kwargs else torch.Tensor()
-        self.gray = kwargs['gray'] if 'gray' in kwargs else torch.Tensor()
-        self.pmat = kwargs['pmat'] if 'pmat' in kwargs else torch.eye(4)    # extrinsics
-        self.kmat = kwargs['kmat'] if 'kmat' in kwargs else torch.eye(3)    # intrinsics
-        self.radi = kwargs['radi'] if 'radi' in kwargs else torch.Tensor()
-        self.normals = kwargs['normals'] if 'normals' in kwargs else torch.Tensor()
+        self.device = self.opts.device if self.opts.numel() > 0 else dept.device
+        self.gray = kwargs['gray'] if 'gray' in kwargs else torch.Tensor().to(self.device)
+        self.pmat = kwargs['pmat'] if 'pmat' in kwargs else torch.eye(4).to(self.device)    # extrinsics
+        self.kmat = kwargs['kmat'] if 'kmat' in kwargs else torch.eye(3).to(self.device)      # intrinsics
+        self.radi = kwargs['radi'] if 'radi' in kwargs else torch.Tensor().to(self.device)
+        self.normals = kwargs['normals'] if 'normals' in kwargs else torch.Tensor().to(self.device)
         self.img_shape = kwargs['img_shape'] if 'img_shape' in kwargs else None
         self.upscale = kwargs['upscale'] if 'upscale' in kwargs else 1   # TODO: enable value other than 1
         self.dbug_opt = False
 
+
         # calculate object points
         if dept.numel() > 0 and self.img_shape is not None:
-            ipts = create_img_coords_t(y=self.img_shape[-2], x=self.img_shape[-1])
-            self.opts = reverse_project(ipts=ipts, kmat=self.kmat.float(), rmat=torch.eye(3), tvec=torch.zeros(3, 1),
+            ipts = create_img_coords_t(y=self.img_shape[-2], x=self.img_shape[-1]).to(self.device)
+            self.opts = reverse_project(ipts=ipts, kmat=self.kmat.float(), rmat=torch.eye(3).to(self.device),
+                                        tvec=torch.zeros(3, 1).to(self.device)  ,
                                         dpth=dept.reshape(self.img_shape).float()).to(dept.dtype)
-        elif dept.numel() == 0 and self.opts.numel() > 0 and self.img_shape is not None:
+        elif dept.numel() == 0 and self.opts.numel() > 0 and self.radi.numel() == 0 and self.img_shape is not None:
             # rotate, translate and forward-project points
             npts = forward_project(self.opts.float(), kmat=self.kmat.float(), rmat=self.pmat[:3, :3],
                                    tvec=self.pmat[:3, -1][..., None], inhomogenize_opt=True).to(self.opts.dtype)
@@ -45,7 +49,7 @@ class SurfelMap(torch.nn.Module):
             if dept.numel() > 0 and self.normals.numel() == 3*dept.numel():
                 self.radi = (dept.view(-1)) / (self.flen* 2**.5 * abs(self.normals[2,:]))
             elif self.opts.numel() > 0:
-                self.radi = torch.ones((1, self.opts.shape[1]))
+                self.radi = torch.ones((1, self.opts.shape[1])).to(self.device)
 
         # initialize confidence
         self.conf = torch.Tensor()
@@ -224,7 +228,7 @@ class SurfelMap(torch.nn.Module):
         opts = transform[:3,:3]@self.opts + transform[:3,3,None]
         normals = transform[:3,:3] @ self.normals
         return SurfelMap(opts=opts, normals=normals, kmat=self.kmat, gray=self.gray, img_shape=self.img_shape,
-                         radi=self.radi)#.to(self.pts.device)
+                         radi=self.radi).to(self.device)
 
     #def set_colors(self, colors):
     #    self.colors = torch.nn.Parameter(colors.squeeze().permute(1,2,0).reshape(-1, 3))
@@ -271,3 +275,13 @@ class SurfelMap(torch.nn.Module):
         pcd.points = open3d.utility.Vector3dVector(self.pts.cpu().numpy())
         pcd.colors = open3d.utility.Vector3dVector(self.colors.cpu().numpy())
         return pcd
+
+    def to(self, d: Union[torch.device, torch.dtype]):
+        self.radi = self.radi.to(d)
+        self.normals = self.normals.to(d)
+        self.gray = self.gray.to(d)
+        self.kmat = self.kmat.to(d)
+        self.opts = self.opts.to(d)
+        self.pmat = self.pmat.to(d)
+        self.device = self.opts.device
+        return self
