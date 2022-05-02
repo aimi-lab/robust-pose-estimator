@@ -5,6 +5,7 @@ from alley_oop.geometry.pinhole_transforms import forward_project, reverse_proje
 from alley_oop.interpol.img_mappings import img_map_torch
 from alley_oop.geometry.normals import normals_from_regular_grid
 from alley_oop.utils.pytorch import batched_dot_product
+from alley_oop.pose.frame_class import FrameClass
 
 
 class SurfelMap(object):
@@ -19,9 +20,10 @@ class SurfelMap(object):
         self.opts = kwargs['opts'] if 'opts' in kwargs else torch.Tensor()
         dept = kwargs['dept'] if 'dept' in kwargs else torch.Tensor()
         self.device = self.opts.device if self.opts.numel() > 0 else dept.device
+        dtype = self.opts.dtype if self.opts.numel() > 0 else dept.dtype
         self.gray = kwargs['gray'] if 'gray' in kwargs else torch.Tensor().to(self.device)
-        self.pmat = kwargs['pmat'] if 'pmat' in kwargs else torch.eye(4).to(self.device)    # extrinsics
-        self.kmat = kwargs['kmat'] if 'kmat' in kwargs else torch.eye(3).to(self.device)      # intrinsics
+        self.pmat = kwargs['pmat'] if 'pmat' in kwargs else torch.eye(4, dtype=dtype, device=self.device)  # extrinsics
+        self.kmat = kwargs['kmat'] if 'kmat' in kwargs else torch.eye(3, dtype=dtype, device=self.device)     # intrinsics
         self.radi = kwargs['radi'] if 'radi' in kwargs else torch.Tensor().to(self.device)
         self.normals = kwargs['normals'] if 'normals' in kwargs else torch.Tensor().to(self.device)
         self.img_shape = kwargs['img_shape'] if 'img_shape' in kwargs else None
@@ -32,14 +34,12 @@ class SurfelMap(object):
         # calculate object points
         if dept.numel() > 0 and self.img_shape is not None:
             ipts = create_img_coords_t(y=self.img_shape[-2], x=self.img_shape[-1]).to(self.device)
-            self.opts = reverse_project(ipts=ipts, kmat=self.kmat.float(), rmat=torch.eye(3).to(self.device),
-                                        tvec=torch.zeros(3, 1).to(self.device)  ,
-                                        dpth=dept.reshape(self.img_shape).float()).to(dept.dtype)
+            self.opts = reverse_project(ipts=ipts, kmat=self.kmat, rmat=torch.eye(3, dtype=dtype).to(self.device),
+                                        tvec=torch.zeros((3, 1), dtype=dtype).to(self.device),
+                                        dpth=dept.reshape(self.img_shape))
         elif dept.numel() == 0 and self.opts.numel() > 0 and self.radi.numel() == 0 and self.img_shape is not None:
             # rotate, translate and forward-project points
-            npts = forward_project(self.opts.float(), kmat=self.kmat.float(), rmat=self.pmat[:3, :3],
-                                   tvec=self.pmat[:3, -1][..., None], inhomogenize_opt=True).to(self.opts.dtype)
-            dept = img_map_torch(img=npts[2].reshape((1,1,*self.img_shape)), npts=npts, mode='bilinear')
+            dept = self.render().depth
 
         # initiliaze focal length
         self.flen = (self.kmat[0, 0] + self.kmat[1, 1]) / 2
@@ -230,9 +230,6 @@ class SurfelMap(object):
         return SurfelMap(opts=opts, normals=normals, kmat=self.kmat, gray=self.gray, img_shape=self.img_shape,
                          radi=self.radi).to(self.device)
 
-    #def set_colors(self, colors):
-    #    self.colors = torch.nn.Parameter(colors.squeeze().permute(1,2,0).reshape(-1, 3))
-
     @property
     def grid_pts(self):
         assert self.img_shape is not None
@@ -243,37 +240,29 @@ class SurfelMap(object):
         assert self.img_shape is not None
         return self.normals.T.view((*self.img_shape, 3))
 
-    def render(self, intrinsics):
-        from alley_oop.geometry.pinhole_transforms import forward_project
-        extrinsics = torch.eye(4).to(self.pts.dtype).to(self.pts.device)
-        rmat = extrinsics[:3, :3]
-        tvec = extrinsics[:3, 3, None]
-        pts_h = torch.vstack([self.pts.T, torch.ones(self.pts.shape[0],
-                                                           device=self.pts.device, dtype=self.pts.dtype)])
-        points_2d = forward_project(pts_h, intrinsics, rmat=rmat, tvec=tvec).T
+    def render(self, intrinsics: torch.tensor=None, extrinsics: torch.tensor=None):
+        ####
+        if intrinsics is None:
+            intrinsics = self.kmat
+        if extrinsics is None:
+            extrinsics = self.pmat
 
-        # filter points that are not in the image
-        valid = (points_2d[:, 1] < self.grid_shape[0]) & (points_2d[:, 0] < self.grid_shape[1]) & (
-                    points_2d[:, 1] > 0) & (points_2d[:, 0] > 0)
-        points_2d = points_2d[valid][...,:2]
-        colors = self.colors[valid]
+        # rotate, translate and forward-project points
+        pts_h = torch.vstack([self.opts, torch.ones(self.opts.shape[1], dtype=self.opts.dtype, device=self.device)])
+        npts = forward_project(pts_h, kmat=intrinsics, rmat=extrinsics[:3, :3],
+                               tvec=extrinsics[:3, -1][..., None], inhomogenize_opt=True)
+        depth = img_map_torch(img=self.opts[2].view((1, 1, *self.img_shape)), npts=npts, mode='bilinear').view((1, 1, *self.img_shape))
+        colors = img_map_torch(img=self.gray.view((1, 1, *self.img_shape)), npts=npts, mode='bilinear').view((1, 1, *self.img_shape))
 
-        import numpy as np
-        x_coords = np.arange(0, self.grid_shape[1]) + 0.5
-        y_coords = np.arange(0, self.grid_shape[0]) + 0.5
-        x_mesh, y_mesh = np.meshgrid(x_coords, y_coords)
-        ipts = np.vstack([x_mesh.flatten(), y_mesh.flatten()]).T
-        interp = NDInterpolator(points_2d, colors, dist_thr=10, default_value=0)
-        interp.fit(ipts, self.grid_shape)
-        img = torch.stack([interp.predict(colors[:, i]) for i in range(3)])
-        return FrameClass(img[None,:], interp.predict(self.pts[valid][:,2])[None,None,:], intrinsics=intrinsics).to(intrinsics.device)
+        return FrameClass(colors, depth, intrinsics=intrinsics).to(intrinsics.device)
 
     def pcl2open3d(self):
         import open3d
         pcd = open3d.geometry.PointCloud()
         #pcd.normals = open3d.utility.Vector3dVector(self.normals.cpu().numpy())
-        pcd.points = open3d.utility.Vector3dVector(self.pts.cpu().numpy())
-        pcd.colors = open3d.utility.Vector3dVector(self.colors.cpu().numpy())
+        pcd.points = open3d.utility.Vector3dVector(self.opts.T.cpu().numpy())
+        rgb = self.gray.unsqueeze(1).repeat((1,3))
+        pcd.colors = open3d.utility.Vector3dVector(rgb.cpu().numpy())
         return pcd
 
     def to(self, d: Union[torch.device, torch.dtype]):
