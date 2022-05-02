@@ -201,7 +201,7 @@ class SurfelMap(object):
             if torch.sum(candidates == torch.min(candidates)) > 1:
                 candidates = torch.arange(len(candidates))
             mask = torch.ones(self.opts[:, vidx].shape[1], dtype=bool)
-            mask[torch.where(midx==d)[0][torch.argmin(torch.as_tensor(candidates, dtype=torch.int))]] = False
+            mask[torch.where(midx==d)[0][torch.argmin(candidates.long())]] = False
             kidx[(midx == d) & mask] = 0
 
         return kidx
