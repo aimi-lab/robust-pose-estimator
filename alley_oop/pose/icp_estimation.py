@@ -3,7 +3,8 @@ import numpy as np
 import warnings
 from alley_oop.geometry.lie_3d import lie_se3_to_SE3
 from alley_oop.geometry.pinhole_transforms import forward_project
-from alley_oop.geometry.point_cloud import PointCloud
+from alley_oop.pose.frame_class import FrameClass
+from alley_oop.fusion.surfel_map import SurfelMap
 from alley_oop.utils.pytorch import batched_dot_product
 from typing import Tuple
 import matplotlib.pyplot as plt
@@ -51,29 +52,29 @@ class ICPEstimator(torch.nn.Module):
         return (residuals**2).mean()
 
     def residual_fun(self, x, ref_pcl, target_pcl, mask=None):
-        xt = torch.tensor(x).double().to(ref_pcl.pts.device) if not torch.is_tensor(x) else x
+        xt = torch.tensor(x).double().to(ref_pcl.opts.device) if not torch.is_tensor(x) else x
         T_est = lie_se3_to_SE3(xt)
         target_pcl_current_c = target_pcl.transform_cpy(torch.linalg.inv(T_est))  # transform into current frame
         self.src_grid_ids, self.trg_ids = self.associate(ref_pcl, target_pcl_current_c, mask)
         # compute residuals
         ref_pcl_world_c = ref_pcl.transform_cpy(T_est)
-        return batched_dot_product(target_pcl.normals[self.trg_ids],
-                                   (ref_pcl_world_c.grid_pts[self.src_grid_ids] - target_pcl.pts[
+        return batched_dot_product(target_pcl.normals.T[self.trg_ids],
+                                   (ref_pcl_world_c.grid_pts[self.src_grid_ids] - target_pcl.opts.T[
                                        self.trg_ids]))
 
     def jacobian(self, x, ref_pcl, target_pcl, mask=None):
         xt = torch.tensor(x).double() if not torch.is_tensor(x) else x
         T_est = lie_se3_to_SE3(xt)
         ref_pcl_world_c = ref_pcl.transform_cpy(T_est)
-        return (target_pcl.normals[self.trg_ids].unsqueeze(1) @ self.j_3d(
+        return (target_pcl.normals.T[self.trg_ids].unsqueeze(1) @ self.j_3d(
             ref_pcl_world_c.grid_pts[self.src_grid_ids])).squeeze()
 
-    def estimate_lm(self, ref_depth: torch.Tensor, target_pcl:PointCloud, mask: torch.tensor=None):
+    def estimate_lm(self, ref_frame: FrameClass, target_pcl:SurfelMap, mask: torch.tensor=None):
         """ Levenberg-Marquard estimation."""
-        ref_pcl = PointCloud()
-        ref_pcl.from_depth(ref_depth, self.intrinsics)
+        ref_pcl = SurfelMap(dept=ref_frame.depth, kmat=self.intrinsics, normals=ref_frame.normals.view(3, -1),
+                            img_shape=self.img_shape)
 
-        x_list, eps = lsq_lma(torch.zeros(6).to(ref_depth.device).to(ref_depth.dtype), self.residual_fun, self.jacobian,
+        x_list, eps = lsq_lma(torch.zeros(6).to(ref_frame.depth.device).to(ref_frame.depth.dtype), self.residual_fun, self.jacobian,
                               args=(ref_pcl, target_pcl,mask,), max_iter=self.n_iter, tol=self.Ftol, xtol=self.xtol)
         x = x_list[-1]
         cost = self.cost_fun(self.residual_fun(x, ref_pcl, target_pcl, mask))
@@ -81,8 +82,8 @@ class ICPEstimator(torch.nn.Module):
 
     def plot(self, x, ref_pcl, target_pcl, downsample=1):
         ref_pcl = ref_pcl.transform_cpy(lie_se3_to_SE3(x[:3], x[3:], homogenous=True))
-        ref_pts = ref_pcl.pts.cpu().numpy()
-        trg_pts = target_pcl.pts.cpu().numpy()
+        ref_pts = ref_pcl.opts.T.cpu().numpy()
+        trg_pts = target_pcl.opts.T.cpu().numpy()
 
         fig = plt.figure()
         ax = fig.gca(projection='3d')
@@ -93,7 +94,7 @@ class ICPEstimator(torch.nn.Module):
         ax.scatter(trg_pts[::downsample, 0], trg_pts[::downsample, 1], trg_pts[::downsample, 2], c='r')
         # plot point connection
         for a, b in zip(ref_pcl.grid_pts[self.src_grid_ids].cpu().numpy()[::downsample],
-                        target_pcl.pts[self.trg_ids].cpu().numpy()[::downsample]):
+                        target_pcl.opts.T[self.trg_ids].cpu().numpy()[::downsample]):
             ax.plot(np.array((a[0], b[0])), np.array((a[1], b[1])), np.array((a[2], b[2])), ':', color='c', linewidth=0.5)
         plt.show()
 
@@ -112,13 +113,13 @@ class ICPEstimator(torch.nn.Module):
         J[:, 2, 5] = 1
         return J
 
-    def projective_association(self, src_pcl:PointCloud, target_pcl:PointCloud, mask:torch.tensor=None):
+    def projective_association(self, src_pcl:SurfelMap, target_pcl:SurfelMap, mask:torch.tensor=None):
         """ perform projectiv data associcaton"""
-        extrinsics = torch.eye(4).to(target_pcl.pts.dtype).to(target_pcl.pts.device)
+        extrinsics = torch.eye(4).to(target_pcl.opts.dtype).to(target_pcl.opts.device)
         rmat = extrinsics[:3, :3]
         tvec = extrinsics[:3, 3, None]
-        pts_h = torch.vstack([target_pcl.pts.T, torch.ones(target_pcl.pts.shape[0],
-                                                           device=target_pcl.pts.device, dtype=target_pcl.pts.dtype)])
+        pts_h = torch.vstack([target_pcl.opts, torch.ones(target_pcl.opts.shape[1],
+                                                           device=target_pcl.opts.device, dtype=target_pcl.opts.dtype)])
         points_2d = forward_project(pts_h, self.intrinsics, rmat=rmat, tvec=tvec).T
 
         # filter points that are not in the image
@@ -128,26 +129,26 @@ class ICPEstimator(torch.nn.Module):
 
         # filter points that are too far in 3d space, or that have a large angle between the normals
         ids = points_2d.long()[valid][:, 1], points_2d.long()[valid][:, 0]
-        valid_dist = torch.norm(src_pcl.grid_pts[ids] - target_pcl.pts[valid], p=2, dim=-1) < self.dist_thr
-        valid_normal = batched_dot_product(src_pcl.grid_normals[ids], target_pcl.normals[valid]) > self.normal_thr
+        valid_dist = torch.norm(src_pcl.grid_pts[ids] - target_pcl.opts.T[valid], p=2, dim=-1) < self.dist_thr
+        valid_normal = batched_dot_product(src_pcl.grid_normals[ids], target_pcl.normals.T[valid]) > self.normal_thr
         valid[valid.clone()] &= valid_dist & valid_normal
         ids = points_2d.long()[valid][:, 1], points_2d.long()[valid][:, 0]
 
         return ids, valid
 
-    def check_association(self, src_pcl: PointCloud):
+    def check_association(self, src_pcl: SurfelMap):
         if self.associate == self.projective_association:
             print("valid ratio:", self.trg_ids.float().mean())
-        print("accuracy: ", (np.abs(src_pcl.grid_pts[self.src_grid_ids][:,0]- src_pcl.pts[self.trg_ids][:,0]) == 0).float().mean())
+        print("accuracy: ", (np.abs(src_pcl.grid_pts[self.src_grid_ids][:,0]- src_pcl.opts[:, self.trg_ids][:,0]) == 0).float().mean())
 
     @staticmethod
-    def dist_association(src_pcl: PointCloud, target_pcl: PointCloud, mask: torch.tensor=None):
+    def dist_association(src_pcl: SurfelMap, target_pcl: SurfelMap, mask: torch.tensor=None):
         """ closest 3d euclidean distance association"""
 
         from scipy.spatial import KDTree
         #ToDo add masking, support direct torch
-        tree = KDTree(target_pcl.pts.numpy())
-        closest_pts = tree.query(src_pcl.pts.numpy())[1]
+        tree = KDTree(target_pcl.opts.T.numpy())
+        closest_pts = tree.query(src_pcl.opts.T.numpy())[1]
         ids = torch.meshgrid(torch.arange(src_pcl.grid_shape[0]), torch.arange(src_pcl.grid_shape[1]))
         ids = (ids[0].reshape(-1), ids[1].reshape(-1))
         valid = torch.tensor(closest_pts)

@@ -3,7 +3,7 @@ import numpy as np
 import warnings
 from alley_oop.geometry.lie_3d import lie_se3_to_SE3
 from alley_oop.geometry.pinhole_transforms import forward_project
-from alley_oop.geometry.point_cloud import PointCloud
+from alley_oop.fusion.surfel_map import SurfelMap
 from typing import Tuple
 import matplotlib.pyplot as plt
 from torchimize.functions import lsq_lma
@@ -54,7 +54,7 @@ class RGBPoseEstimator(torch.nn.Module):
 
     def jacobian(self, x, ref_img, ref_pcl, trg_img, trg_mask=None):
         J_img = self._image_jacobian(trg_img).squeeze()
-        J = J_img.unsqueeze(1) @ self.j_wt(ref_pcl.pts)
+        J = J_img.unsqueeze(1) @ self.j_wt(ref_pcl.opts.T)
         J = J[self.valid]
         if trg_mask is not None:
             J = J[trg_mask.view(-1)[self.valid]]
@@ -62,8 +62,8 @@ class RGBPoseEstimator(torch.nn.Module):
 
     def estimate_lm(self, ref_frame: FrameClass, target_frame: FrameClass, trg_mask: torch.Tensor=None):
         """ Levenberg-Marquard estimation."""
-        ref_pcl = PointCloud()
-        ref_pcl.from_depth(ref_frame.depth, self.intrinsics, normals=ref_frame.normals)
+        ref_pcl = SurfelMap(dept=ref_frame.depth, kmat=self.intrinsics, normals=ref_frame.normals.view(3, -1),
+                            img_shape=self.img_shape)
         x_list, eps = lsq_lma(torch.zeros(6).to(ref_frame.depth.device).to(ref_frame.depth.dtype),
                               self.residual_fun, self.jacobian,
                               args=(ref_frame.img_gray, ref_pcl, target_frame.img_gray, trg_mask,),
@@ -124,12 +124,12 @@ class RGBPoseEstimator(torch.nn.Module):
 
         return J
 
-    def _warp_img(self, img:torch.Tensor, pcl:PointCloud, T:torch.Tensor):
+    def _warp_img(self, img:torch.Tensor, pcl:SurfelMap, T:torch.Tensor):
         assert T.shape == (4,4)
         # transform and project
         # Note that, we implicitly perform nearest neighbour interpolation which is not a continuous function. This
         # requires careful choice of optimization parameters and (and step parameter for automatic estimation of the Jacobian)
-        pts = torch.vstack([pcl.pts.T, torch.ones(pcl.pts.shape[0], device=pcl.pts.device, dtype=pcl.pts.dtype)])
+        pts = torch.vstack([pcl.opts, torch.ones(pcl.opts.shape[1], device=pcl.opts.device, dtype=pcl.opts.dtype)])
         img_pts = forward_project(pts, self.intrinsics, T[:3,:3], T[:3,3,None]).long().T
         # filter points that are not in the image
         valid = (img_pts[:, 1] < img.shape[-2]) & (img_pts[:, 0] < img.shape[-1]) & (

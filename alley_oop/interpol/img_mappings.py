@@ -35,7 +35,7 @@ def img_map_torch(
 
     # create new sample grid
     y, x = img.shape[-2:]
-    grid = torch.swapaxes(npts[:2].reshape([2, *img.shape[-2:]]).transpose(1, 2), 0, -1) / torch.Tensor([x, y]) * 2 - 1
+    grid = torch.swapaxes(npts[:2].reshape([2, *img.shape[-2:]]).transpose(1, 2), 0, -1) / torch.Tensor([x, y]).to(img.device) * 2 - 1
 
     # interpolate new image
     nimg = torch.nn.functional.grid_sample(img, grid[None, :], mode=mode, padding_mode='zeros', align_corners=False)

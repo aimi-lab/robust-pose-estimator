@@ -1,9 +1,11 @@
 import torch
+from typing import Union
 
 from alley_oop.geometry.pinhole_transforms import forward_project, reverse_project, create_img_coords_t
 from alley_oop.interpol.img_mappings import img_map_torch
 from alley_oop.geometry.normals import normals_from_regular_grid
 from alley_oop.utils.pytorch import batched_dot_product
+from alley_oop.pose.frame_class import FrameClass
 
 
 class SurfelMap(object):
@@ -16,33 +18,38 @@ class SurfelMap(object):
 
         # consider input arguments
         self.opts = kwargs['opts'] if 'opts' in kwargs else torch.Tensor()
-        self.dept = kwargs['dept'] if 'dept' in kwargs else torch.Tensor()
-        self.gray = kwargs['gray'] if 'gray' in kwargs else torch.Tensor()
-        self.pmat = kwargs['pmat'] if 'pmat' in kwargs else torch.eye(4)    # extrinsics
-        self.kmat = kwargs['kmat'] if 'kmat' in kwargs else torch.eye(3)    # intrinsics
-        self.normals = kwargs['normals'] if 'normals' in kwargs else torch.Tensor()
+        dept = kwargs['dept'] if 'dept' in kwargs else torch.Tensor()
+        self.device = self.opts.device if self.opts.numel() > 0 else dept.device
+        dtype = self.opts.dtype if self.opts.numel() > 0 else dept.dtype
+        self.gray = kwargs['gray'] if 'gray' in kwargs else torch.Tensor().to(self.device)
+        self.pmat = kwargs['pmat'] if 'pmat' in kwargs else torch.eye(4, dtype=dtype, device=self.device)  # extrinsics
+        self.kmat = kwargs['kmat'] if 'kmat' in kwargs else torch.eye(3, dtype=dtype, device=self.device)     # intrinsics
+        self.radi = kwargs['radi'] if 'radi' in kwargs else torch.Tensor().to(self.device)
+        self.normals = kwargs['normals'] if 'normals' in kwargs else torch.Tensor().to(self.device)
         self.img_shape = kwargs['img_shape'] if 'img_shape' in kwargs else None
-        self.upscale = kwargs['upscale'] if 'opts' in kwargs else 1   # TODO: enable value other than 1
+        self.upscale = kwargs['upscale'] if 'upscale' in kwargs else 1   # TODO: enable value other than 1
         self.dbug_opt = False
 
+
         # calculate object points
-        if self.dept.numel() > 0 and self.img_shape is not None:
-            ipts = create_img_coords_t(y=self.img_shape[-2], x=self.img_shape[-1])
-            self.opts = reverse_project(ipts=ipts, kmat=self.kmat, rmat=torch.eye(3), tvec=torch.zeros(3, 1), dpth=self.dept.reshape(self.img_shape))
-        elif self.dept.numel() == 0 and self.opts.numel() > 0 and self.img_shape is not None:
+        if dept.numel() > 0 and self.img_shape is not None:
+            ipts = create_img_coords_t(y=self.img_shape[-2], x=self.img_shape[-1]).to(self.device).to(dtype)
+            self.opts = reverse_project(ipts=ipts, kmat=self.kmat, rmat=torch.eye(3, dtype=dtype).to(self.device),
+                                        tvec=torch.zeros((3, 1), dtype=dtype).to(self.device),
+                                        dpth=dept.reshape(self.img_shape))
+        elif dept.numel() == 0 and self.opts.numel() > 0 and self.radi.numel() == 0 and self.img_shape is not None:
             # rotate, translate and forward-project points
-            npts = forward_project(self.opts, kmat=self.kmat, rmat=self.pmat[:3, :3], tvec=self.pmat[:3, -1][..., None], inhomogenize_opt=True)
-            self.dept = img_map_torch(img=npts[2].reshape(self.img_shape), npts=npts, mode='bilinear')
+            dept = self.render().depth
 
         # initiliaze focal length
         self.flen = (self.kmat[0, 0] + self.kmat[1, 1]) / 2
 
         # initialize radii
-        self.radi = torch.Tensor()
-        if self.dept.numel() > 0 and self.normals.numel() == self.dept.numel():
-            self.radi = (self.disp[:, 2] * 2**.5) / (self.flen * abs(self.normals[:, 2]))
-        elif self.opts.numel() > 0:
-            self.radi = torch.ones((1, self.opts.shape[1]))
+        if self.radi.numel() == 0:
+            if dept.numel() > 0 and self.normals.numel() == 3*dept.numel():
+                self.radi = ((dept.view(-1)) / (self.flen* 2**.5 * abs(self.normals[2,:]))).unsqueeze(0)
+            elif self.opts.numel() > 0:
+                self.radi = torch.ones((1, self.opts.shape[1])).to(self.device)
 
         # initialize confidence
         self.conf = torch.Tensor()
@@ -208,3 +215,62 @@ class SurfelMap(object):
         import matplotlib.pyplot as plt
         plt.imshow(timg.cpu().numpy()[0 ,0 , ...])
         plt.show()
+
+    ########################
+
+    def transform(self, transform):
+        assert transform.shape == (4,4)
+        self.opts = transform[:3,:3]@self.opts + transform[:3,3,None]
+        self.normals = transform[:3,:3] @ self.normals
+
+    def transform_cpy(self, transform):
+        assert transform.shape == (4, 4)
+        opts = transform[:3,:3]@self.opts + transform[:3,3,None]
+        normals = transform[:3,:3] @ self.normals
+        return SurfelMap(opts=opts, normals=normals, kmat=self.kmat, gray=self.gray, img_shape=self.img_shape,
+                         radi=self.radi).to(self.device)
+
+    @property
+    def grid_pts(self):
+        assert self.img_shape is not None
+        return self.opts.T.view((*self.img_shape, 3))
+
+    @property
+    def grid_normals(self):
+        assert self.img_shape is not None
+        return self.normals.T.view((*self.img_shape, 3))
+
+    def render(self, intrinsics: torch.tensor=None, extrinsics: torch.tensor=None):
+        ####
+        if intrinsics is None:
+            intrinsics = self.kmat
+        if extrinsics is None:
+            extrinsics = self.pmat
+
+        # rotate, translate and forward-project points
+        pts_h = torch.vstack([self.opts, torch.ones(self.opts.shape[1], dtype=self.opts.dtype, device=self.device)])
+        npts = forward_project(pts_h, kmat=intrinsics, rmat=extrinsics[:3, :3],
+                               tvec=extrinsics[:3, -1][..., None], inhomogenize_opt=True)
+        depth = img_map_torch(img=self.opts[2].view((1, 1, *self.img_shape)), npts=npts, mode='bilinear').view((1, 1, *self.img_shape))
+        colors = img_map_torch(img=self.gray.view((1, 1, *self.img_shape)), npts=npts, mode='bilinear').view((1, 1, *self.img_shape))
+
+        return FrameClass(colors, depth, intrinsics=intrinsics).to(intrinsics.device)
+
+    def pcl2open3d(self):
+        import open3d
+        pcd = open3d.geometry.PointCloud()
+        #pcd.normals = open3d.utility.Vector3dVector(self.normals.cpu().numpy())
+        pcd.points = open3d.utility.Vector3dVector(self.opts.T.cpu().numpy())
+        rgb = self.gray.unsqueeze(1).repeat((1,3))
+        pcd.colors = open3d.utility.Vector3dVector(rgb.cpu().numpy())
+        return pcd
+
+    def to(self, d: Union[torch.device, torch.dtype]):
+        self.radi = self.radi.to(d)
+        self.normals = self.normals.to(d)
+        self.gray = self.gray.to(d)
+        self.kmat = self.kmat.to(d)
+        self.opts = self.opts.to(d)
+        self.pmat = self.pmat.to(d)
+        self.device = self.opts.device
+        return self
