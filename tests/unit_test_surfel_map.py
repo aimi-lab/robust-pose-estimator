@@ -122,7 +122,7 @@ class SurfelMapTest(unittest.TestCase):
             # plot resulting surfel map
             from mayavi import mlab
             from alley_oop.utils.mlab_plot import mlab_rgbd
-            ds = 1
+            ds = 4
             spts = surf_map.opts.cpu().numpy()[:, ::ds]
             simg = surf_map.gray.cpu().numpy()[:, ::ds].T
             fig = mlab.figure(bgcolor=(.5, .5, .5))
