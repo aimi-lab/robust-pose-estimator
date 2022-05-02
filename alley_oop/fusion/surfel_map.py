@@ -27,7 +27,7 @@ class SurfelMap(object):
         self.radi = kwargs['radi'] if 'radi' in kwargs else torch.Tensor().to(self.device)
         self.nrml = kwargs['normals'] if 'normals' in kwargs else torch.Tensor().to(self.device)
         self.img_shape = kwargs['img_shape'] if 'img_shape' in kwargs else None
-        self.upscale = kwargs['upscale'] if 'upscale' in kwargs else 1   # TODO: enable value other than 1
+        self.upscale = kwargs['upscale'] if 'upscale' in kwargs else 1
         self.dbug_opt = False
 
 
@@ -65,20 +65,24 @@ class SurfelMap(object):
         # update image shape
         self.img_shape = gray.shape[-2:] if self.img_shape is None else self.img_shape
 
-        # compute opts considering upsampling
+        if self.upscale > 1:
+            # consider upsampling
+            gray = torch.nn.functional.interpolate(gray, scale_factor=self.upscale, mode='bilinear', align_corners=None)
+            dept = torch.nn.functional.interpolate(dept, scale_factor=self.upscale, mode='bilinear', align_corners=None)
+
+        # prepare image and object coordinates
         ipts = create_img_coords_t(y=self.img_shape[-2]*self.upscale, x=self.img_shape[-1]*self.upscale)
         ipts[:2, :] -= .5
-        dept = torch.nn.functional.interpolate(dept, scale_factor=self.upscale, mode='bilinear', align_corners=None)
         opts = reverse_project(ipts=ipts, dpth=dept, rmat=self.pmat[:3, :3], tvec=self.pmat[:3, -1][..., None], kmat=self.kmat)
 
-        if normals is None:
-            # TODO: ensure normals have same length as opts etc.
-            normals = normals_from_regular_grid(opts.reshape((self.img_shape[0]*self.upscale, self.img_shape[1]*self.upscale, 3)))
-        
+        # update normals (if necessary)
+        if normals is None or self.upscale > 1:
+            normals = normals_from_regular_grid(opts.reshape((self.img_shape[0]*self.upscale, self.img_shape[1]*self.upscale, 3)), pad_opt=True).T
+
         # enforce channel x samples shape
-        normals = normals.reshape(3, -1)
         gray = gray.flatten()[None, :]
         dept = dept.flatten()[None, :]
+        normals = normals.reshape(3, -1)
 
         # project all surfels to current image frame
         global_ipts = forward_project(self.opts, kmat=self.kmat, rmat=pmat[:3, :3], tvec=pmat[:3, -1][:, None])
@@ -86,9 +90,13 @@ class SurfelMap(object):
 
         # find correspondence by projecting surfels to current frame
         midx = self.get_match_indices(global_ipts[:, bidx])                     # image border constraints
-        fidx = bidx#self.filter_corresponding_points(opts=opts, normals=normals, midx=midx, vidx=bidx)
-        kidx = self.get_unique_correspondence_mask(opts=opts, vidx=fidx, midx=midx)
-        midx = self.get_match_indices(global_ipts[:, fidx][:, kidx])   # filter constraints
+
+        # compute that rejects correspondences for a single unique one
+        kidx = self.get_unique_correspondence_mask(opts=opts, vidx=bidx, midx=midx)
+        # TODO: find strategy to combine bidx and kidx to single mask
+
+        # re-compute matching indices while considering uniquness constraint
+        midx = self.get_match_indices(global_ipts[:, bidx][:, kidx])
 
         # compute radii
         radi = (opts[2, :] * 2**.5) / (self.flen * abs(normals[2, :]))[None, :]
@@ -108,20 +116,21 @@ class SurfelMap(object):
         self.nrml[:, bidx][:, kidx] = conf_idx*self.nrml[:, bidx][:, kidx] + ccor*ncor / (conf_idx + ccor)
         self.conf[:, bidx][:, kidx] = conf_idx + ccor
 
-        # concatenate unmatched points, intensities, normals, radii and confidences
+        # create mask identifying unmatched indices
         mask = torch.ones(opts.shape[1], dtype=bool)
         mask[midx.unique()] = False
 
         if self.dbug_opt:
-            # print ratio of added points vs resolution of current frame
-            ratio = mask.sum()/len(mask)
+            # print ratio of added points vs frame resolution
+            ratio = mask[0::self.upscale**2].sum()/len(mask[0::self.upscale**2])
             print(ratio)
 
-        self.opts = torch.cat((self.opts, opts[:, mask]), dim=-1)
-        self.gray = torch.cat((self.gray, gray[:, mask]), dim=-1)
-        self.radi = torch.cat((self.radi, radi[:, mask]), dim=-1)
-        self.nrml = torch.cat((self.nrml, normals[:, mask]), dim=-1)
-        self.conf = torch.cat((self.conf, conf[:, mask]), dim=-1)
+        # concatenate unmatched points, intensities, normals, radii and confidences
+        self.opts = torch.cat((self.opts, opts[:, mask][0::self.upscale**2]), dim=-1)
+        self.gray = torch.cat((self.gray, gray[:, mask][0::self.upscale**2]), dim=-1)
+        self.radi = torch.cat((self.radi, radi[:, mask][0::self.upscale**2]), dim=-1)
+        self.nrml = torch.cat((self.nrml, normals[:, mask][0::self.upscale**2]), dim=-1)
+        self.conf = torch.cat((self.conf, conf[:, mask][0::self.upscale**2]), dim=-1)
 
         self.tick = self.tick + 1
 
