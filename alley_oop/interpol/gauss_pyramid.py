@@ -71,7 +71,7 @@ class GaussPyramid(torch.nn.Module):
         gkern1d = self.gauss_1d(size=size, std=std)
         gkern2d = scale * torch.outer(gkern1d, gkern1d)[None, None, ...]
 
-        return gkern2d
+        return gkern2d / gkern2d.sum()
 
     @property
     def top_level(self):

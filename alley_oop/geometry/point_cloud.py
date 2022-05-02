@@ -40,7 +40,7 @@ class PointCloud(torch.nn.Module):
             self.normals = torch.nn.Parameter(normals.view(-1,3))
 
     def set_colors(self, colors):
-        self.colors = torch.nn.Parameter(colors.reshape(-1, 3))
+        self.colors = torch.nn.Parameter(colors.squeeze().permute(1,2,0).reshape(-1, 3))
 
     @property
     def grid_pts(self):
@@ -68,14 +68,22 @@ class PointCloud(torch.nn.Module):
         colors = self.colors[valid]
 
         import numpy as np
-        x_coords = np.arange(0, self.grid_shape[1])
-        y_coords = np.arange(0, self.grid_shape[0])
+        x_coords = np.arange(0, self.grid_shape[1]) + 0.5
+        y_coords = np.arange(0, self.grid_shape[0]) + 0.5
         x_mesh, y_mesh = np.meshgrid(x_coords, y_coords)
         ipts = np.vstack([x_mesh.flatten(), y_mesh.flatten()]).T
         interp = NDInterpolator(points_2d, colors, dist_thr=10, default_value=0)
         interp.fit(ipts, self.grid_shape)
         img = torch.stack([interp.predict(colors[:, i]) for i in range(3)])
-        return FrameClass(img[None,:], interp.predict(self.pts[:,2])[None,None,:], intrinsics=intrinsics).to(intrinsics.device)
+        return FrameClass(img[None,:], interp.predict(self.pts[valid][:,2])[None,None,:], intrinsics=intrinsics).to(intrinsics.device)
+
+    def pcl2open3d(self):
+        import open3d
+        pcd = open3d.geometry.PointCloud()
+        #pcd.normals = open3d.utility.Vector3dVector(self.normals.cpu().numpy())
+        pcd.points = open3d.utility.Vector3dVector(self.pts.cpu().numpy())
+        pcd.colors = open3d.utility.Vector3dVector(self.colors.cpu().numpy())
+        return pcd
 
 
 from scipy.interpolate.interpnd import _ndim_coords_from_arrays
