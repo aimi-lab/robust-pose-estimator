@@ -109,11 +109,14 @@ class SurfelMapTest(unittest.TestCase):
         # test assertions
         self.assertTrue(surf_map.opts.shape[1] > self.global_opts.shape[1], 'Number of surfel map points too little')
         self.assertTrue(surf_map.opts.shape[1] < self.global_opts.shape[1]+self.target_opts.shape[1]//4, 'Number of surfel map points too large')
+        self.assertTrue(surf_map.tick == 1, 'Tick index deviates')
 
         # pass existing data to surfel map
         point_num = surf_map.opts.shape[1]
         surf_map.fuse(dept=self.target_dept, gray=self.target_gray, normals=self.target_normals, pmat=torch.eye(4))
         #self.assertTrue(surf_map.opts.shape[1] == point_num, 'Number of surfel map points changed when passing known frame')
+
+        self.assertTrue(surf_map.tick == 2, 'Tick index deviates')
 
         if self.plot_opt:
             # plot resulting surfel map
