@@ -6,7 +6,7 @@ from alley_oop.geometry.normals import normals_from_regular_grid
 from alley_oop.utils.pytorch import batched_dot_product
 
 
-class SurfelMap(object):
+class SurfelMap(torch.nn.Module):
     def __init__(self, *args, **kwargs):
         """ 
         https://reality.cs.ucl.ac.uk/projects/kinect/keller13realtime.pdf
@@ -16,7 +16,7 @@ class SurfelMap(object):
 
         # consider input arguments
         self.opts = kwargs['opts'] if 'opts' in kwargs else torch.Tensor()
-        self.dept = kwargs['dept'] if 'dept' in kwargs else torch.Tensor()
+        dept = kwargs['dept'] if 'dept' in kwargs else torch.Tensor()
         self.gray = kwargs['gray'] if 'gray' in kwargs else torch.Tensor()
         self.pmat = kwargs['pmat'] if 'pmat' in kwargs else torch.eye(4)    # extrinsics
         self.kmat = kwargs['kmat'] if 'kmat' in kwargs else torch.eye(3)    # intrinsics
@@ -27,23 +27,23 @@ class SurfelMap(object):
         self.dbug_opt = False
 
         # calculate object points
-        if self.dept.numel() > 0 and self.img_shape is not None:
+        if dept.numel() > 0 and self.img_shape is not None:
             ipts = create_img_coords_t(y=self.img_shape[-2], x=self.img_shape[-1])
             self.opts = reverse_project(ipts=ipts, kmat=self.kmat.float(), rmat=torch.eye(3), tvec=torch.zeros(3, 1),
-                                        dpth=self.dept.reshape(self.img_shape).float()).to(self.dept.dtype)
-        elif self.dept.numel() == 0 and self.opts.numel() > 0 and self.img_shape is not None:
+                                        dpth=dept.reshape(self.img_shape).float()).to(dept.dtype)
+        elif dept.numel() == 0 and self.opts.numel() > 0 and self.img_shape is not None:
             # rotate, translate and forward-project points
             npts = forward_project(self.opts.float(), kmat=self.kmat.float(), rmat=self.pmat[:3, :3],
                                    tvec=self.pmat[:3, -1][..., None], inhomogenize_opt=True).to(self.opts.dtype)
-            self.dept = img_map_torch(img=npts[2].reshape((1,1,*self.img_shape)), npts=npts, mode='bilinear')
+            dept = img_map_torch(img=npts[2].reshape((1,1,*self.img_shape)), npts=npts, mode='bilinear')
 
         # initiliaze focal length
         self.flen = (self.kmat[0, 0] + self.kmat[1, 1]) / 2
 
         # initialize radii
         if self.radi.numel() == 0:
-            if self.dept.numel() > 0 and self.normals.numel() == 3*self.dept.numel():
-                self.radi = (self.dept.view(-1)) / (self.flen* 2**.5 * abs(self.normals[2,:]))
+            if dept.numel() > 0 and self.normals.numel() == 3*dept.numel():
+                self.radi = (dept.view(-1)) / (self.flen* 2**.5 * abs(self.normals[2,:]))
             elif self.opts.numel() > 0:
                 self.radi = torch.ones((1, self.opts.shape[1]))
 
