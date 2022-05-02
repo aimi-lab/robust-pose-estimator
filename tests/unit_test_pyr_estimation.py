@@ -65,7 +65,6 @@ class PyramidPoseEstimatorTester(unittest.TestCase):
             T = estimator.estimate(target_frame.to(device), target_pcl.to(device))
             T = estimator.estimate(ref_frame.to(device), target_pcl.to(device))
             # assertion
-            print(T, T_true)
             self.assertTrue(np.allclose(T[:3, :3].cpu(), T_true[:3,:3].cpu(), atol=1e-1))
             self.assertTrue(np.allclose(T[:3, 3].cpu(), T_true[:3,3].cpu(), atol=5))
 

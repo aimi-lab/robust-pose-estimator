@@ -33,7 +33,6 @@ class PyramidPoseEstimator(torch.nn.Module):
             # render view of model from last camera pose
             model_frame = model.render(self.pyramid._top_instrinsics)
             model_frame_pyr, _ = self.pyramid(model_frame)
-            model_frame.plot()
             # compute SO(3) pre-alignment from previous image to current image
             rot_estimator = RotationEstimator(frame_pyr[-1].shape, intrinsics_pyr[-1],
                                                self.config['rot']['n_iter'], self.config['rot']['Ftol']).to(self.device)
@@ -47,7 +46,7 @@ class PyramidPoseEstimator(torch.nn.Module):
                                                      self.config['icp_weight'],
                                                      self.config['n_iter'][pyr_level]).to(self.device)
                 T_last2cur, *_ = pose_estimator.estimate_gn(frame_pyr[pyr_level], model_frame_pyr[pyr_level], model, init_pose=T_last2cur)
-                self.plot(T_last2cur, frame, model, self.pyramid._top_instrinsics)
+                #self.plot(T_last2cur, frame, model, self.pyramid._top_instrinsics)
             pose = self.last_pose @ T_last2cur
             self.last_pose.data = pose
         self.last_frame_pyr = frame_pyr
