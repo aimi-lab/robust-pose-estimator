@@ -5,7 +5,7 @@ from alley_oop.pose.rotation_estimation import RotationEstimator
 import torch
 from typing import Tuple
 import numpy as np
-from alley_oop.geometry.point_cloud import PointCloud
+from alley_oop.fusion.surfel_map import SurfelMap
 
 
 class PyramidPoseEstimator(torch.nn.Module):
@@ -23,10 +23,9 @@ class PyramidPoseEstimator(torch.nn.Module):
         self.last_frame_pyr = None
         self.last_pose = torch.nn.Parameter(torch.eye(4, dtype=intrinsics.dtype))
 
-    def estimate(self, frame:FrameClass, model):
+    def estimate(self, frame: FrameClass, model: SurfelMap):
         # transform model to last camera pose coordinates
-        model.transform(torch.linalg.inv(self.last_pose))
-        #frame.plot()
+        model = model.transform_cpy(torch.linalg.inv(self.last_pose))
         # apply gaussian pyramid to current and rendered images
         frame_pyr, intrinsics_pyr = self.pyramid(frame)
 
@@ -34,6 +33,7 @@ class PyramidPoseEstimator(torch.nn.Module):
             # render view of model from last camera pose
             model_frame = model.render(self.pyramid._top_instrinsics)
             model_frame_pyr, _ = self.pyramid(model_frame)
+            model_frame.plot()
             # compute SO(3) pre-alignment from previous image to current image
             rot_estimator = RotationEstimator(frame_pyr[-1].shape, intrinsics_pyr[-1],
                                                self.config['rot']['n_iter'], self.config['rot']['Ftol']).to(self.device)
@@ -47,7 +47,7 @@ class PyramidPoseEstimator(torch.nn.Module):
                                                      self.config['icp_weight'],
                                                      self.config['n_iter'][pyr_level]).to(self.device)
                 T_last2cur, *_ = pose_estimator.estimate_gn(frame_pyr[pyr_level], model_frame_pyr[pyr_level], model, init_pose=T_last2cur)
-                #self.plot(T_last2cur, frame, model, self.pyramid._top_instrinsics)
+                self.plot(T_last2cur, frame, model, self.pyramid._top_instrinsics)
             pose = self.last_pose @ T_last2cur
             self.last_pose.data = pose
         self.last_frame_pyr = frame_pyr
@@ -58,9 +58,10 @@ class PyramidPoseEstimator(torch.nn.Module):
         return self.last_pose.device
 
     def plot(self, T, ref_frame, model, intrinsics):
-        ref_pcl = PointCloud()
-        ref_pcl.from_depth(ref_frame.depth, intrinsics, normals=ref_frame.normals)
-        ref_pcl.set_colors(ref_frame.img)
+        ref_pcl = SurfelMap(dept=ref_frame.depth, kmat=intrinsics, normals=ref_frame.normals.view(3, -1),
+                            gray=ref_frame.img_gray.view(-1),
+                            img_shape=ref_frame.shape)
+
         ref_pcl.transform(torch.linalg.inv(T))
 
         from viewer.view_render import Render

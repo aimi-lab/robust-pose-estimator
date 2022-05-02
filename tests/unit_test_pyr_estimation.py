@@ -3,7 +3,7 @@ import numpy as np
 from pathlib import Path
 
 from alley_oop.pose.pyramid_pose_estimator import PyramidPoseEstimator, FrameClass
-from alley_oop.geometry.point_cloud import PointCloud
+from alley_oop.fusion.surfel_map import SurfelMap
 from alley_oop.utils.pfm_handler import load_pfm
 from scipy.spatial.transform import Rotation as R
 import cv2
@@ -54,9 +54,8 @@ class PyramidPoseEstimatorTester(unittest.TestCase):
             img = img.permute(2, 0, 1).unsqueeze(0)
             ref_frame = FrameClass(img.double(), depth.unsqueeze(0).unsqueeze(0), intrinsics=intrinsics)
 
-            ref_pcl = PointCloud()
-            ref_pcl.from_depth(depth, intrinsics, normals=ref_frame.normals)
-            ref_pcl.set_colors(ref_frame.img)
+            ref_pcl = SurfelMap(dept=ref_frame.depth, kmat=intrinsics, normals=ref_frame.normals.view(3,-1), gray=ref_frame.img_gray.view(-1),
+                                img_shape=ref_frame.shape)
 
             target_pcl = ref_pcl.transform_cpy(T_true)
             target_frame = target_pcl.render(intrinsics)
@@ -67,6 +66,7 @@ class PyramidPoseEstimatorTester(unittest.TestCase):
             T = estimator.estimate(ref_frame.to(device), target_pcl.to(device))
             T_true_inv = torch.linalg.inv(T_true)
             # assertion
+            print(T, T_true_inv)
             self.assertTrue(np.allclose(T[:3, :3].cpu(), T_true_inv[:3,:3].cpu(), atol=1e-1))
             self.assertTrue(np.allclose(T[:3, 3].cpu(), T_true_inv[:3,3].cpu(), atol=5))
 
