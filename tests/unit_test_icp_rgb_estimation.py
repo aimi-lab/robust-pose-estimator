@@ -3,7 +3,7 @@ import numpy as np
 from pathlib import Path
 
 from alley_oop.pose.icp_rgb_pose_estimation import RGBICPPoseEstimator, FrameClass
-from alley_oop.geometry.point_cloud import PointCloud
+from alley_oop.fusion.surfel_map import SurfelMap
 import cv2
 import torch
 from scipy.spatial.transform import Rotation as R
@@ -46,8 +46,7 @@ class RGBICPPoseEstimatorTester(unittest.TestCase):
                                 t_true.unsqueeze(1).float(), intrinsics.float())
         mask = (target_img[0, 0] != 0)
         target_frame = FrameClass(target_img.double(), depth.unsqueeze(0).unsqueeze(0), intrinsics=intrinsics)
-        ref_pcl = PointCloud()
-        ref_pcl.from_depth(depth, intrinsics)
+        ref_pcl = SurfelMap(dept=ref_frame.depth, kmat=intrinsics, normals=ref_frame.normals.view(3,-1), img_shape=ref_frame.shape)
         target_pcl = ref_pcl.transform_cpy(T_true)
 
         estimator = RGBICPPoseEstimator(img.shape[-2:], intrinsics, icp_weight=0.001, n_iter=100).to(device)
