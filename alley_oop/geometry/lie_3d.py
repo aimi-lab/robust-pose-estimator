@@ -30,7 +30,7 @@ def lie_so3_to_SO3(
         return eye_3
 
     # compute scale from vector norm
-    theta = (wvec.T @ wvec)**.5
+    theta = (wvec @ wvec)**.5
 
     # normalize vector
     wvec = wvec / theta if theta > tol else wvec
@@ -94,7 +94,7 @@ def lie_se3_to_SE3(
     eye_3 = lib.eye(3, dtype=pvec.dtype).to(pvec.device) if lib == torch else lib.eye(3, dtype=pvec.dtype)
 
     # compute scale from vector norm
-    theta = (pvec[:3].T @ pvec[:3])**.5
+    theta = (pvec[:3] @ pvec[:3])**.5
 
     # Taylor coefficients for rotation
     a_term = lib.sin(theta)
@@ -138,7 +138,7 @@ def lie_SE3_to_se3(
     wvec = lie_SO3_to_so3(pmat[:3, :3])
 
     # compute scale from vector norm
-    theta = (wvec.T @ wvec)**.5
+    theta = (wvec @ wvec)**.5
 
     # Taylor 1 - A/(2B) -> directly compute value because thetas do not cancel out as for rotation
     mul_term = 1- (theta*lib.sin(theta)/(2*(1-lib.cos(theta)))) if theta > tol else theta**2/12+theta**4/720
