@@ -39,10 +39,11 @@ class SurfelMapTest(unittest.TestCase):
 
         # crop image parts
         self.gtruth_disp = torch.tensor(self.disp.copy())[None, None, ...]
-        self.gtruth_limg = torch.from_numpy(self.limg.copy()[None, ...]).permute(0, 3, 1, 2)
+        self.gtruth_limg = torch.from_numpy(self.limg.copy()[None, ...]).permute(0, 3, 1, 2).float()
+        self.gtruth_limg /= self.gtruth_limg.max()
 
         # convert to gray
-        self.gtruth_gray = rgb2gray_t(self.gtruth_limg, ax0=1)
+        self.gtruth_gray = rgb2gray_t(self.gtruth_limg, ax0=1)*255
 
         # convert disparity to depth
         self.gtruth_dept = disp2depth(self.gtruth_disp, kmat=self.kmat).reshape(self.gtruth_disp.shape)
@@ -88,7 +89,7 @@ class SurfelMapTest(unittest.TestCase):
             from alley_oop.utils.mlab_plot import mlab_rgbd
             ds = 10
             gpts = self.global_opts.cpu().numpy()[:, ::ds]
-            gimg = self.global_gray.T[0, ...].cpu().numpy()[::ds]#self.global_gray.cpu().numpy()[:, ::ds] #torch.ones(self.global_opts.shape[1]).cpu().numpy()[::ds]#
+            gimg = self.global_gray.cpu().numpy()[:, ::ds].T
             tpts = self.target_opts.cpu().numpy()[:, ::ds]
             timg = self.target_gray.permute(0, 2, 3, 1)[0, ...].cpu().numpy().reshape(-1, 1)[::ds]
             fig = mlab.figure(bgcolor=(.5, .5, .5))
