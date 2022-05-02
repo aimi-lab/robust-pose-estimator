@@ -57,8 +57,6 @@ class SurfelMap(object):
             gamma = self.opts[2].flatten()/torch.max(self.opts[2])
             self.conf = torch.exp(-.5 * gamma**2 / .6**2)[None ,:]
 
-        # upsample value
-
         # intialize tick as timestamp
         self.tick = 0
             
