@@ -58,7 +58,7 @@ class SurfelMapTest(unittest.TestCase):
         self.gtruth_opts = reverse_project(ipts=ipts, kmat=self.kmat, rmat=torch.eye(3), tvec=torch.zeros(3, 1), dpth=self.gtruth_dept)
 
         # compute normals
-        self.gtruth_normals = normals_from_regular_grid(self.gtruth_opts.T.reshape((*grid_shape, 3)))
+        self.gtruth_nrml = normals_from_regular_grid(self.gtruth_opts.T.reshape((*grid_shape, 3)))
 
         # separate into global map and target_map
         gap = 100
@@ -66,11 +66,11 @@ class SurfelMapTest(unittest.TestCase):
         self.target_opts = self.gtruth_opts.reshape(3, *grid_shape)[..., gap:-gap, gap:-gap].reshape(3, -1)
         self.target_gray = self.gtruth_gray[..., gap:-gap, gap:-gap]
         self.target_dept = self.gtruth_dept[..., gap:-gap, gap:-gap]
-        self.target_normals = self.gtruth_normals[gap:-gap+1, gap:-gap+1, :]
+        self.target_nrml = self.gtruth_nrml[gap:-gap+1, gap:-gap+1, :]
         self.global_opts = self.gtruth_opts.reshape(3, *grid_shape)[..., 2*gap:, 2*gap:].reshape(3, -1)
         self.global_gray = self.gtruth_gray[..., 2*gap:, 2*gap:].reshape(-1)[None, :]
         self.global_dept = self.gtruth_dept[..., 2*gap:, 2*gap:].reshape(-1)[None, :]
-        self.global_normals = self.gtruth_normals[2*gap-1:, 2*gap-1:].reshape(3, -1)
+        self.global_nrml = self.gtruth_nrml[2*gap-1:, 2*gap-1:].reshape(3, -1)
 
         # break uniqueness and order in global points
         shuffle_idx = torch.randperm(self.global_opts.shape[1])
@@ -78,7 +78,7 @@ class SurfelMapTest(unittest.TestCase):
         self.global_opts = torch.cat((self.global_opts[:, :gap], self.global_opts[:, shuffle_idx]), dim=-1)
         self.global_gray = torch.cat((self.global_gray[:, :gap], self.global_gray[:, shuffle_idx]), dim=-1)
         self.global_dept = torch.cat((self.global_dept[:, :gap], self.global_dept[:, shuffle_idx]), dim=-1)
-        self.global_normals = torch.cat((self.global_normals[:, :gap], self.global_normals[:, shuffle_idx]), dim=-1)
+        self.global_nrml = torch.cat((self.global_nrml[:, :gap], self.global_nrml[:, shuffle_idx]), dim=-1)
 
         # pseudo pose deviation
         torch.manual_seed(3008)
@@ -98,14 +98,14 @@ class SurfelMapTest(unittest.TestCase):
             mlab_rgbd(tpts, colors=timg, size=.05, show_opt=True, fig=fig)
 
         # initialize surfel map
-        surf_map = SurfelMap(opts=self.global_opts, dept=self.global_dept, gray=self.global_gray, normals=self.global_normals, pmat=torch.eye(4), kmat=self.kmat, upscale=1)
+        surf_map = SurfelMap(opts=self.global_opts, dept=self.global_dept, gray=self.global_gray, normals=self.global_nrml, pmat=torch.eye(4), kmat=self.kmat, upscale=1)
         
         # pass image dimensions and intrinsics
         surf_map.img_shape = self.target_gray.shape[-2:]
         surf_map.kmat[:2, -1] = torch.tensor([self.target_gray.shape[-1]//2, self.target_gray.shape[-2]//2])
 
         # update surfel map
-        surf_map.fuse(dept=self.target_dept, gray=self.target_gray, normals=self.target_normals, pmat=torch.eye(4))
+        surf_map.fuse(dept=self.target_dept, gray=self.target_gray, normals=self.target_nrml, pmat=torch.eye(4))
 
         # test assertions
         self.assertTrue(surf_map.opts.shape[1] > self.global_opts.shape[1], 'Number of surfel map points too little')
@@ -114,7 +114,7 @@ class SurfelMapTest(unittest.TestCase):
 
         # pass existing data to surfel map
         point_num = surf_map.opts.shape[1]
-        surf_map.fuse(dept=self.target_dept, gray=self.target_gray, normals=self.target_normals, pmat=torch.eye(4))
+        surf_map.fuse(dept=self.target_dept, gray=self.target_gray, normals=self.target_nrml, pmat=torch.eye(4))
         #self.assertTrue(surf_map.opts.shape[1] == point_num, 'Number of surfel map points changed when passing known frame')
 
         self.assertTrue(surf_map.tick == 2, 'Tick index deviates')
@@ -169,7 +169,7 @@ class SurfelMapTest(unittest.TestCase):
         surf_map.img_shape = torch.Size((480, 640))
         surf_map.opts = ipts
         surf_map.conf = torch.ones((1, ipts.shape[1]))
-        surf_map.normals = torch.ones(surf_map.opts.shape)
+        surf_map.nrml = torch.ones(surf_map.opts.shape)
 
         midx = surf_map.get_match_indices(ipts)
 
