@@ -47,7 +47,7 @@ class SurfelMap(object):
         # initialize radii
         if self.radi.numel() == 0:
             if dept.numel() > 0 and self.normals.numel() == 3*dept.numel():
-                self.radi = (dept.view(-1)) / (self.flen* 2**.5 * abs(self.normals[2,:]))
+                self.radi = ((dept.view(-1)) / (self.flen* 2**.5 * abs(self.normals[2,:]))).unsqueeze(0)
             elif self.opts.numel() > 0:
                 self.radi = torch.ones((1, self.opts.shape[1])).to(self.device)
 
