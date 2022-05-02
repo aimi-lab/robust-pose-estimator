@@ -6,7 +6,7 @@ from typing import Union
 from alley_oop.utils.lib_handling import get_lib
 
 
-def normals_from_regular_grid(oarr: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, torch.Tensor]:
+def normals_from_regular_grid(oarr: Union[np.ndarray, torch.Tensor], pad_opt: bool = False) -> Union[np.ndarray, torch.Tensor]:
     """
     compute normal for each point in a regular grid
 
@@ -18,8 +18,15 @@ def normals_from_regular_grid(oarr: Union[np.ndarray, torch.Tensor]) -> Union[np
     lib = get_lib(oarr)
 
     # compute difference in vertical and horizontal direction
-    vdif = (oarr[:-1, :, :] - oarr[1:, :, :])[:, :-1, :]
-    hdif = (oarr[:, :-1, :] - oarr[:, 1:, :])[:-1, :, :]
+    vdif = (oarr[:-1, :, :] - oarr[1:, :, :])
+    hdif = (oarr[:, :-1, :] - oarr[:, 1:, :])
+
+    if pad_opt:
+        vdif = lib.vstack((vdif, vdif[-1, :, :][None, :, :]))
+        hdif = lib.hstack((hdif, hdif[:, -1, :][:, None, :]))
+    else:
+        vdif = vdif[:, :-1, :]
+        hdif = hdif[:-1, :, :]
 
     # compute normals
     narr = lib.cross(hdif, vdif)
