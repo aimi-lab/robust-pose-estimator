@@ -40,8 +40,8 @@ class SurfelMap(object):
 
         # initialize radii
         self.radi = torch.Tensor()
-        if self.dept.numel() > 0 and self.normals.numel() == self.dept.numel():
-            self.radi = (self.disp[:, 2] * 2**.5) / (self.flen * abs(self.normals[:, 2]))
+        if self.dept.numel() > 0 and self.normals.numel() == 3*self.dept.numel():
+            self.radi = (self.dept.view(-1)) / (self.flen* 2**.5 * abs(self.normals[2,:]))
         elif self.opts.numel() > 0:
             self.radi = torch.ones((1, self.opts.shape[1]))
 
