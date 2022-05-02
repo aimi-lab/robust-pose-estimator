@@ -169,7 +169,7 @@ class SurfelMap(object):
         n_thresh: float = 20,
         ):
         """
-        yields indices of points mapping to the same pixel location to enforce unique correspondence assignment 
+        yields mask to exclude points mapping to the same 2-D pixel location for a unique correspondence assignment 
         """
 
         # parameter init
