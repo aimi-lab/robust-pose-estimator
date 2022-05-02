@@ -128,7 +128,7 @@ class SurfelMap(object):
     def get_match_indices(
         self,
         ipts: torch.Tensor = None,
-        ):
+        ) -> torch.Tensor:
 
         # quantize points (while considering super-sampling factor)
         ipts_quantized = torch.round(ipts*self.upscale)
@@ -146,7 +146,7 @@ class SurfelMap(object):
         vidx: torch.Tensor = None,
         d_thresh: float = 1, 
         n_thresh: float = 20,
-        ):
+        ) -> torch.Tensor:
 
         # 1. depth distance constraint
         didx = abs(opts[2] - self.opts[2, vidx][midx]) < d_thresh
@@ -167,9 +167,9 @@ class SurfelMap(object):
         normals: torch.Tensor = None,
         d_thresh: float = 1,
         n_thresh: float = 20,
-        ):
+        ) -> torch.Tensor:
         """
-        yields mask to exclude points mapping to the same 2-D pixel location for a unique correspondence assignment 
+        yields mask for a unique correspondence assignment to exclude points mapping to the same 2-D pixel location
         """
 
         # parameter init
