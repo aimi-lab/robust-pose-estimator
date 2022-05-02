@@ -33,7 +33,7 @@ class SurfelMap(object):
 
         # calculate object points
         if dept.numel() > 0 and self.img_shape is not None:
-            ipts = create_img_coords_t(y=self.img_shape[-2], x=self.img_shape[-1]).to(self.device)
+            ipts = create_img_coords_t(y=self.img_shape[-2], x=self.img_shape[-1]).to(self.device).to(dtype)
             self.opts = reverse_project(ipts=ipts, kmat=self.kmat, rmat=torch.eye(3, dtype=dtype).to(self.device),
                                         tvec=torch.zeros((3, 1), dtype=dtype).to(self.device),
                                         dpth=dept.reshape(self.img_shape))
