@@ -64,11 +64,10 @@ class PyramidPoseEstimatorTester(unittest.TestCase):
 
             T = estimator.estimate(target_frame.to(device), target_pcl.to(device))
             T = estimator.estimate(ref_frame.to(device), target_pcl.to(device))
-            T_true_inv = torch.linalg.inv(T_true)
             # assertion
-            print(T, T_true_inv)
-            self.assertTrue(np.allclose(T[:3, :3].cpu(), T_true_inv[:3,:3].cpu(), atol=1e-1))
-            self.assertTrue(np.allclose(T[:3, 3].cpu(), T_true_inv[:3,3].cpu(), atol=5))
+            print(T, T_true)
+            self.assertTrue(np.allclose(T[:3, :3].cpu(), T_true[:3,:3].cpu(), atol=1e-1))
+            self.assertTrue(np.allclose(T[:3, 3].cpu(), T_true[:3,3].cpu(), atol=5))
 
 
     def test_all(self):
