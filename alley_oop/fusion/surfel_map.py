@@ -20,9 +20,10 @@ class SurfelMap(object):
         self.gray = kwargs['gray'] if 'gray' in kwargs else torch.Tensor()
         self.pmat = kwargs['pmat'] if 'pmat' in kwargs else torch.eye(4)    # extrinsics
         self.kmat = kwargs['kmat'] if 'kmat' in kwargs else torch.eye(3)    # intrinsics
+        self.radi = kwargs['radi'] if 'radi' in kwargs else torch.Tensor()
         self.normals = kwargs['normals'] if 'normals' in kwargs else torch.Tensor()
         self.img_shape = kwargs['img_shape'] if 'img_shape' in kwargs else None
-        self.upscale = kwargs['upscale'] if 'opts' in kwargs else 1   # TODO: enable value other than 1
+        self.upscale = kwargs['upscale'] if 'upscale' in kwargs else 1   # TODO: enable value other than 1
         self.dbug_opt = False
 
         # calculate object points
@@ -39,11 +40,11 @@ class SurfelMap(object):
         self.flen = (self.kmat[0, 0] + self.kmat[1, 1]) / 2
 
         # initialize radii
-        self.radi = torch.Tensor()
-        if self.dept.numel() > 0 and self.normals.numel() == 3*self.dept.numel():
-            self.radi = (self.dept.view(-1)) / (self.flen* 2**.5 * abs(self.normals[2,:]))
-        elif self.opts.numel() > 0:
-            self.radi = torch.ones((1, self.opts.shape[1]))
+        if self.radi.numel() == 0:
+            if self.dept.numel() > 0 and self.normals.numel() == 3*self.dept.numel():
+                self.radi = (self.dept.view(-1)) / (self.flen* 2**.5 * abs(self.normals[2,:]))
+            elif self.opts.numel() > 0:
+                self.radi = torch.ones((1, self.opts.shape[1]))
 
         # initialize confidence
         self.conf = torch.Tensor()
@@ -209,3 +210,63 @@ class SurfelMap(object):
         import matplotlib.pyplot as plt
         plt.imshow(timg.cpu().numpy()[0 ,0 , ...])
         plt.show()
+
+    ########################
+
+    def transform(self, transform):
+        assert transform.shape == (4,4)
+        self.opts = transform[:3,:3]@self.opts + transform[:3,3,None]
+        self.normals = transform[:3,:3] @ self.normals
+
+    def transform_cpy(self, transform):
+        assert transform.shape == (4, 4)
+        opts = transform[:3,:3]@self.opts + transform[:3,3,None]
+        normals = transform[:3,:3] @ self.normals
+        return SurfelMap(opts=opts, normals=normals, kmat=self.kmat, gray=self.gray, img_shape=self.img_shape,
+                         radi=self.radi)#.to(self.pts.device)
+
+    #def set_colors(self, colors):
+    #    self.colors = torch.nn.Parameter(colors.squeeze().permute(1,2,0).reshape(-1, 3))
+
+    @property
+    def grid_pts(self):
+        assert self.img_shape is not None
+        return self.opts.T.view((*self.img_shape, 3))
+
+    @property
+    def grid_normals(self):
+        assert self.img_shape is not None
+        return self.normals.T.view((*self.img_shape, 3))
+
+    def render(self, intrinsics):
+        from alley_oop.geometry.pinhole_transforms import forward_project
+        extrinsics = torch.eye(4).to(self.pts.dtype).to(self.pts.device)
+        rmat = extrinsics[:3, :3]
+        tvec = extrinsics[:3, 3, None]
+        pts_h = torch.vstack([self.pts.T, torch.ones(self.pts.shape[0],
+                                                           device=self.pts.device, dtype=self.pts.dtype)])
+        points_2d = forward_project(pts_h, intrinsics, rmat=rmat, tvec=tvec).T
+
+        # filter points that are not in the image
+        valid = (points_2d[:, 1] < self.grid_shape[0]) & (points_2d[:, 0] < self.grid_shape[1]) & (
+                    points_2d[:, 1] > 0) & (points_2d[:, 0] > 0)
+        points_2d = points_2d[valid][...,:2]
+        colors = self.colors[valid]
+
+        import numpy as np
+        x_coords = np.arange(0, self.grid_shape[1]) + 0.5
+        y_coords = np.arange(0, self.grid_shape[0]) + 0.5
+        x_mesh, y_mesh = np.meshgrid(x_coords, y_coords)
+        ipts = np.vstack([x_mesh.flatten(), y_mesh.flatten()]).T
+        interp = NDInterpolator(points_2d, colors, dist_thr=10, default_value=0)
+        interp.fit(ipts, self.grid_shape)
+        img = torch.stack([interp.predict(colors[:, i]) for i in range(3)])
+        return FrameClass(img[None,:], interp.predict(self.pts[valid][:,2])[None,None,:], intrinsics=intrinsics).to(intrinsics.device)
+
+    def pcl2open3d(self):
+        import open3d
+        pcd = open3d.geometry.PointCloud()
+        #pcd.normals = open3d.utility.Vector3dVector(self.normals.cpu().numpy())
+        pcd.points = open3d.utility.Vector3dVector(self.pts.cpu().numpy())
+        pcd.colors = open3d.utility.Vector3dVector(self.colors.cpu().numpy())
+        return pcd
