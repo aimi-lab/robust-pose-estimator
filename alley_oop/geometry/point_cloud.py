@@ -74,7 +74,7 @@ class PointCloud(torch.nn.Module):
         ipts = np.vstack([x_mesh.flatten(), y_mesh.flatten()]).T
         interp = NDInterpolator(points_2d, colors, dist_thr=10, default_value=0)
         interp.fit(ipts, self.grid_shape)
-        img = torch.stack([interp.predict(colors[:, i]) for i in range(3)])
+        img = torch.stack([interp.predict(colors[:, i]) for i in range(colors.shape[-1])])
         return FrameClass(img[None,:], interp.predict(self.pts[valid][:,2])[None,None,:], intrinsics=intrinsics).to(intrinsics.device)
 
     def pcl2open3d(self):
