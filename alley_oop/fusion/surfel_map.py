@@ -66,7 +66,7 @@ class SurfelMap(object):
         self.img_shape = gray.shape[-2:] if self.img_shape is None else self.img_shape
 
         # compute opts considering upsampling
-        ipts = create_img_coords_t(y=self.img_shape[-2]*self.upscale, x=self.img_shape[-1]*self.upscale)
+        ipts = create_img_coords_t(y=self.img_shape[-2]*self.upscale, x=self.img_shape[-1]*self.upscale).to(dept.dtype).to(dept.device)
         ipts[:2, :] -= .5
         dept = torch.nn.functional.interpolate(dept, scale_factor=self.upscale, mode='bilinear', align_corners=None)
         opts = reverse_project(ipts=ipts, dpth=dept, rmat=self.pmat[:3, :3], tvec=self.pmat[:3, -1][..., None], kmat=self.kmat)
@@ -174,7 +174,7 @@ class SurfelMap(object):
 
         # parameter init
         vidx = torch.ones(self.opts.shape[1], dtype=bool) if vidx is None else vidx
-        normals = torch.ones(self.opts.shape)
+        normals = torch.ones_like(self.opts) if normals is None else normals
         angle_threshold = torch.cos(torch.tensor(n_thresh)/180*torch.pi)
 
         # identify duplicates 
