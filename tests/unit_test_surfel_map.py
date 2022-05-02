@@ -96,14 +96,14 @@ class SurfelMapTest(unittest.TestCase):
             mlab_rgbd(tpts, colors=timg, size=.05, show_opt=True, fig=fig)
 
         # initialize surfel map
-        surf_map = SurfelMap(opts=self.global_opts, dept=self.global_dept, gray=self.global_gray, normals=self.global_normals, pmat=torch.eye(4), kmat=self.kmat, upscale=1)
+        surf_map = SurfelMap(opts=self.global_opts, dept=self.global_dept, gray=self.global_gray.float(), normals=self.global_normals, pmat=torch.eye(4), kmat=self.kmat, upscale=1)
         
         # pass image dimensions and intrinsics
         surf_map.img_shape = self.target_gray.shape[-2:]
         surf_map.kmat[:2, -1] = torch.tensor([self.target_gray.shape[-1]//2, self.target_gray.shape[-2]//2])
 
         # update surfel map
-        surf_map.fuse(dept=self.target_dept, gray=self.target_gray, normals=self.target_normals, pmat=torch.eye(4))
+        surf_map.fuse(dept=self.target_dept, gray=self.target_gray.float(), normals=self.target_normals, pmat=torch.eye(4))
 
         # test assertions
         self.assertTrue(surf_map.opts.shape[1] > self.global_opts.shape[1], 'Number of surfel map points too little')
