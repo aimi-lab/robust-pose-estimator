@@ -27,7 +27,7 @@ class SurfelMap(object):
         self.radi = kwargs['radi'] if 'radi' in kwargs else torch.Tensor().to(self.device)
         self.nrml = kwargs['normals'] if 'normals' in kwargs else torch.Tensor().to(self.device)
         self.img_shape = kwargs['img_shape'] if 'img_shape' in kwargs else None
-        self.upscale = kwargs['upscale'] if 'upscale' in kwargs else 1
+        self.upscale = kwargs['upscale'] if 'upscale' in kwargs else 4
         self.dbug_opt = False
 
 
@@ -59,7 +59,19 @@ class SurfelMap(object):
 
         # intialize tick as timestamp
         self.tick = 0
-            
+    
+    def create_frame_coords(self, y: int = None, x: int = None) -> torch.Tensor:
+
+        y = self.img_shape[-2]*self.upscale if y is None else y*self.upscale
+        x = self.img_shape[-1]*self.upscale if x is None else x*self.upscale
+
+        # create 2-D coordinates
+        x_mesh = torch.linspace(0, x-1, x).repeat(y, 1)
+        y_mesh = torch.linspace(0, y-1, y).repeat(x, 1).transpose(1, 2)
+        ipts = torch.vstack([x_mesh.flatten(), y_mesh.flatten(), torch.ones(x_mesh.flatten().shape[0])])
+
+        return ipts
+
     def fuse(self, dept: torch.Tensor, gray: torch.Tensor, normals: torch.Tensor = None, pmat: torch.Tensor = None):
         
         # update image shape
@@ -72,7 +84,6 @@ class SurfelMap(object):
 
         # prepare image and object coordinates
         ipts = create_img_coords_t(y=self.img_shape[-2]*self.upscale, x=self.img_shape[-1]*self.upscale)
-        ipts[:2, :] -= .5
         opts = reverse_project(ipts=ipts, dpth=dept, rmat=self.pmat[:3, :3], tvec=self.pmat[:3, -1][..., None], kmat=self.kmat)
 
         # update normals (if necessary)
@@ -89,7 +100,7 @@ class SurfelMap(object):
         bidx = (global_ipts[0, :] >= 0) & (global_ipts[1, :] >= 0) & (global_ipts[0, :] < self.img_shape[1]-1) & (global_ipts[1, :] < self.img_shape[0]-1)
 
         # find correspondence by projecting surfels to current frame
-        midx = self.get_match_indices(global_ipts[:, bidx])                     # image border constraints
+        midx = self.get_match_indices(global_ipts[:, bidx])
 
         # compute that rejects correspondences for a single unique one
         kidx = self.get_unique_correspondence_mask(opts=opts, vidx=bidx, midx=midx)
@@ -140,7 +151,7 @@ class SurfelMap(object):
         ) -> torch.Tensor:
 
         # quantize points (while considering super-sampling factor)
-        ipts_quantized = torch.round(ipts*self.upscale)
+        ipts_quantized = torch.round((ipts-.5)*self.upscale)
 
         # get point correspondence from indexing as flattened 2D indices
         midx = ipts_quantized[1, :] * self.img_shape[1] * self.upscale + ipts_quantized[0, :]

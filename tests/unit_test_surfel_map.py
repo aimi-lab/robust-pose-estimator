@@ -52,7 +52,6 @@ class SurfelMapTest(unittest.TestCase):
         # create image coordinates
         grid_shape = self.gtruth_limg.shape[-2:]
         ipts = create_img_coords_t(y=grid_shape[-2], x=grid_shape[-1])
-        ipts[:2, :] -= .5
 
         # project to space
         self.gtruth_opts = reverse_project(ipts=ipts, kmat=self.kmat, rmat=torch.eye(3), tvec=torch.zeros(3, 1), dpth=self.gtruth_dept)
@@ -159,8 +158,7 @@ class SurfelMapTest(unittest.TestCase):
         # prepare data
         nois = torch.randn(480*640)*1e-1
         shuffle_idx = torch.randperm(480*640)
-        gpts = create_img_coords_t(y=480, x=640)    #+ nois    # take 0.5 shift in coords generation into account
-        gpts[:2, :] -= .5
+        gpts = create_img_coords_t(y=480, x=640)    #+ nois
         opts = gpts[:, shuffle_idx]
         ipts = torch.cat((opts, gpts[:, :20]), dim=-1)   # attach identical points to mimic correspondence duplicates
 
