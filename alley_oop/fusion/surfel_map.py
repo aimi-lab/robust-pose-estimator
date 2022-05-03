@@ -59,18 +59,6 @@ class SurfelMap(object):
 
         # intialize tick as timestamp
         self.tick = 0
-    
-    def create_frame_coords(self, y: int = None, x: int = None) -> torch.Tensor:
-
-        y = self.img_shape[-2]*self.upscale if y is None else y*self.upscale
-        x = self.img_shape[-1]*self.upscale if x is None else x*self.upscale
-
-        # create 2-D coordinates
-        x_mesh = torch.linspace(0, x-1, x).repeat(y, 1)
-        y_mesh = torch.linspace(0, y-1, y).repeat(x, 1).transpose(1, 2)
-        ipts = torch.vstack([x_mesh.flatten(), y_mesh.flatten(), torch.ones(x_mesh.flatten().shape[0])])
-
-        return ipts
 
     def fuse(self, dept: torch.Tensor, gray: torch.Tensor, normals: torch.Tensor = None, pmat: torch.Tensor = None):
         
