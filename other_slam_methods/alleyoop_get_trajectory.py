@@ -67,13 +67,12 @@ def main(input_path, output_path, config, force_cpu, nsamples):
                 limg, depth, mask, img_number = data
                 diff_pose = np.eye(4)
                 config['slam']['kinematics'] = 'fuse'
-            #if (i == 0) & (viewer is not None): viewer.set_reference(limg, depth)
-            pose, scene = slam.processFrame(limg, depth.astype(np.uint16))
-            viewer(pose, scene.pcl2open3d(), frame=slam.get_frame(), synth_frame=slam.get_rendered_frame())
+            pose, scene = slam.processFrame(limg, depth)
+            if viewer is not None:
+                viewer(pose, scene.pcl2open3d(), frame=slam.get_frame(), synth_frame=slam.get_rendered_frame())
             trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number, 'residual': 0.0, 'key_frame': True})
             if len(trajectory) > nsamples:
                 break
-            #if viewer is not None: viewer(limg, *slam.get_matching_res(), pose)
         os.makedirs(output_path, exist_ok=True)
         with open(os.path.join(output_path, 'trajectory.json'), 'w') as f:
             json.dump(trajectory, f)
