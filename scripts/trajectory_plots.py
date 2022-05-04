@@ -28,7 +28,7 @@ def load_scared_pose(fnames:List=None) -> np.ndarray:
             pose[0:3, 3] = -pose[0:3, 3]  # neg. translation as Intuitive's coordinate system is inverted wrt. OpenCV
             pose[0:3, 0:3] = pose[0:3, 0:3].T  # invert rotation as Intuitive's coordinate system is inverted wrt. OpenCV
             pose_list.append(pose)
-    elif str(fnames[0]).lower().__contains__('efusion') | str(fnames[0]).lower().__contains__('combined') :  # ORBSLAM2:
+    elif str(fnames[0]).lower().__contains__('efusion') | str(fnames[0]).lower().__contains__('combined')| str(fnames[0]).lower().__contains__('alleyoop') :  # ORBSLAM2:
         fname = fnames[0]
         with open(str(fname), 'r') as f: pose_elem_list = json.load(f)
         pose_list = []
