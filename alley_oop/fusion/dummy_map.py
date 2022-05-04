@@ -19,5 +19,7 @@ class DummyMap(SurfelMap):
         assert transform.shape == (4, 4)
         opts = transform[:3,:3]@self.opts + transform[:3,3,None]
         normals = transform[:3,:3] @ self.nrml
-        return DummyMap(opts=opts, normals=normals, kmat=self.kmat, gray=self.gray, img_shape=self.img_shape,
+        map =  DummyMap(opts=opts, normals=normals, kmat=self.kmat, gray=self.gray, img_shape=self.img_shape,
                          radi=self.radi).to(self.device)
+        map.last_frame = self.last_frame
+        return map
