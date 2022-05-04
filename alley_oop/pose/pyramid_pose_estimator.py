@@ -28,7 +28,7 @@ class PyramidPoseEstimator(torch.nn.Module):
         model = model.transform_cpy(torch.linalg.inv(self.last_pose))
         # apply gaussian pyramid to current and rendered images
         frame_pyr, intrinsics_pyr = self.pyramid(frame)
-
+        model_frame = None
         if self.last_frame_pyr is not None:
             # render view of model from last camera pose
             model_frame = model.render(self.pyramid._top_instrinsics)
@@ -51,7 +51,7 @@ class PyramidPoseEstimator(torch.nn.Module):
             pose = self.last_pose @ T_last2cur
             self.last_pose.data = pose
         self.last_frame_pyr = frame_pyr
-        return self.last_pose
+        return self.last_pose, model_frame
 
     @property
     def device(self):
