@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from typing import Union
+from typing import Union, Tuple
 
 
 from alley_oop.utils.lib_handling import get_lib
@@ -32,6 +32,20 @@ def forward_project(
     ipts = ipts[:3] / ipts[-1] if inhomogenize_opt else ipts
 
     return ipts
+
+
+def forward_project2image(
+        opts: Union[np.ndarray, torch.Tensor],
+        kmat: Union[np.ndarray, torch.Tensor],
+        img_shape: Tuple,
+        rmat: Union[np.ndarray, torch.Tensor] = None,
+        tvec: Union[np.ndarray, torch.Tensor] = None,
+                    ):
+    assert len(img_shape) == 2
+    ipts = forward_project(opts, kmat, rmat, tvec)
+    # filter points that are not in the image
+    valid = (ipts[1] < img_shape[0]-1) & (ipts[0] < img_shape[1]-1) & (ipts[1] >= 0) & (ipts[0] >= 0)
+    return ipts, valid
 
 
 def reverse_project(
