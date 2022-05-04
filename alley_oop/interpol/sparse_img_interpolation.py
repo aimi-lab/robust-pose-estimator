@@ -14,7 +14,7 @@ class SparseImgInterpolator(torch.nn.Module):
         x[mask] = self.prior_val
         channels = x.shape[1]
         padnum = self._kernel_size // 2
-        padded = pad(x, (padnum, padnum, padnum, padnum), value=0)
+        padded = pad(x, (padnum, padnum, padnum, padnum), mode='reflect')
         gsconv = conv2d(padded, self.kernel.repeat((channels, 1, 1, 1)).to(x.dtype), stride=1, padding='same',
                         groups=channels)[..., padnum:-padnum, padnum:-padnum]
         x[mask] = gsconv[mask]
