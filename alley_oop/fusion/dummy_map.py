@@ -12,8 +12,11 @@ class DummyMap(SurfelMap):
         super().fuse(dept, gray, normals, pmat)
         self.last_frame = FrameClass(gray, dept, normals=normals.view(1,3,*self.img_shape))
 
-    def render(self, intrinsics: torch.tensor=None, extrinsics: torch.tensor=None):
-        return self.last_frame
+    def render(self, intrinsics: torch.tensor=None, extrinsics: torch.tensor=None, dummy=True):
+        if dummy:
+            return self.last_frame
+        else:
+            return super().render(intrinsics, extrinsics)
 
     def transform_cpy(self, transform):
         assert transform.shape == (4, 4)
