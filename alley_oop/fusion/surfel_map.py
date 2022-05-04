@@ -28,6 +28,8 @@ class SurfelMap(object):
         self.kmat = kwargs['kmat'] if 'kmat' in kwargs else torch.eye(3, dtype=dtype, device=self.device)     # intrinsics
         self.radi = kwargs['radi'] if 'radi' in kwargs else torch.Tensor().to(self.device)
         self.nrml = kwargs['normals'] if 'normals' in kwargs else torch.Tensor().to(self.device)
+        self.conf_thr = kwargs['conf_thr'] if 'conf_thr' in kwargs else 10
+        self.t_max = kwargs['t_max'] if 't_max' in kwargs else 15
         self.img_shape = kwargs['img_shape'] if 'img_shape' in kwargs else None
         self.upscale = kwargs['upscale'] if 'upscale' in kwargs else 4
         self.dbug_opt = False
@@ -62,6 +64,7 @@ class SurfelMap(object):
 
         # intialize tick as timestamp
         self.tick = 0
+        self.t_created = torch.zeros(1,self.opts.shape[1]).to(self.device)
 
     def fuse(self, dept: torch.Tensor, gray: torch.Tensor, normals: torch.Tensor, pmat: torch.Tensor):
         
@@ -136,8 +139,21 @@ class SurfelMap(object):
         self.radi = torch.cat((self.radi, self._downsample(radi)[:, mask]), dim=-1)
         self.nrml = torch.cat((self.nrml, self._downsample(normals)[:, mask]), dim=-1)
         self.conf = torch.cat((self.conf, self._downsample(conf)[:, mask]), dim=-1)
+        self.t_created = torch.cat((self.t_created, self.tick*torch.ones(1, mask.sum()).to(self.device)), dim=-1)
 
         self.tick = self.tick + 1
+        self.clean()
+
+    def clean(self):
+        # remove unstable points that have been created long time ago
+        ok_pts = ((self.conf > self.conf_thr) | ((self.tick - self.t_created) < self.t_max)).squeeze()
+        self.opts = self.opts[:, ok_pts]
+        self.gray = self.gray[:, ok_pts]
+        self.radi = self.radi[:, ok_pts]
+        self.nrml = self.nrml[:, ok_pts]
+        self.conf = self.conf[:, ok_pts]
+        self.t_created = self.t_created[:, ok_pts]
+
 
     def _downsample(self, x):
         x = x.view(-1, self.img_shape[0] * self.upscale, self.img_shape[1] * self.upscale)
@@ -163,8 +179,8 @@ class SurfelMap(object):
         midx: torch.Tensor,
         vidx: torch.Tensor = None,
         normals: torch.Tensor = None,
-        d_thresh: float = 1,
-        n_thresh: float = 20,
+        d_thresh: float = 2,
+        n_thresh: float = 30,
         ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         yields mask for a unique correspondence assignment to exclude points mapping to the same 2-D pixel location
@@ -262,12 +278,13 @@ class SurfelMap(object):
         colors = self.interpolate(colors[None,None,...])
         return FrameClass(colors, depth, intrinsics=intrinsics).to(intrinsics.device)
 
-    def pcl2open3d(self):
+    def pcl2open3d(self, stable=True):
         import open3d
         pcd = open3d.geometry.PointCloud()
         #pcd.normals = open3d.utility.Vector3dVector(self.nrml.cpu().numpy())
-        pcd.points = open3d.utility.Vector3dVector(self.opts.T.cpu().numpy())
-        rgb = self.gray.repeat((3,1)).T
+        stable = (self.conf > self.conf_thr).squeeze()
+        pcd.points = open3d.utility.Vector3dVector(self.opts.T[stable].cpu().numpy())
+        rgb = self.gray.repeat((3,1)).T[stable]
         pcd.colors = open3d.utility.Vector3dVector(rgb.cpu().numpy())
         return pcd
 
@@ -280,4 +297,6 @@ class SurfelMap(object):
         self.pmat = self.pmat.to(d)
         self.device = self.opts.device
         self.interpolate = self.interpolate.to(d)
+        self.conf = self.conf.to(d)
+        self.t_created = self.t_created.to(d)
         return self
