@@ -12,7 +12,7 @@ import numpy as np
 from tqdm import tqdm
 from viewer.slam_viewer import SlamViewer
 from other_slam_methods.stereo_slam.disparity.disparity_model import DisparityModel
-from other_slam_methods.stereo_slam.segmentation_network import SemanticSegmentationModel
+from other_slam_methods.stereo_slam.segmentation_network.seg_model import SemanticSegmentationModel
 import open3d
 
 def save_ply(pcl_array, path):
