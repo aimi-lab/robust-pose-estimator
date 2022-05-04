@@ -43,21 +43,21 @@ class Viewer3D(object):
                 plt.axis('off')
                 plt.draw()
                 plt.pause(0.0001)
-        # self.exit_loop = not self.blocking
-        # if self.blocking:
-        #     print('blocking mode: press q to continue')
-        # if pcd is not None:
-        #     self.viewer.remove_geometry(self.pcd, reset_bounding_box=True)
-        #     self.pcd = pcd
-        #     self.viewer.add_geometry(self.pcd)
-        # if add_pcd is not None:
-        #     self.viewer.add_geometry(add_pcd)
-        # self.control.convert_from_pinhole_camera_parameters(self.pose2view(pose))
-        # self.control.set_zoom(zoom)
-        # self.viewer.poll_events()
-        # self.viewer.update_renderer()
-        # while not self.exit_loop:
-        #     self.viewer.poll_events()
-        #     self.viewer.update_renderer()
-        # if add_pcd is not None:
-        #     self.viewer.remove_geometry(add_pcd)
+        self.exit_loop = not self.blocking
+        if self.blocking:
+            print('blocking mode: press q to continue')
+        if pcd is not None:
+            self.viewer.remove_geometry(self.pcd, reset_bounding_box=True)
+            self.pcd = pcd
+            self.viewer.add_geometry(self.pcd)
+        if add_pcd is not None:
+            self.viewer.add_geometry(add_pcd)
+        self.control.convert_from_pinhole_camera_parameters(self.pose2view(pose))
+        self.control.set_zoom(zoom)
+        self.viewer.poll_events()
+        self.viewer.update_renderer()
+        while not self.exit_loop:
+            self.viewer.poll_events()
+            self.viewer.update_renderer()
+        if add_pcd is not None:
+            self.viewer.remove_geometry(add_pcd)
