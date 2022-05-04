@@ -29,7 +29,7 @@ class SLAM(object):
             if self.scene is None:
                 # initialize scene with first frame
                 self.scene = SurfelMap(dept=self.frame.depth, kmat=self.intrinsics, normals=self.frame.normals.view(3,-1),
-                                       gray=self.frame.img_gray.view(1, -1), img_shape=self.frame.shape)
+                                       gray=self.frame.img_gray.view(1, -1), img_shape=self.frame.shape, upscale=1)
             pose, self.rendered_frame = self.pose_estimator.estimate(self.frame, self.scene)
             if self.cnt > 0:
                 self.scene.fuse(self.frame.depth, self.frame.img_gray, self.frame.normals, pose)
