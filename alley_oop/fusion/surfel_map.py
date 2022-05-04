@@ -30,7 +30,7 @@ class SurfelMap(object):
         self.img_shape = kwargs['img_shape'] if 'img_shape' in kwargs else None
         self.upscale = kwargs['upscale'] if 'upscale' in kwargs else 1   # TODO: enable value other than 1
         self.dbug_opt = False
-        self.interpolate = SparseImgInterpolator(15, 5, 0)
+        self.interpolate = SparseImgInterpolator(5, 2, 0)
 
 
         # calculate object points
@@ -278,4 +278,5 @@ class SurfelMap(object):
         self.opts = self.opts.to(d)
         self.pmat = self.pmat.to(d)
         self.device = self.opts.device
+        self.interpolate = self.interpolate.to(d)
         return self

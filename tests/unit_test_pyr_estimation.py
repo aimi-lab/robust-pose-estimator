@@ -55,16 +55,16 @@ class PyramidPoseEstimatorTester(unittest.TestCase):
             img = img.permute(2, 0, 1).unsqueeze(0)
             ref_frame = FrameClass(img.double(), depth.unsqueeze(0).unsqueeze(0), intrinsics=intrinsics)
 
-            ref_pcl = SurfelMap(dept=ref_frame.depth, kmat=intrinsics, normals=ref_frame.normals.view(3,-1), gray=ref_frame.img_gray.view(-1),
+            ref_pcl = SurfelMap(dept=ref_frame.depth, kmat=intrinsics, normals=ref_frame.normals.view(3,-1), gray=ref_frame.img_gray.view(1, -1),
                                 img_shape=ref_frame.shape)
 
-            target_pcl = ref_pcl.transform_cpy(T_true)
+            target_pcl = ref_pcl.transform_cpy(torch.linalg.inv(T_true))
             target_frame = target_pcl.render(intrinsics)
             mask = (target_frame.img_gray[0, 0] != 0)
             estimator = PyramidPoseEstimator(intrinsics, config).to(device)
 
-            T = estimator.estimate(target_frame.to(device), target_pcl.to(device))
-            T = estimator.estimate(ref_frame.to(device), target_pcl.to(device))
+            _ = estimator.estimate(target_frame.to(device), target_pcl.to(device))
+            T, _ = estimator.estimate(ref_frame.to(device), target_pcl.to(device))
             # assertion
             self.assertTrue(np.allclose(T[:3, :3].cpu(), T_true[:3,:3].cpu(), atol=1e-1))
             self.assertTrue(np.allclose(T[:3, 3].cpu(), T_true[:3,3].cpu(), atol=5))
