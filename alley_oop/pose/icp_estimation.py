@@ -51,33 +51,33 @@ class ICPEstimator(torch.nn.Module):
     def cost_fun(residuals):
         return (residuals**2).mean()
 
-    def residual_fun(self, x, ref_pcl, target_pcl, mask=None):
+    def residual_fun(self, x, ref_pcl, target_pcl, src_mask=None):
         xt = torch.tensor(x).double().to(ref_pcl.opts.device) if not torch.is_tensor(x) else x
         T_est = lie_se3_to_SE3(xt)
         target_pcl_current_c = target_pcl.transform_cpy(torch.linalg.inv(T_est))  # transform into current frame
-        self.src_grid_ids, self.trg_ids = self.associate(ref_pcl, target_pcl_current_c, mask)
+        self.src_grid_ids, self.trg_ids = self.associate(ref_pcl, target_pcl_current_c, src_mask)
         # compute residuals
         ref_pcl_world_c = ref_pcl.transform_cpy(T_est)
         return batched_dot_product(target_pcl.normals.T[self.trg_ids],
                                    (ref_pcl_world_c.grid_pts[self.src_grid_ids] - target_pcl.opts.T[
                                        self.trg_ids]))
 
-    def jacobian(self, x, ref_pcl, target_pcl, mask=None):
+    def jacobian(self, x, ref_pcl, target_pcl, src_mask=None):
         xt = torch.tensor(x).double() if not torch.is_tensor(x) else x
         T_est = lie_se3_to_SE3(xt)
         ref_pcl_world_c = ref_pcl.transform_cpy(T_est)
         return (target_pcl.normals.T[self.trg_ids].unsqueeze(1) @ self.j_3d(
             ref_pcl_world_c.grid_pts[self.src_grid_ids])).squeeze()
 
-    def estimate_lm(self, ref_frame: FrameClass, target_pcl:SurfelMap, mask: torch.tensor=None):
+    def estimate_lm(self, ref_frame: FrameClass, target_pcl:SurfelMap, src_mask: torch.tensor=None):
         """ Levenberg-Marquard estimation."""
         ref_pcl = SurfelMap(dept=ref_frame.depth, kmat=self.intrinsics, normals=ref_frame.normals.view(3, -1),
                             img_shape=self.img_shape)
 
         x_list, eps = lsq_lma(torch.zeros(6).to(ref_frame.depth.device).to(ref_frame.depth.dtype), self.residual_fun, self.jacobian,
-                              args=(ref_pcl, target_pcl,mask,), max_iter=self.n_iter, tol=self.Ftol, xtol=self.xtol)
+                              args=(ref_pcl, target_pcl, src_mask,), max_iter=self.n_iter, tol=self.Ftol, xtol=self.xtol)
         x = x_list[-1]
-        cost = self.cost_fun(self.residual_fun(x, ref_pcl, target_pcl, mask))
+        cost = self.cost_fun(self.residual_fun(x, ref_pcl, target_pcl, src_mask))
         return lie_se3_to_SE3(x), cost
 
     def plot(self, x, ref_pcl, target_pcl, downsample=1):
@@ -113,7 +113,7 @@ class ICPEstimator(torch.nn.Module):
         J[:, 2, 5] = 1
         return J
 
-    def projective_association(self, src_pcl:SurfelMap, target_pcl:SurfelMap, mask:torch.tensor=None):
+    def projective_association(self, src_pcl:SurfelMap, target_pcl:SurfelMap, src_mask:torch.tensor=None):
         """ perform projectiv data associcaton"""
         extrinsics = torch.eye(4).to(target_pcl.opts.dtype).to(target_pcl.opts.device)
         rmat = extrinsics[:3, :3]
@@ -123,8 +123,8 @@ class ICPEstimator(torch.nn.Module):
         points_2d, valid = forward_project2image(pts_h, self.intrinsics, img_shape=self.img_shape, rmat=rmat, tvec=tvec)
         points_2d = points_2d.T
         # filter points that are not in the image
-        if mask is not None:
-            valid[valid.clone()] &= (mask[points_2d[valid][:,1].long(),points_2d[valid][:,0].long()]).type(torch.bool)
+        if src_mask is not None:
+            valid[valid.clone()] &= (src_mask[points_2d[valid][:, 1].long(), points_2d[valid][:, 0].long()]).type(torch.bool)
 
         # filter points that are too far in 3d space, or that have a large angle between the normals
         ids = points_2d.long()[valid][:, 1], points_2d.long()[valid][:, 0]
