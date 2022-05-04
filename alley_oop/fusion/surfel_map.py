@@ -119,22 +119,30 @@ class SurfelMap(object):
         self.conf[:, vidx] = conf_idx + ccor
 
         # create mask identifying unmatched indices
-        mask = torch.ones(opts.shape[1], dtype=bool)
-        mask[midx.unique()] = False
+        mask = torch.zeros(opts.shape[1]).to(opts.device)
+        mask[midx] = 1.0
+        # bring mask back to original shape
+        mask = ~max_pool2d(mask.view(1,1,self.img_shape[0]*self.upscale, self.img_shape[1]*self.upscale), self.upscale, stride=self.upscale).view(-1).to(torch.bool)
 
         if self.dbug_opt:
             # print ratio of added points vs frame resolution
-            ratio = mask[0::self.upscale**2].sum()/len(mask[0::self.upscale**2])
+            ratio = mask.float().mean()
             print(ratio)
 
         # concatenate unmatched points, intensities, normals, radii and confidences
-        self.opts = torch.cat((self.opts, opts[:, mask][0::self.upscale**2]), dim=-1)
-        self.gray = torch.cat((self.gray, gray[:, mask][0::self.upscale**2]), dim=-1)
-        self.radi = torch.cat((self.radi, radi[:, mask][0::self.upscale**2]), dim=-1)
-        self.nrml = torch.cat((self.nrml, normals[:, mask][0::self.upscale**2]), dim=-1)
-        self.conf = torch.cat((self.conf, conf[:, mask][0::self.upscale**2]), dim=-1)
+
+        self.opts = torch.cat((self.opts, self._downsample(opts)[:, mask]), dim=-1)
+        self.gray = torch.cat((self.gray, self._downsample(gray)[:, mask]), dim=-1)
+        self.radi = torch.cat((self.radi, self._downsample(radi)[:, mask]), dim=-1)
+        self.nrml = torch.cat((self.nrml, self._downsample(normals)[:, mask]), dim=-1)
+        self.conf = torch.cat((self.conf, self._downsample(conf)[:, mask]), dim=-1)
 
         self.tick = self.tick + 1
+
+    def _downsample(self, x):
+        x = x.view(-1, self.img_shape[0] * self.upscale, self.img_shape[1] * self.upscale)
+        x = x[:, ::self.upscale, ::self.upscale].reshape(x.shape[0], -1)
+        return x
 
     def get_match_indices(
         self,
