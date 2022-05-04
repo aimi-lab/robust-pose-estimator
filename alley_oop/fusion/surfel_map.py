@@ -1,7 +1,7 @@
 import torch
 from typing import Union
 
-from alley_oop.geometry.pinhole_transforms import forward_project2image, reverse_project, create_img_coords_t
+from alley_oop.geometry.pinhole_transforms import forward_project2image, reverse_project, create_img_coords_t, forward_project
 from alley_oop.interpol.img_mappings import img_map_torch
 from alley_oop.interpol.sparse_img_interpolation import SparseImgInterpolator
 from alley_oop.geometry.normals import normals_from_regular_grid
@@ -83,7 +83,8 @@ class SurfelMap(object):
         dept = dept.flatten()[None, :]
 
         # project all surfels to current image frame
-        global_ipts, bidx = forward_project2image(self.opts, img_shape=self.img_shape, kmat=self.kmat, rmat=pmat[:3, :3], tvec=pmat[:3, -1][:, None])
+        global_ipts = forward_project(self.opts, kmat=self.kmat, rmat=pmat[:3, :3], tvec=pmat[:3, -1][:, None])
+        bidx = (global_ipts[0, :] >= 0) & (global_ipts[1, :] >= 0) & (global_ipts[0, :] < self.img_shape[1]-1) & (global_ipts[1, :] < self.img_shape[0]-1)
 
         # find correspondence by projecting surfels to current frame
         midx = self.get_match_indices(global_ipts[:, bidx])                     # image border constraints
@@ -265,7 +266,7 @@ class SurfelMap(object):
         pcd = open3d.geometry.PointCloud()
         #pcd.normals = open3d.utility.Vector3dVector(self.nrml.cpu().numpy())
         pcd.points = open3d.utility.Vector3dVector(self.opts.T.cpu().numpy())
-        rgb = self.gray.unsqueeze(1).repeat((1,3))
+        rgb = self.gray.repeat((3,1)).T
         pcd.colors = open3d.utility.Vector3dVector(rgb.cpu().numpy())
         return pcd
 

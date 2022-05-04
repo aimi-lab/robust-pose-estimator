@@ -44,7 +44,7 @@ def forward_project2image(
     assert len(img_shape) == 2
     ipts = forward_project(opts, kmat, rmat, tvec)
     # filter points that are not in the image
-    valid = (ipts[1] < img_shape[0]-1) & (ipts[0] < img_shape[1]-1) & (ipts[1] >= 0) & (ipts[0] >= 0)
+    valid = (ipts[1] < img_shape[0]) & (ipts[0] < img_shape[1]) & (ipts[1] >= 0) & (ipts[0] >= 0)
     return ipts, valid
 
 
