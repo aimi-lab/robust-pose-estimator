@@ -73,7 +73,7 @@ class SurfelMap(object):
             dept = torch.nn.functional.interpolate(dept, scale_factor=self.upscale, mode='bilinear', align_corners=None)
 
         # prepare image and object coordinates
-        ipts = create_img_coords_t(y=self.img_shape[-2]*self.upscale, x=self.img_shape[-1]*self.upscale)
+        ipts = create_img_coords_t(y=self.img_shape[-2]*self.upscale, x=self.img_shape[-1]*self.upscale).to(dept.dtype).to(dept.device)
         opts = reverse_project(ipts=ipts, dpth=dept, rmat=self.pmat[:3, :3], tvec=self.pmat[:3, -1][..., None], kmat=self.kmat)
 
         # update normals (if necessary)

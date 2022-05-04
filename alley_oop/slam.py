@@ -13,10 +13,10 @@ class SLAM(object):
     def __init__(self, intrinsics, config):
         super().__init__()
         self.scene = None
-        self.pose_estimator = PyramidPoseEstimator(intrinsics=intrinsics, config=config)
         self.device = intrinsics.device
-        self.dtype = torch.float64
+        self.dtype = torch.float32
         self.intrinsics = intrinsics.to(self.dtype)
+        self.pose_estimator = PyramidPoseEstimator(intrinsics=self.intrinsics, config=config)
         self.cnt = 0
         self.rendered_frame = None
         self.frame = None
