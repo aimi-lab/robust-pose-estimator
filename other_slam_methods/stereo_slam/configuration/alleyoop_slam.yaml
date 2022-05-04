@@ -1,0 +1,30 @@
+slam:
+  pyramid_levels: 3
+  rot:
+    n_iter: 50
+    Ftol: 1.0e-3
+  icp_weight: 0.0000001
+  n_iter:
+    - 12
+    - 13
+    - 20
+  Ftol:
+    - 1.0e-5
+    - 1.0e-5
+    - 1.0e-5
+
+img_size:
+  - 640
+  - 512
+
+sample: 60
+
+depth_clipping:
+  - 0
+  - 300 # in mm
+
+viewer:
+  enable: True
+  show: True
+  matches: True
+  view_synthesis: True
