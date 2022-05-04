@@ -189,7 +189,7 @@ class SurfelMap(object):
         # duplicates = oidx[bins>1]
         #
         # kidx = torch.ones(self.opts[:, vidx].shape[1], dtype=bool)
-        # # TODO vectorize for-loop
+        # # TODO vectorize for-loop , this is too slow, I had to comment it out for the moment
         # for d in duplicates:
         #     # 3. confidence constraint
         #     if torch.sum(candidates == torch.min(candidates)) > 1:
