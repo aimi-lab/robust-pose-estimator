@@ -6,6 +6,7 @@ from alley_oop.pose.frame_class import FrameClass
 from typing import Union
 from numpy import ndarray
 from torch import tensor
+import cv2
 
 
 class SLAM(object):
@@ -27,7 +28,7 @@ class SLAM(object):
             self.frame = FrameClass(img, depth, intrinsics=self.intrinsics) #ToDo support mask
             if self.scene is None:
                 # initialize scene with first frame
-                self.scene = DummyMap(dept=self.frame.depth, kmat=self.intrinsics, normals=self.frame.normals.view(3,-1),
+                self.scene = SurfelMap(dept=self.frame.depth, kmat=self.intrinsics, normals=self.frame.normals.view(3,-1),
                                        gray=self.frame.img_gray.view(1, -1), img_shape=self.frame.shape)
             pose, self.rendered_frame = self.pose_estimator.estimate(self.frame, self.scene)
             if self.cnt > 0:
@@ -37,7 +38,8 @@ class SLAM(object):
 
     def _pre_process(self, img:ndarray, depth:ndarray, mask:ndarray=None):
         img = (torch.tensor(img).permute(2,0,1).unsqueeze(0)/255.0).to(self.dtype).to(self.device)
-        depth = (torch.tensor(depth.astype(float)).unsqueeze(0).unsqueeze(0)).to(self.dtype).to(self.device)
+        depth = cv2.bilateralFilter(depth, None, sigmaColor=10, sigmaSpace=10)
+        depth = (torch.tensor(depth).unsqueeze(0).unsqueeze(0)).to(self.dtype).to(self.device)
         if mask is not None:
             mask = (torch.tensor(mask).unsqueeze(0).unsqueeze(0)).to(self.dtype).to(self.device)
         return img, depth, mask
