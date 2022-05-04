@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import warnings
 from alley_oop.geometry.lie_3d import lie_se3_to_SE3
-from alley_oop.geometry.pinhole_transforms import forward_project
+from alley_oop.geometry.pinhole_transforms import forward_project2image
 from alley_oop.pose.frame_class import FrameClass
 from alley_oop.fusion.surfel_map import SurfelMap
 from alley_oop.utils.pytorch import batched_dot_product
@@ -120,10 +120,9 @@ class ICPEstimator(torch.nn.Module):
         tvec = extrinsics[:3, 3, None]
         pts_h = torch.vstack([target_pcl.opts, torch.ones(target_pcl.opts.shape[1],
                                                            device=target_pcl.opts.device, dtype=target_pcl.opts.dtype)])
-        points_2d = forward_project(pts_h, self.intrinsics, rmat=rmat, tvec=tvec).T
-
+        points_2d, valid = forward_project2image(pts_h, self.intrinsics, img_shape=self.img_shape, rmat=rmat, tvec=tvec)
+        points_2d = points_2d.T
         # filter points that are not in the image
-        valid = (points_2d[:, 1] < self.img_shape[0]) & (points_2d[:, 0] < self.img_shape[1]) & (points_2d[:, 1] > 0) & (points_2d[:, 0] > 0)
         if mask is not None:
             valid[valid.clone()] &= (mask[points_2d[valid][:,1].long(),points_2d[valid][:,0].long()]).type(torch.bool)
 

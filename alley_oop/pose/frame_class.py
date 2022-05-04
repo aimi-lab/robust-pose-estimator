@@ -59,3 +59,9 @@ class FrameClass:
         ax[1].imshow(self.img_gray.cpu().squeeze(0).permute(1, 2, 0).numpy())
         ax[2].imshow(self.depth.cpu().squeeze(0).permute(1, 2, 0).numpy())
         plt.show()
+
+    def to_numpy(self):
+        img = self.img.detach().cpu().permute(0,2,3,1).squeeze().numpy()
+        img_gray = self.img_gray.detach().cpu().squeeze().numpy()
+        depth = self.depth.detach().cpu().squeeze().numpy()
+        return img, img_gray, depth

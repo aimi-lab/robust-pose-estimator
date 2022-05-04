@@ -1,8 +1,9 @@
 import torch
 from typing import Union
 
-from alley_oop.geometry.pinhole_transforms import forward_project, reverse_project, create_img_coords_t
+from alley_oop.geometry.pinhole_transforms import forward_project2image, reverse_project, create_img_coords_t, forward_project
 from alley_oop.interpol.img_mappings import img_map_torch
+from alley_oop.interpol.sparse_img_interpolation import SparseImgInterpolator
 from alley_oop.geometry.normals import normals_from_regular_grid
 from alley_oop.utils.pytorch import batched_dot_product
 from alley_oop.pose.frame_class import FrameClass
@@ -29,6 +30,7 @@ class SurfelMap(object):
         self.img_shape = kwargs['img_shape'] if 'img_shape' in kwargs else None
         self.upscale = kwargs['upscale'] if 'upscale' in kwargs else 4
         self.dbug_opt = False
+        self.interpolate = SparseImgInterpolator(5, 2, 0)
 
 
         # calculate object points
@@ -182,7 +184,7 @@ class SurfelMap(object):
 
         # parameter init
         vidx = torch.ones(self.opts.shape[1], dtype=bool) if vidx is None else vidx
-        normals = torch.ones(self.opts.shape)
+        normals = torch.ones_like(self.opts) if normals is None else normals
         angle_threshold = torch.cos(torch.tensor(n_thresh)/180*torch.pi)
 
         # identify duplicates 
@@ -253,11 +255,18 @@ class SurfelMap(object):
 
         # rotate, translate and forward-project points
         pts_h = torch.vstack([self.opts, torch.ones(self.opts.shape[1], dtype=self.opts.dtype, device=self.device)])
-        npts = forward_project(pts_h, kmat=intrinsics, rmat=extrinsics[:3, :3],
-                               tvec=extrinsics[:3, -1][..., None], inhomogenize_opt=True)
-        depth = img_map_torch(img=self.opts[2].view((1, 1, *self.img_shape)), npts=npts, mode='bilinear').view((1, 1, *self.img_shape))
-        colors = img_map_torch(img=self.gray.view((1, 1, *self.img_shape)), npts=npts, mode='bilinear').view((1, 1, *self.img_shape))
+        npts, valid = forward_project2image(pts_h, img_shape=self.img_shape, kmat=intrinsics, rmat=extrinsics[:3, :3],
+                               tvec=extrinsics[:3, -1][..., None])
 
+        # generate sparse img maps and interpolate missing values
+        img_coords = npts[1, valid].long(), npts[0, valid].long()
+        depth = torch.nan*torch.ones(self.img_shape, dtype=self.opts.dtype, device=self.device)
+        depth[img_coords] = self.opts[2, valid]
+        depth = self.interpolate(depth[None,None,...])
+
+        colors = torch.nan*torch.ones(self.img_shape, dtype=self.opts.dtype, device=self.device)
+        colors[img_coords] = self.gray[0, valid]
+        colors = self.interpolate(colors[None,None,...])
         return FrameClass(colors, depth, intrinsics=intrinsics).to(intrinsics.device)
 
     def pcl2open3d(self):
@@ -265,7 +274,7 @@ class SurfelMap(object):
         pcd = open3d.geometry.PointCloud()
         #pcd.normals = open3d.utility.Vector3dVector(self.nrml.cpu().numpy())
         pcd.points = open3d.utility.Vector3dVector(self.opts.T.cpu().numpy())
-        rgb = self.gray.unsqueeze(1).repeat((1,3))
+        rgb = self.gray.repeat((3,1)).T
         pcd.colors = open3d.utility.Vector3dVector(rgb.cpu().numpy())
         return pcd
 
@@ -277,4 +286,5 @@ class SurfelMap(object):
         self.opts = self.opts.to(d)
         self.pmat = self.pmat.to(d)
         self.device = self.opts.device
+        self.interpolate = self.interpolate.to(d)
         return self
