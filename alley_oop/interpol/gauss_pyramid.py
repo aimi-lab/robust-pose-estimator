@@ -8,7 +8,7 @@ class GaussPyramid(torch.nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__()
 
-        self.dtype = torch.float64
+        self.dtype = torch.float32
 
         self._level_num = kwargs['level_num'] if 'level_num' in kwargs else 2
         self._kernel_size = kwargs['kernel_size'] if 'kernel_size' in kwargs else 5
@@ -85,7 +85,7 @@ class FrameGaussPyramid(GaussPyramid):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.dtype = torch.float64
+        self.dtype = torch.float32
         self._top_level_frame = kwargs['frame'] if 'frame' in kwargs else None
         self.level_frame = []
 
