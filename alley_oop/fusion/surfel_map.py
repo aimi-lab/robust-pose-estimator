@@ -91,7 +91,7 @@ class SurfelMap(object):
         normals = pmat[:3, :3] @ normals
 
         # project all surfels to current image frame
-        global_ipts = forward_project(self.opts, kmat=kmat, rmat=pmat_inv[:3, :3], tvec=pmat_inv[:3, -1][:, None]) #Todo check if forward is ok
+        global_ipts = forward_project(self.opts, kmat=kmat, rmat=pmat_inv[:3, :3], tvec=pmat_inv[:3, -1][:, None])
         bidx = (global_ipts[0, :] >= 0) & (global_ipts[1, :] >= 0) & (global_ipts[0, :] < self.img_shape[1]*self.upscale-1) & (global_ipts[1, :] < self.img_shape[0]*self.upscale-1)
 
         # find correspondence by projecting surfels to current frame
