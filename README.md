@@ -19,3 +19,8 @@ if the above install script is not used, submodules can be loaded manually by
 
 - image ```torch.Tensor``` dimensions: N x C x H x W
 - point array/tensor dimensions: 3 x M
+
+## Run Alley-OOP SLAM
+
+    cd scripts
+    python alleyoop_get_trajectory.py path/to/input/folder
