@@ -271,12 +271,13 @@ class SurfelMap(object):
         img_coords = npts[1, valid].long(), npts[0, valid].long()
         depth = torch.nan*torch.ones(self.img_shape, dtype=self.opts.dtype, device=self.device)
         depth[img_coords] = self.opts[2, valid]
+        mask = ~torch.isnan(depth[None,None,...]).to(depth.device)
         depth = self.interpolate(depth[None,None,...])
 
         colors = torch.nan*torch.ones(self.img_shape, dtype=self.opts.dtype, device=self.device)
         colors[img_coords] = self.gray[0, valid]
         colors = self.interpolate(colors[None,None,...])
-        return FrameClass(colors, depth, intrinsics=intrinsics).to(intrinsics.device)
+        return FrameClass(colors, depth, intrinsics=intrinsics, mask=mask).to(intrinsics.device)
 
     def pcl2open3d(self, stable=True):
         import open3d
