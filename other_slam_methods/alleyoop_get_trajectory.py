@@ -37,7 +37,7 @@ def main(input_path, output_path, config, force_cpu, nsamples):
 
         rect = StereoRectifier(calib_file, img_size_new=config['img_size'])
         calib = rect.get_rectified_calib()
-        viewer = Viewer3D(config['img_size']) if config['viewer']['enable'] else None
+        viewer = Viewer3D((2*config['img_size'][0], 2*config['img_size'][1]), blocking=config['viewer']['blocking']) if config['viewer']['enable'] else None
 
         try:
             dataset = RGBDDataset(input_path, calib['bf'], img_size=calib['img_size'])
@@ -69,7 +69,7 @@ def main(input_path, output_path, config, force_cpu, nsamples):
                 config['slam']['kinematics'] = 'fuse'
             pose, scene = slam.processFrame(limg, depth)
             if viewer is not None:
-                viewer(pose, scene.pcl2open3d(), frame=slam.get_frame(), synth_frame=slam.get_rendered_frame())
+                viewer(pose, scene.pcl2open3d(stable=False), frame=slam.get_frame(), synth_frame=slam.get_rendered_frame())
             trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number, 'residual': 0.0, 'key_frame': True})
             if len(trajectory) > nsamples:
                 break
