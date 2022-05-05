@@ -1,6 +1,5 @@
 import torch
 from alley_oop.fusion.surfel_map import SurfelMap
-from alley_oop.fusion.dummy_map import DummyMap
 from alley_oop.pose.pyramid_pose_estimator import PyramidPoseEstimator
 from alley_oop.pose.frame_class import FrameClass
 from typing import Union
