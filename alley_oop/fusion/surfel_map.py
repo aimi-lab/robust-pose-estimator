@@ -203,7 +203,6 @@ class SurfelMap(object):
         valid = torch.abs(opts[2, midx] - self.opts[2, vidx]) < d_thresh
         # 2. normals constraint (20 degrees threshold)
         valid &= batched_dot_product(normals[:, midx].T, self.nrml[:, vidx].T) > angle_threshold
-        print(valid.float().mean())
         # update indicies
         vidx[vidx.clone()] &= valid
         midx = midx[valid]

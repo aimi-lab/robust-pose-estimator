@@ -44,7 +44,6 @@ class SLAM(object):
             pose, self.rendered_frame = self.pose_estimator.estimate(self.frame, self.scene)
             if self.cnt > 0:
                 self.scene.fuse(self.frame.depth, self.frame.img_gray, self.frame.normals, pose)
-                print(self.scene.opts.shape[1])
             self.cnt += 1
             return pose, self.scene
 
