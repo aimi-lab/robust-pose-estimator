@@ -20,12 +20,13 @@ class SLAM(object):
         self.cnt = 0
         self.rendered_frame = None
         self.frame = None
+        self.depth_clipping = config['depth_clipping']
 
     def processFrame(self, img: Union[ndarray, tensor], depth:Union[ndarray, tensor], mask:Union[ndarray, tensor]=None):
         with torch.no_grad():
             if not torch.is_tensor(img):
                 img, depth, mask = self._pre_process(img, depth, mask)
-            self.frame = FrameClass(img, depth, intrinsics=self.intrinsics) #ToDo support mask
+            self.frame = FrameClass(img, depth, intrinsics=self.intrinsics, mask=mask)
             if self.scene is None:
                 # initialize scene with first frame
                 self.scene = SurfelMap(dept=self.frame.depth, kmat=self.intrinsics, normals=self.frame.normals.view(3,-1),
@@ -33,6 +34,7 @@ class SLAM(object):
             pose, self.rendered_frame = self.pose_estimator.estimate(self.frame, self.scene)
             if self.cnt > 0:
                 self.scene.fuse(self.frame.depth, self.frame.img_gray, self.frame.normals, pose)
+                print(self.scene.opts.shape[1])
             self.cnt += 1
             return pose, self.scene
 
@@ -40,8 +42,13 @@ class SLAM(object):
         img = (torch.tensor(img).permute(2,0,1).unsqueeze(0)/255.0).to(self.dtype).to(self.device)
         depth = cv2.bilateralFilter(depth, None, sigmaColor=10, sigmaSpace=10)
         depth = (torch.tensor(depth).unsqueeze(0).unsqueeze(0)).to(self.dtype).to(self.device)
-        if mask is not None:
+        if mask is None:
+            mask = torch.ones_like(depth).to(torch.bool)
+        else:
             mask = (torch.tensor(mask).unsqueeze(0).unsqueeze(0)).to(self.dtype).to(self.device)
+        # depth clipping
+        mask &= (depth > self.depth_clipping[0]) & (depth < self.depth_clipping[1])
+
         return img, depth, mask
 
     def to(self, device: torch.device):

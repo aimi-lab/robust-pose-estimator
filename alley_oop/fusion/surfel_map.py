@@ -23,6 +23,7 @@ class SurfelMap(object):
         dept = kwargs['dept'] if 'dept' in kwargs else torch.Tensor()
         self.device = self.opts.device if self.opts.numel() > 0 else dept.device
         dtype = self.opts.dtype if self.opts.numel() > 0 else dept.dtype
+        mask = kwargs['mask'] if 'mask' in kwargs else torch.ones_like(dept).to(torch.bool)
         self.gray = kwargs['gray'] if 'gray' in kwargs else torch.Tensor().to(self.device)
         self.pmat = kwargs['pmat'] if 'pmat' in kwargs else torch.eye(4, dtype=dtype, device=self.device)  # extrinsics
         self.kmat = kwargs['kmat'] if 'kmat' in kwargs else torch.eye(3, dtype=dtype, device=self.device)     # intrinsics
@@ -41,7 +42,7 @@ class SurfelMap(object):
             ipts = create_img_coords_t(y=self.img_shape[-2], x=self.img_shape[-1]).to(self.device).to(dtype)
             self.opts = reverse_project(ipts=ipts, kmat=self.kmat, rmat=self.pmat[:3,:3],
                                         tvec=self.pmat[:3,3][..., None],
-                                        dpth=dept.reshape(self.img_shape))
+                                        dpth=dept.reshape(self.img_shape))[:, mask.view(-1)]
         elif dept.numel() == 0 and self.opts.numel() > 0 and self.radi.numel() == 0 and self.img_shape is not None:
             # rotate, translate and forward-project points
             dept = self.render().depth
@@ -52,7 +53,7 @@ class SurfelMap(object):
         # initialize radii
         if self.radi.numel() == 0:
             if dept.numel() > 0 and self.nrml.numel() == 3*dept.numel():
-                self.radi = ((dept.view(-1)) / (self.flen* 2**.5 * abs(self.nrml[2,:]))).unsqueeze(0)
+                self.radi = ((dept.view(-1)) / (self.flen* 2**.5 * abs(self.nrml[2,:]))).unsqueeze(0)[:, mask.view(-1)]
             elif self.opts.numel() > 0:
                 self.radi = torch.ones((1, self.opts.shape[1])).to(self.device)
 
@@ -66,16 +67,20 @@ class SurfelMap(object):
         self.tick = 0
         self.t_created = torch.zeros(1,self.opts.shape[1]).to(self.device)
 
-    def fuse(self, dept: torch.Tensor, gray: torch.Tensor, normals: torch.Tensor, pmat: torch.Tensor):
+    def fuse(self, dept: torch.Tensor, gray: torch.Tensor, normals: torch.Tensor, pmat: torch.Tensor, mask: torch.Tensor=None):
         
         # update image shape
         self.img_shape = gray.shape[-2:] if self.img_shape is None else self.img_shape
         pmat_inv = torch.linalg.inv(pmat)
         kmat = self.kmat.clone()
+        if mask is None:
+            mask = torch.ones_like(dept).to(torch.bool)
+
         if self.upscale > 1:
             # consider upsampling
             gray = torch.nn.functional.interpolate(gray, scale_factor=self.upscale, mode='bilinear', align_corners=None)
             dept = torch.nn.functional.interpolate(dept, scale_factor=self.upscale, mode='bilinear', align_corners=None)
+            mask = torch.nn.functional.interpolate(mask.float(), scale_factor=self.upscale, mode='nearest', align_corners=None).to(torch.bool)
             kmat[:2] *= self.upscale
 
         # prepare image and object coordinates
@@ -87,9 +92,10 @@ class SurfelMap(object):
         if normals is None or self.upscale > 1:
             normals = normals_from_regular_grid(opts.T.reshape((self.img_shape[0]*self.upscale, self.img_shape[1]*self.upscale, 3)), pad_opt=True).T
 
+        opts = opts[:, mask.view(-1)]
         # enforce channel x samples shape
-        gray = gray.flatten()[None, :]
-        normals = normals.reshape(3, -1)
+        gray = gray.flatten()[None, mask.view(-1)]
+        normals = normals.reshape(3, -1)[:, mask.view(-1)]
         # rotate image normals to world-coordinates
         normals = pmat[:3, :3] @ normals
 
@@ -179,8 +185,8 @@ class SurfelMap(object):
         midx: torch.Tensor,
         vidx: torch.Tensor = None,
         normals: torch.Tensor = None,
-        d_thresh: float = 2,
-        n_thresh: float = 30,
+        d_thresh: float = 3,
+        n_thresh: float = 89,
         ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         yields mask for a unique correspondence assignment to exclude points mapping to the same 2-D pixel location
@@ -196,6 +202,7 @@ class SurfelMap(object):
         valid = torch.abs(opts[2, midx] - self.opts[2, vidx]) < d_thresh
         # 2. normals constraint (20 degrees threshold)
         valid &= batched_dot_product(normals[:, midx].T, self.nrml[:, vidx].T) > angle_threshold
+        print(valid.float().mean())
         # update indicies
         vidx[vidx.clone()] &= valid
         midx = midx[valid]
