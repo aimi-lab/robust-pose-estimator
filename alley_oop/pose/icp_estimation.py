@@ -124,7 +124,7 @@ class ICPEstimator(torch.nn.Module):
         points_2d = points_2d.T
         # filter points that are not in the image
         if src_mask is not None:
-            valid[valid.clone()] &= (src_mask[points_2d[valid][:, 1].long(), points_2d[valid][:, 0].long()]).type(torch.bool)
+            valid[valid.clone()] &= (src_mask.squeeze()[points_2d[valid][:, 1].long(), points_2d[valid][:, 0].long()]).type(torch.bool)
 
         # filter points that are too far in 3d space, or that have a large angle between the normals
         ids = points_2d.long()[valid][:, 1], points_2d.long()[valid][:, 0]

@@ -43,34 +43,38 @@ class RGBPoseEstimator(torch.nn.Module):
     def cost_fun(residuals):
         return (residuals**2).mean()
 
-    def residual_fun(self, x, ref_img, ref_pcl, trg_img, trg_mask=None): #ToDo add src_mask
+    def residual_fun(self, x, ref_img, ref_pcl, trg_img, trg_mask=None, src_mask=None):
         x = torch.tensor(x, dtype=ref_img.dtype, device=ref_img.device) if not torch.is_tensor(x) else x
         T_est = lie_se3_to_SE3(x)
         self.warped_img, self.valid = self._warp_img(ref_img, ref_pcl, T_est)
         residuals = self.warped_img - trg_img.view(-1)[self.valid]
-        if trg_mask is not None:
-            residuals = residuals[trg_mask.view(-1)[self.valid]]
+        mask = trg_mask if trg_mask is not None else src_mask
+        if mask is not None:
+            mask = mask & src_mask if src_mask is not None else mask
+            residuals = residuals[mask.view(-1)[self.valid]]
         return residuals
 
-    def jacobian(self, x, ref_img, ref_pcl, trg_img, trg_mask=None):
+    def jacobian(self, x, ref_img, ref_pcl, trg_img, trg_mask=None, src_mask=None):
         J_img = self._image_jacobian(trg_img).squeeze()
         J = J_img.unsqueeze(1) @ self.j_wt(ref_pcl.opts.T)
         J = J[self.valid]
-        if trg_mask is not None:
-            J = J[trg_mask.view(-1)[self.valid]]
+        mask = trg_mask if trg_mask is not None else src_mask
+        if mask is not None:
+            mask = mask & src_mask if src_mask is not None else mask
+            J = J[mask.view(-1)[self.valid]]
         return J.squeeze()
 
-    def estimate_lm(self, ref_frame: FrameClass, target_frame: FrameClass, trg_mask: torch.Tensor=None):
+    def estimate_lm(self, ref_frame: FrameClass, target_frame: FrameClass):
         """ Levenberg-Marquard estimation."""
         ref_pcl = SurfelMap(dept=ref_frame.depth, kmat=self.intrinsics, normals=ref_frame.normals.view(3, -1),
                             img_shape=self.img_shape)
         x_list, eps = lsq_lma(torch.zeros(6).to(ref_frame.depth.device).to(ref_frame.depth.dtype),
                               self.residual_fun, self.jacobian,
-                              args=(ref_frame.img_gray, ref_pcl, target_frame.img_gray, trg_mask,),
+                              args=(ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask,),
                               max_iter=self.n_iter, tol=self.Ftol, xtol=self.xtol)
 
         x = x_list[-1]
-        cost = self.cost_fun(self.residual_fun(x, ref_frame.img_gray, ref_pcl, target_frame.img_gray, trg_mask))
+        cost = self.cost_fun(self.residual_fun(x, ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask))
         return lie_se3_to_SE3(x), cost
 
     def plot(self, x, ref_img, ref_depth, target_img):

@@ -39,8 +39,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
         self.Ftol = Ftol
         self.xtol = xtol
 
-    def estimate_gn(self, ref_frame: FrameClass, target_frame: FrameClass, target_pcl:SurfelMap,
-                    ref_mask: torch.tensor=None, target_mask: torch.tensor=None, init_pose: torch.Tensor=None):
+    def estimate_gn(self, ref_frame: FrameClass, target_frame: FrameClass, target_pcl:SurfelMap, init_pose: torch.Tensor=None):
         """ Minimize combined energy using Gauss-Newton and solving the normal equations."""
         ref_pcl = SurfelMap(dept=ref_frame.depth, kmat=self.icp_estimator.intrinsics, normals=ref_frame.normals.view(3, -1),
                             img_shape=self.icp_estimator.img_shape)
@@ -51,11 +50,11 @@ class RGBICPPoseEstimator(torch.nn.Module):
         converged = False
         for i in range(self.n_iter):
             # geometric
-            icp_residuals = self.icp_estimator.residual_fun(x, ref_pcl, target_pcl, ref_mask)
-            icp_jacobian = self.icp_estimator.jacobian(x, ref_pcl, target_pcl, ref_mask)
+            icp_residuals = self.icp_estimator.residual_fun(x, ref_pcl, target_pcl, ref_frame.mask)
+            icp_jacobian = self.icp_estimator.jacobian(x, ref_pcl, target_pcl, ref_frame.mask)
             # photometric
-            rgb_residuals = self.rgb_estimator.residual_fun(x, ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_mask)
-            rgb_jacobian = self.rgb_estimator.jacobian(x, ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_mask)
+            rgb_residuals = self.rgb_estimator.residual_fun(x, ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
+            rgb_jacobian = self.rgb_estimator.jacobian(x, ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
 
             # normal equations to be solved
             A = self.icp_weight*icp_jacobian.T @ icp_jacobian + rgb_jacobian.T @ rgb_jacobian

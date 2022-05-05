@@ -9,7 +9,8 @@ class FrameClass:
     """
         Class containing image, depth and normals
     """
-    def __init__(self, img: torch.Tensor, depth: torch.Tensor, normals: torch.Tensor=None, intrinsics: torch.Tensor=None):
+    def __init__(self, img: torch.Tensor, depth: torch.Tensor, normals: torch.Tensor=None,
+                 intrinsics: torch.Tensor=None, mask: torch.Tensor=None):
         """
 
         :param img: RGB image in range (0, 1) with shape Nx3xHxW or gray-scale Nx1xHxW
@@ -25,6 +26,10 @@ class FrameClass:
             self.img_gray = rgb2gray_t(self.img, ax0=1).contiguous()
         else:
             self.img_gray = self.img
+
+        if mask is None:
+            mask = torch.ones_like(self.img_gray, dtype=torch.bool)
+        self.mask = mask
         self.depth = depth.contiguous()
 
         if normals is not None:
@@ -46,6 +51,7 @@ class FrameClass:
         self.img_gray = self.img_gray.to(dev_or_type)
         self.depth = self.depth.to(dev_or_type)
         self.normals = self.normals.to(dev_or_type)
+        self.mask = self.mask.to(dev_or_type)
         return self
 
     @property
@@ -54,14 +60,19 @@ class FrameClass:
 
     def plot(self):
         import matplotlib.pyplot as plt
-        fig, ax = plt.subplots(1,3)
-        ax[0].imshow(self.img.cpu().squeeze(0).permute(1,2,0).numpy())
-        ax[1].imshow(self.img_gray.cpu().squeeze(0).permute(1, 2, 0).numpy())
-        ax[2].imshow(self.depth.cpu().squeeze(0).permute(1, 2, 0).numpy())
+        fig, ax = plt.subplots(1,4)
+        img, img_gray, depth, mask = self.to_numpy()
+        ax[0].imshow(img)
+        ax[1].imshow(img_gray)
+        ax[2].imshow(depth)
+        ax[3].imshow(mask)
+        for a in ax:
+            a.axis('off')
         plt.show()
 
     def to_numpy(self):
         img = self.img.detach().cpu().permute(0,2,3,1).squeeze().numpy()
         img_gray = self.img_gray.detach().cpu().squeeze().numpy()
         depth = self.depth.detach().cpu().squeeze().numpy()
-        return img, img_gray, depth
+        mask = self.mask.detach().cpu().squeeze().numpy()
+        return img, img_gray, depth, mask
