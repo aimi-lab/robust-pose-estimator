@@ -1,26 +1,29 @@
 slam:
-  pyramid_levels: 1
+  pyramid_levels: 3
   rot:
     n_iter: 0
     Ftol: 1.0e-4
-  icp_weight: 0.0000001
+  icp_weight: 0.0001
   n_iter:
-    - 50
+    - 5
+    - 5
+    - 5
   Ftol:
-    - 1.0e-5
+    - 1.0e-4
+    - 1.0e-4
+    - 1.0e-4
+  depth_clipping:
+    - 0
+    - 300 # in mm
 
 img_size:
-  - 640
-  - 512
+  - 320
+  - 256
 
-sample: 60
 
-depth_clipping:
-  - 0
-  - 300 # in mm
+
 
 viewer:
   enable: True
-  show: True
-  matches: True
-  view_synthesis: True
+  blocking: False
+  stable: False
