@@ -25,27 +25,27 @@ class RGBICPPoseEstimatorTester(unittest.TestCase):
         disparity = cv2.imread(str(Path.cwd() / 'tests' / 'test_data' / '000000l.pfm'), cv2.IMREAD_UNCHANGED)
         h, w = (int(disparity.shape[0]/scale), int(disparity.shape[1]/scale))
         disparity = cv2.resize(disparity, (w, h))/scale
-        depth = torch.tensor(4289.756 / disparity).double()
+        depth = torch.tensor(4289.756 / disparity)
         img = torch.tensor(cv2.resize(cv2.imread(str(Path.cwd() / 'tests' / 'test_data' / '000000l.png')),
                                        (w, h))).float() / 255.0
 
         # generate dummy intrinsics and dummy images
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        R_true = torch.tensor(R.from_euler('xyz', (0.0, 2.0, 20.0), degrees=True).as_matrix()).double()
-        t_true = torch.tensor([0.0, 5.0, 30.0]).double()
-        T_true = torch.eye(4).double()
+        R_true = torch.tensor(R.from_euler('xyz', (0.0, 2.0, 20.0), degrees=True).as_matrix())
+        t_true = torch.tensor([0.0, 5.0, 30.0])
+        T_true = torch.eye(4)
         T_true[:3, :3] = R_true
         T_true[:3, 3] = t_true
         intrinsics = torch.tensor([[1035.3/scale, 0, 596.955/scale],
                                    [0, 1035.3/scale, 488.41/scale],
-                                   [0, 0, 1]]).double()
+                                   [0, 0, 1]])
         img = img.permute(2, 0, 1).unsqueeze(0)
-        ref_frame = FrameClass(img.double(), depth.unsqueeze(0).unsqueeze(0), intrinsics=intrinsics)
+        ref_frame = FrameClass(img, depth.unsqueeze(0).unsqueeze(0), intrinsics=intrinsics)
         target_img = synth_view(ref_frame.img.float(), ref_frame.depth.float(), R_true.float(),
                                 t_true.unsqueeze(1).float(), intrinsics.float())
         mask = (target_img[0, 0] != 0)
-        target_frame = FrameClass(target_img.double(), depth.unsqueeze(0).unsqueeze(0), intrinsics=intrinsics)
+        target_frame = FrameClass(target_img, depth.unsqueeze(0).unsqueeze(0), intrinsics=intrinsics)
         ref_pcl = SurfelMap(dept=ref_frame.depth, kmat=intrinsics, normals=ref_frame.normals.view(3,-1), img_shape=ref_frame.shape)
         target_pcl = ref_pcl.transform_cpy(T_true)
 

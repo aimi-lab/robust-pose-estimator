@@ -36,7 +36,7 @@ class IcpEstimationTester(unittest.TestCase):
         # generate dummy intrinsics and dummy images
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        R_true = torch.tensor(R.from_euler('xyz', (0.0, 1.0, 2.0), degrees=True).as_matrix()).double()
+        R_true = torch.tensor(R.from_euler('xyz', (0.0, 0.0, 2.0), degrees=True).as_matrix()).double()
         t_true = torch.tensor([0, 0.0, 3.0]).double()
         T_true = torch.eye(4).double()
         T_true[:3, :3] = R_true

@@ -36,24 +36,24 @@ class PyramidPoseEstimatorTester(unittest.TestCase):
             # background is very far, make it appear closer
             rand_background = 17 + 6 * np.random.rand(int((disparity < 20).sum()))
             disparity[disparity < 20] = rand_background
-            depth = torch.tensor(1050.0 / disparity).double()
+            depth = torch.tensor(1050.0 / disparity)
             img = torch.tensor(
                 cv2.cvtColor(cv2.resize(cv2.imread(str(Path.cwd() / 'tests' / 'test_data' / '0006.png')),
                                         (w, h)), cv2.COLOR_RGB2BGR)).float() / 255.0
 
             # generate dummy intrinsics and dummy images
-            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            device = torch.device('cpu')
 
-            R_true = torch.tensor(R.from_euler('xyz', (0.0, 2.0, 5.0), degrees=True).as_matrix()).double()
-            t_true = torch.tensor([0.0, 1.0, 3.0]).double()
-            T_true = torch.eye(4).double()
+            R_true = torch.tensor(R.from_euler('xyz', (0.0, 1.0, 2.0), degrees=True).as_matrix())
+            t_true = torch.tensor([0.0, 1.0, 3.0])
+            T_true = torch.eye(4)
             T_true[:3, :3] = R_true
             T_true[:3, 3] = t_true
             intrinsics = torch.tensor([[1050.0 / scale, 0, 479.5 / scale],
                                        [0, 1050.0 / scale, 269.5 / scale],
-                                       [0, 0, 1]]).double()
+                                       [0, 0, 1]])
             img = img.permute(2, 0, 1).unsqueeze(0)
-            ref_frame = FrameClass(img.double(), depth.unsqueeze(0).unsqueeze(0), intrinsics=intrinsics)
+            ref_frame = FrameClass(img, depth.unsqueeze(0).unsqueeze(0), intrinsics=intrinsics)
 
             ref_pcl = SurfelMap(dept=ref_frame.depth, kmat=intrinsics, normals=ref_frame.normals.view(3,-1), gray=ref_frame.img_gray.view(1, -1),
                                 img_shape=ref_frame.shape)

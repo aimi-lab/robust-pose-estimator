@@ -49,10 +49,10 @@ class RGBEstimatorTester(unittest.TestCase):
         target_img = synth_view(frame1.img.float(), frame1.depth.float(), R_true.float(),
                           t_true.unsqueeze(1).float(), intrinsics.float())
         mask = (target_img[0,0] != 0)
-        frame2 = FrameClass(target_img.double(), depth.unsqueeze(0).unsqueeze(0), intrinsics=intrinsics)
+        frame2 = FrameClass(target_img.double(), depth.unsqueeze(0).unsqueeze(0), intrinsics=intrinsics, mask=mask)
         estimator = RGBPoseEstimator(img.shape[-2:], intrinsics).to(device)
         with torch.no_grad():
-            T, cost = estimator.estimate_lm(frame1.to(device), frame2.to(device), trg_mask=mask.to(device))
+            T, cost = estimator.estimate_lm(frame1.to(device), frame2.to(device))
         # assertion
         self.assertTrue(np.allclose(T[:3,:3].cpu(), R_true.cpu(), atol=1e-1))
         self.assertTrue(np.allclose(T[:3,3].cpu(), t_true.cpu(), atol=5))
