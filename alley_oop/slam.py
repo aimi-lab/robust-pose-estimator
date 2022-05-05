@@ -9,7 +9,12 @@ import cv2
 
 
 class SLAM(object):
-    def __init__(self, intrinsics, config):
+    def __init__(self, intrinsics:torch.tensor, config:dict):
+        """
+        Alley-OOP SLAM (imitation of ElasticFusion)
+        :param intrinsics: camera intrinsics tensor
+        :param config: configuration dictionary
+        """
         super().__init__()
         self.scene = None
         self.device = intrinsics.device
@@ -22,6 +27,12 @@ class SLAM(object):
         self.depth_clipping = config['depth_clipping']
 
     def processFrame(self, img: Union[ndarray, tensor], depth:Union[ndarray, tensor], mask:Union[ndarray, tensor]=None):
+        """
+        track frame and fuse points to SurfelMap
+        :param img: RGB input image
+        :param depth: input depth map
+        :param mask: input mask (to mask out tools)
+        """
         with torch.no_grad():
             if not torch.is_tensor(img):
                 img, depth, mask = self._pre_process(img, depth, mask)
