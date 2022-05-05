@@ -25,7 +25,7 @@ class PyramidPoseEstimator(torch.nn.Module):
 
     def estimate(self, frame: FrameClass, model: SurfelMap):
         # transform model to last camera pose coordinates
-        model = model.transform_cpy(self.last_pose)
+        model = model.transform_cpy(torch.linalg.inv(self.last_pose))
         # apply gaussian pyramid to current and rendered images
         frame_pyr, intrinsics_pyr = self.pyramid(frame)
         model_frame = None
@@ -48,7 +48,7 @@ class PyramidPoseEstimator(torch.nn.Module):
                                                      self.config['Ftol'][pyr_level]).to(self.device)
                 T_last2cur, *_ = pose_estimator.estimate_gn(frame_pyr[pyr_level], model_frame_pyr[pyr_level], model, init_pose=T_last2cur)
                 #self.plot(T_last2cur, frame, model, self.pyramid._top_instrinsics)
-            pose = self.last_pose @ T_last2cur
+            pose = self.last_pose @ torch.linalg.inv(T_last2cur)
             self.last_pose.data = pose
         self.last_frame_pyr = frame_pyr
         return self.last_pose, model_frame
