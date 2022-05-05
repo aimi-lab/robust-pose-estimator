@@ -283,9 +283,12 @@ class SurfelMap(object):
         import open3d
         pcd = open3d.geometry.PointCloud()
         #pcd.normals = open3d.utility.Vector3dVector(self.nrml.cpu().numpy())
-        stable = (self.conf > self.conf_thr).squeeze()
-        pcd.points = open3d.utility.Vector3dVector(self.opts.T[stable].cpu().numpy())
-        rgb = self.gray.repeat((3,1)).T[stable]
+        if stable:
+            stable_pts = (self.conf > self.conf_thr).squeeze()
+        else:
+            stable_pts = torch.ones_like(self.conf, dtype=torch.bool).squeeze()
+        pcd.points = open3d.utility.Vector3dVector(self.opts.T[stable_pts].cpu().numpy())
+        rgb = self.gray.repeat((3,1)).T[stable_pts]
         pcd.colors = open3d.utility.Vector3dVector(rgb.cpu().numpy())
         return pcd
 
