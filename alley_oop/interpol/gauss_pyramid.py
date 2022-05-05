@@ -115,4 +115,7 @@ class FrameGaussPyramid(GaussPyramid):
         return levels
 
     def create_next_level_mask(self, x: torch.Tensor) -> torch.Tensor:
-        return (-max_pool2d(-x.float(), kernel_size=self._ds_step, stride=self._ds_step)).to(torch.bool)
+        # max-pooling for mask decimation to not loose mask information
+        # check padding for input with odd-shape
+        padding = (x.shape[-2]%2, x.shape[-1]%2)
+        return (-max_pool2d(-x.float(), kernel_size=self._ds_step, stride=self._ds_step, padding=padding)).to(torch.bool)
