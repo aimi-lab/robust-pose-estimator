@@ -65,7 +65,8 @@ class SurfelMap(object):
 
         # intialize tick as timestamp
         self.tick = 0
-        self.t_created = torch.zeros(1,self.opts.shape[1]).to(self.device)
+        if self.opts.numel() > 0:
+            self.t_created = torch.zeros(1,self.opts.shape[1]).to(self.device)
 
     def fuse(self, dept: torch.Tensor, gray: torch.Tensor, normals: torch.Tensor, pmat: torch.Tensor, mask: torch.Tensor=None):
         
@@ -186,7 +187,7 @@ class SurfelMap(object):
         vidx: torch.Tensor = None,
         normals: torch.Tensor = None,
         d_thresh: float = 3,
-        n_thresh: float = 89,
+        n_thresh: float = 30,
         ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         yields mask for a unique correspondence assignment to exclude points mapping to the same 2-D pixel location
