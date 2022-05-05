@@ -241,12 +241,20 @@ class SurfelMap(object):
 
     ########################
 
-    def transform(self, transform):
+    def transform(self, transform:torch.tensor):
+        """
+        transform surfels (3d points and normals) inplace
+        :param transform: 4x4 homogenous transform
+        """
         assert transform.shape == (4,4)
         self.opts = transform[:3,:3]@self.opts + transform[:3,3,None]
         self.nrml = transform[:3,:3] @ self.nrml
 
-    def transform_cpy(self, transform):
+    def transform_cpy(self, transform:torch.tensor):
+        """
+        transform surfels (3d points and normals) and return a copy
+        :param transform: 4x4 homogenous transform
+        """
         assert transform.shape == (4, 4)
         opts = transform[:3,:3]@self.opts + transform[:3,3,None]
         normals = transform[:3,:3] @ self.nrml
@@ -264,7 +272,11 @@ class SurfelMap(object):
         return self.nrml.T.view((*self.img_shape, 3))
 
     def render(self, intrinsics: torch.tensor=None, extrinsics: torch.tensor=None):
-        ####
+        """
+        render frame (image, depth and mask) from surfel-map
+        :param intrinsics: camera intrinsics
+        :param extrinsics: camera extrinsics
+        """
         if intrinsics is None:
             intrinsics = self.kmat
         if extrinsics is None:
@@ -287,10 +299,13 @@ class SurfelMap(object):
         colors = self.interpolate(colors[None,None,...])
         return FrameClass(colors, depth, intrinsics=intrinsics, mask=mask).to(intrinsics.device)
 
-    def pcl2open3d(self, stable=True):
+    def pcl2open3d(self, stable: bool=True):
+        """
+        convert SurfelMap points to open3D PointCloud object for visualization
+        :param stable: if True return only stable surfels
+        """
         import open3d
         pcd = open3d.geometry.PointCloud()
-        #pcd.normals = open3d.utility.Vector3dVector(self.nrml.cpu().numpy())
         if stable:
             stable_pts = (self.conf > self.conf_thr).squeeze()
         else:
