@@ -33,7 +33,7 @@ class SLAM(object):
         :param depth: input depth map
         :param mask: input mask (to mask out tools)
         """
-        with torch.no_grad():
+        with torch.inference_mode():
             if not torch.is_tensor(img):
                 img, depth, mask = self._pre_process(img, depth, mask)
             self.frame = FrameClass(img, depth, intrinsics=self.intrinsics, mask=mask)
