@@ -3,13 +3,23 @@ from torch.nn.functional import conv2d, pad
 
 
 class SparseImgInterpolator(torch.nn.Module):
-    def __init__(self, kernel_size, sigma, prior_val):
+    """ Interpolate 2D tensor with sparse missing values"""
+    def __init__(self, kernel_size: int, sigma: float, prior_val: float=0.0):
+        """
+        :param kernel_size: size of interpolation kernel
+        :param sigma: sigma of Gauss interpolation kernel
+        :param prior_val: prior value to fill missing values prior to interpolation
+        """
         super().__init__()
         self.prior_val = prior_val
         self.kernel = torch.nn.Parameter(self.gauss_2d(kernel_size, sigma))
         self._kernel_size = kernel_size
 
-    def forward(self, x):
+    def forward(self, x:torch.tensor):
+        """
+
+        :param x: 2D tensor shape NxCxHxW with nan as missing values
+        """
         mask = torch.isnan(x).to(x.device)
         x[mask] = self.prior_val
         channels = x.shape[1]
