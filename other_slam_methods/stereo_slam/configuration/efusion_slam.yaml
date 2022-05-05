@@ -1,5 +1,5 @@
 slam:
-  kinematics: 'fuse' # fuse, none, replace
+  kinematics: 'none' # fuse, none, replace
 
 img_size:
   - 640

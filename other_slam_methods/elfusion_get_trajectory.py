@@ -65,7 +65,9 @@ def main(input_path, output_path, config, force_cpu, nsamples):
             diff_pose = np.eye(4)
             config['slam']['kinematics'] = 'fuse'
         #if (i == 0) & (viewer is not None): viewer.set_reference(limg, depth)
-        pose= slam.processFrame(limg, depth.astype(np.uint16), (mask == 0).astype(np.uint8), img_number, diff_pose, config['slam']['kinematics'] == 'fuse')
+        if mask is None:
+            mask = np.ones_like(depth)
+        pose= slam.processFrame(limg, depth.astype(np.uint16),(mask == 0).astype(np.uint8) , img_number, diff_pose, config['slam']['kinematics'] == 'fuse')
         trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number, 'residual': 0.0, 'key_frame': True})
         if len(trajectory) > nsamples:
             break
