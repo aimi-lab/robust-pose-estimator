@@ -44,7 +44,12 @@ class FrameClass:
             normals = normals_from_regular_grid(pts.view((*self.depth.shape[-2:], 3)))
             # pad normals
             pad = torch.nn.ReplicationPad2d((0, 1, 0, 1))
-            self.normals = pad(normals.permute(2, 1, 0)).contiguous()
+            self.normals = pad(normals.permute(2, 0, 1)).contiguous().unsqueeze(0)
+
+        assert self.img.shape[-2:] == self.img_gray.shape[-2:]
+        assert self.img.shape[-2:] == self.depth.shape[-2:]
+        assert self.img.shape[-2:] == self.mask.shape[-2:]
+        assert self.img.shape[-2:] == self.normals.shape[-2:]
 
     def to(self, dev_or_type: Union[torch.device, torch.dtype]):
         self.img = self.img.to(dev_or_type)
