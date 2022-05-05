@@ -65,7 +65,7 @@ class FrameClass:
         ax[0].imshow(img)
         ax[1].imshow(img_gray)
         ax[2].imshow(depth)
-        ax[3].imshow(mask)
+        ax[3].imshow(mask, vmin=0, vmax=1)
         for a in ax:
             a.axis('off')
         plt.show()

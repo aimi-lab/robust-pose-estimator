@@ -1,5 +1,5 @@
 import torch
-from torch.nn.functional import conv2d, pad
+from torch.nn.functional import conv2d, pad, max_pool2d
 from typing import List
 from alley_oop.pose.frame_class import FrameClass
 
@@ -115,4 +115,4 @@ class FrameGaussPyramid(GaussPyramid):
         return levels
 
     def create_next_level_mask(self, x: torch.Tensor) -> torch.Tensor:
-        return x[..., 0::self._ds_step, 0::self._ds_step]
+        return (-max_pool2d(-x.float(), kernel_size=self._ds_step, stride=self._ds_step)).to(torch.bool)
