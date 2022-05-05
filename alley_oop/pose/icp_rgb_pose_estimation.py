@@ -48,6 +48,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
             x = lie_SE3_to_se3(init_pose)
         cost = None
         converged = False
+        best_sol = (x.clone(), torch.inf)
         for i in range(self.n_iter):
             # geometric
             icp_residuals = self.icp_estimator.residual_fun(x, ref_pcl, target_pcl, ref_frame.mask)
@@ -68,6 +69,8 @@ class RGBICPPoseEstimator(torch.nn.Module):
             #self.icp_estimator.plot(x, ref_pcl, target_pcl)
 
             cost = self.icp_weight*self.icp_estimator.cost_fun(icp_residuals) + self.rgb_estimator.cost_fun(rgb_residuals)
+            if cost < best_sol[1]:
+                best_sol = (x.clone(), cost)
             if cost < self.Ftol:
                 converged = True
                 break
@@ -77,5 +80,4 @@ class RGBICPPoseEstimator(torch.nn.Module):
             x -= x0
         if not converged:
             warnings.warn(f"not converged after {self.n_iter}", RuntimeWarning)
-
-        return lie_se3_to_SE3(x), cost
+        return lie_se3_to_SE3(best_sol[0]), best_sol[1]
