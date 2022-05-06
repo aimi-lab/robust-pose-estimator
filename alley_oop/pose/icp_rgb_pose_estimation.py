@@ -38,6 +38,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
         self.n_iter = n_iter
         self.Ftol = Ftol
         self.xtol = xtol
+        self.best_cost = (0,0,0)
 
     def estimate_gn(self, ref_frame: FrameClass, target_frame: FrameClass, target_pcl:SurfelMap, init_pose: torch.Tensor=None):
         """ Minimize combined energy using Gauss-Newton and solving the normal equations."""
@@ -67,10 +68,12 @@ class RGBICPPoseEstimator(torch.nn.Module):
             #self.rgb_estimator.plot(x, ref_img, ref_depth, target_img)
             #self.icp_estimator.plot_correspondence(x, ref_img, ref_depth, target_img)
             #self.icp_estimator.plot(x, ref_pcl, target_pcl)
-
-            cost = self.icp_weight*self.icp_estimator.cost_fun(icp_residuals) + self.rgb_estimator.cost_fun(rgb_residuals)
+            icp_cost = self.icp_estimator.cost_fun(icp_residuals)
+            rgb_cost = self.rgb_estimator.cost_fun(rgb_residuals)
+            cost = self.icp_weight*icp_cost + rgb_cost
             if cost < best_sol[1]:
                 best_sol = (x.clone(), cost)
+                self.best_cost = (cost, self.icp_weight*icp_cost, rgb_cost)
             if cost < self.Ftol:
                 converged = True
                 break

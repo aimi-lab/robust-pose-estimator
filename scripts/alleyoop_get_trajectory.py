@@ -77,6 +77,7 @@ def main(input_path, output_path, config, force_cpu, nsamples):
         with open(os.path.join(output_path, 'trajectory.json'), 'w') as f:
             json.dump(trajectory, f)
         pcl = slam.getPointCloud()
+        slam.plot_recordings(show=True)
         if pcl is not None:
             save_ply(*pcl, os.path.join(output_path, 'map.ply'))
             print(pcl[0].shape)

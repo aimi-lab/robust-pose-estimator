@@ -22,6 +22,7 @@ class PyramidPoseEstimator(torch.nn.Module):
         self.config = config
         self.last_frame_pyr = None
         self.last_pose = torch.nn.Parameter(torch.eye(4, dtype=intrinsics.dtype))
+        self.cost = config['pyramid_levels']*[0]
 
     def estimate(self, frame: FrameClass, model: SurfelMap):
         # transform model to last camera pose coordinates
@@ -46,7 +47,8 @@ class PyramidPoseEstimator(torch.nn.Module):
                                                      self.config['icp_weight'],
                                                      self.config['n_iter'][pyr_level],
                                                      self.config['Ftol'][pyr_level]).to(self.device)
-                T_last2cur, *_ = pose_estimator.estimate_gn(frame_pyr[pyr_level], model_frame_pyr[pyr_level], model, init_pose=T_last2cur)
+                T_last2cur, _ = pose_estimator.estimate_gn(frame_pyr[pyr_level], model_frame_pyr[pyr_level], model, init_pose=T_last2cur)
+                self.cost[pyr_level] = pose_estimator.best_cost
                 #self.plot(T_last2cur, frame, model, self.pyramid._top_instrinsics)
             pose = self.last_pose @ torch.linalg.inv(T_last2cur)
             self.last_pose.data = pose
