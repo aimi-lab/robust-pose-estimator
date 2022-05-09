@@ -140,15 +140,23 @@ class ICPEstimator(torch.nn.Module):
             print("valid ratio:", self.trg_ids.float().mean())
         print("accuracy: ", (np.abs(src_pcl.grid_pts[self.src_grid_ids][:,0]- src_pcl.opts[:, self.trg_ids][:,0]) == 0).float().mean())
 
-    @staticmethod
-    def dist_association(src_pcl: SurfelMap, target_pcl: SurfelMap, mask: torch.tensor=None):
+    def dist_association(self, src_pcl: SurfelMap, target_pcl: SurfelMap, T_est: torch.tensor, src_mask: torch.tensor=None):
         """ closest 3d euclidean distance association"""
 
-        from scipy.spatial import KDTree
-        #ToDo add masking, support direct torch
-        tree = KDTree(target_pcl.opts.T.numpy())
-        closest_pts = tree.query(src_pcl.opts.T.numpy())[1]
-        ids = torch.meshgrid(torch.arange(src_pcl.grid_shape[0]), torch.arange(src_pcl.grid_shape[1]))
-        ids = (ids[0].reshape(-1), ids[1].reshape(-1))
-        valid = torch.tensor(closest_pts)
-        return ids, valid
+        # update image shape
+        src_pcl = src_pcl.transform_cpy(T_est)
+        pmat_inv = torch.linalg.inv(T_est)
+
+        # project all surfels to current image frame
+        global_ipts, bidx = forward_project2image(target_pcl.opts, kmat=self.intrinsics, rmat=pmat_inv[:3, :3],
+                                                  tvec=pmat_inv[:3, -1][:, None], img_shape=self.img_shape)
+
+        dists = torch.cdist(src_pcl.opts.T.unsqueeze(0), target_pcl.opts.T[bidx].unsqueeze(0)).squeeze()
+        closest_pts = torch.argmin(dists, dim=-1)
+        midx = torch.arange(src_pcl.opts.shape[1]).to(src_pcl.device)
+        if src_mask is not None:
+            pass
+
+        vidx = torch.zeros_like(midx).to(torch.bool)
+        vidx[closest_pts] = True
+        return midx, vidx
