@@ -46,7 +46,8 @@ class PyramidPoseEstimator(torch.nn.Module):
                 pose_estimator = RGBICPPoseEstimator(frame_pyr[pyr_level].shape, intrinsics_pyr[pyr_level],
                                                      self.config['icp_weight'],
                                                      self.config['n_iter'][pyr_level],
-                                                     self.config['Ftol'][pyr_level]).to(self.device)
+                                                     self.config['Ftol'][pyr_level],
+                                                     association_mode=self.config['mode'][pyr_level]).to(self.device)
                 T_last2cur, _ = pose_estimator.estimate_gn(frame_pyr[pyr_level], model_frame_pyr[pyr_level], model, init_pose=T_last2cur)
                 self.cost[pyr_level] = pose_estimator.best_cost
                 #self.plot(T_last2cur, frame, model, self.pyramid._top_instrinsics)

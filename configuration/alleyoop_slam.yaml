@@ -1,9 +1,9 @@
 slam:
   pyramid_levels: 3
   rot:
-    n_iter: 0
+    n_iter: 10
     Ftol: 1.0e-4
-  icp_weight: 0.0001
+  icp_weight: 0.01
   n_iter:
     - 5
     - 5
@@ -12,9 +12,14 @@ slam:
     - 1.0e-4
     - 1.0e-4
     - 1.0e-4
+  mode:
+    - 'projective'
+    - 'projective'
+    - 'euclidean'
   depth_clipping:
     - 0
     - 300 # in mm
+  debug: False
 
 img_size:
   - 320
@@ -24,6 +29,6 @@ img_size:
 
 
 viewer:
-  enable: True
-  blocking: False
+  enable: False
+  blocking: True
   stable: False

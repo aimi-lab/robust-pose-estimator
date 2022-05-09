@@ -148,15 +148,13 @@ class ICPEstimator(torch.nn.Module):
         pmat_inv = torch.linalg.inv(T_est)
 
         # project all surfels to current image frame
-        global_ipts, bidx = forward_project2image(target_pcl.opts, kmat=self.intrinsics, rmat=pmat_inv[:3, :3],
-                                                  tvec=pmat_inv[:3, -1][:, None], img_shape=self.img_shape)
+        #global_ipts, bidx = forward_project2image(target_pcl.opts, kmat=self.intrinsics, rmat=pmat_inv[:3, :3],
+        #                                          tvec=pmat_inv[:3, -1][:, None], img_shape=self.img_shape)
 
-        dists = torch.cdist(src_pcl.opts.T.unsqueeze(0), target_pcl.opts.T[bidx].unsqueeze(0)).squeeze()
+        dists = torch.cdist(src_pcl.opts.T.unsqueeze(0), target_pcl.opts.T.unsqueeze(0)).squeeze()
         closest_pts = torch.argmin(dists, dim=-1)
         midx = torch.arange(src_pcl.opts.shape[1]).to(src_pcl.device)
         if src_mask is not None:
             pass
 
-        vidx = torch.zeros_like(midx).to(torch.bool)
-        vidx[closest_pts] = True
-        return midx, vidx
+        return midx, closest_pts
