@@ -170,13 +170,16 @@ class SurfelMap(object):
     def get_match_indices(
         self,
         ipts: torch.Tensor = None,
+        upscale: int = None
         ) -> torch.Tensor:
 
+        if upscale is None:
+            upscale = self.upscale
         # quantize points (while considering super-sampling factor)
         ipts_quantized = torch.round((ipts-.5))
 
         # get point correspondence from indexing as flattened 2D indices
-        midx = ipts_quantized[1, :] * self.img_shape[1] * self.upscale + ipts_quantized[0, :]
+        midx = ipts_quantized[1, :] * self.img_shape[1] * upscale + ipts_quantized[0, :]
 
         return midx.long()
 
