@@ -308,8 +308,9 @@ class SurfelMap(object):
         else:
             stable_pts = torch.ones_like(self.conf, dtype=torch.bool).squeeze()
         pcd.points = open3d.utility.Vector3dVector(self.opts.T[stable_pts].cpu().numpy())
-        rgb = self.gray.repeat((3,1)).T[stable_pts]
-        pcd.colors = open3d.utility.Vector3dVector(rgb.cpu().numpy())
+        if self.gray.numel() > 0:
+            rgb = self.gray.repeat((3,1)).T[stable_pts]
+            pcd.colors = open3d.utility.Vector3dVector(rgb.cpu().numpy())
         return pcd
 
     def to(self, d: Union[torch.device, torch.dtype]):
