@@ -206,7 +206,7 @@ class SurfelMap(object):
         # 1. depth distance constraint
         valid = torch.abs(opts[2, midx] - self.opts[2, vidx]) < d_thresh
         # 2. normals constraint (20 degrees threshold)
-        valid &= batched_dot_product(normals[:, midx].T, self.nrml[:, vidx].T) > angle_threshold
+        valid &= torch.abs(batched_dot_product(normals[:, midx].T, self.nrml[:, vidx].T)) > angle_threshold
         # update indicies
         vidx[vidx.clone()] &= valid
         midx = midx[valid]
