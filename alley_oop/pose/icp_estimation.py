@@ -19,7 +19,7 @@ class ICPEstimator(torch.nn.Module):
 """
 
     def __init__(self, img_shape: Tuple, intrinsics: torch.Tensor, n_iter: int=20, Ftol: float=0.001, xtol: float=1e-8,
-                 dist_thr: float=200.0/15, normal_thr: float=0.94, association_mode='projective'):
+                 dist_thr: float=200.0/15, normal_thr: float=30, association_mode='projective'):
         """
 
         :param img_shape: height and width of images to process
@@ -130,7 +130,8 @@ class ICPEstimator(torch.nn.Module):
 
         # compute that rejects correspondences for a single unique one
         vidx, midx = target_pcl.get_unique_correspondence_mask(opts=src_pcl.opts, vidx=bidx, midx=midx,
-                                                               normals=src_pcl.normals)
+                                                               normals=src_pcl.normals, d_thresh=self.dist_thr,
+                                                               n_thresh=self.normal_thr)
 
         return midx, vidx
 
