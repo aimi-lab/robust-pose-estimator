@@ -191,6 +191,7 @@ class SurfelMap(object):
         normals: torch.Tensor = None,
         d_thresh: float = 3,
         n_thresh: float = 30,
+        remove_duplicates: bool = False
         ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         yields mask for a unique correspondence assignment to exclude points mapping to the same 2-D pixel location
@@ -210,28 +211,22 @@ class SurfelMap(object):
         vidx[vidx.clone()] &= valid
         midx = midx[valid]
 
-        # # identify duplicates
-        # oidx, bins = torch.unique(midx, sorted=False, return_counts=True)
-        # duplicates = oidx[bins>1]
-        #
-        # kidx = torch.ones(self.opts[:, vidx].shape[1], dtype=bool)
-        # # TODO vectorize for-loop , this is too slow, I had to comment it out for the moment
-        # for d in duplicates:
-        #     # 3. confidence constraint
-        #     if torch.sum(candidates == torch.min(candidates)) > 1:
-        #         candidates = self.conf[:, vidx][:, midx == d]
-        #     # 4. euclidean distance constraint (if necessary)
-        #     if torch.sum(candidates == torch.min(candidates)) > 1:
-        #         candidates = torch.sum((opts[:, d][:, None] - self.opts[:, vidx][:, midx == d])**2, dim=0)**.5
-        #     # pick first element if there is no unique candidate
-        #     if torch.sum(candidates == torch.min(candidates)) > 1:
-        #         candidates = torch.arange(len(candidates))
-        #     mask = torch.ones(self.opts[:, vidx].shape[1], dtype=bool)
-        #     mask[torch.where(midx==d)[0][torch.argmin(candidates.long())]] = False
-        #     kidx[(midx == d) & mask] = 0
-        #
-        # return kidx
-        return vidx, midx
+        if remove_duplicates:
+            # identify duplicates
+            oidx, inv_idx, bins = torch.unique(midx, sorted=False, return_counts=True, return_inverse=True)
+            duplicates = oidx[bins>1]
+            candidate_mask = torch.ones_like(midx).to(torch.bool)
+            kidx = vidx.clone()
+            # TODO vectorize for-loop , this is too slow, I had to comment it out for the moment
+            for d in duplicates:
+                candidates = midx == d
+                candidates &= ~(self.conf[:,vidx] == torch.max(self.conf[:,vidx][:,candidates])).squeeze()
+                kidx[vidx] &= ~candidates
+                candidate_mask &= ~candidates
+            midx = midx[candidate_mask]
+        else:
+            kidx = vidx
+        return kidx, midx
 
     @property
     def normals(self):
