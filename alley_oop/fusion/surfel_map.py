@@ -3,7 +3,6 @@ from torch.nn.functional import max_pool2d
 from typing import Union, Tuple
 
 from alley_oop.geometry.pinhole_transforms import forward_project2image, reverse_project, create_img_coords_t, forward_project
-from alley_oop.interpol.img_mappings import img_map_torch
 from alley_oop.interpol.sparse_img_interpolation import SparseImgInterpolator
 from alley_oop.geometry.normals import normals_from_regular_grid
 from alley_oop.utils.pytorch import batched_dot_product
@@ -86,6 +85,7 @@ class SurfelMap(object):
 
         # prepare image and object coordinates
         ipts = create_img_coords_t(y=self.img_shape[-2]*self.upscale, x=self.img_shape[-1]*self.upscale).to(dept.dtype).to(dept.device)
+        
         # project depth to 3d-points in world coordinates
         opts = reverse_project(ipts=ipts, dpth=dept, rmat=pmat[:3, :3], tvec=pmat[:3, -1][..., None], kmat=kmat)
 
@@ -93,10 +93,11 @@ class SurfelMap(object):
         if normals is None or self.upscale > 1:
             normals = normals_from_regular_grid(opts.T.reshape((self.img_shape[0]*self.upscale, self.img_shape[1]*self.upscale, 3)), pad_opt=True).T
 
+        # consider masked surfels and enforce channel x samples shape
         opts = opts[:, mask.view(-1)]
-        # enforce channel x samples shape
         gray = gray.flatten()[None, mask.view(-1)]
         normals = normals.reshape(3, -1)[:, mask.view(-1)]
+
         # rotate image normals to world-coordinates
         normals = pmat[:3, :3] @ normals
 
@@ -123,7 +124,7 @@ class SurfelMap(object):
         # update existing points, intensities, normals, radii and confidences
         conf_idx = self.conf[:, vidx]
         self.opts[:, vidx] = (conf_idx*self.opts[:, vidx] + ccor*ocor) / (conf_idx + ccor)
-        self.gray[:, vidx] = (conf_idx*self.gray[:, vidx]+ ccor*gcor) / (conf_idx + ccor)
+        self.gray[:, vidx] = (conf_idx*self.gray[:, vidx] + ccor*gcor) / (conf_idx + ccor)
         self.radi[:, vidx] = (conf_idx*self.radi[:, vidx] + ccor*rcor) / (conf_idx + ccor)
         self.nrml[:, vidx] = (conf_idx*self.nrml[:, vidx] + ccor*ncor) / (conf_idx + ccor)
         self.conf[:, vidx] = conf_idx + ccor
@@ -140,7 +141,6 @@ class SurfelMap(object):
             print(ratio)
 
         # concatenate unmatched points, intensities, normals, radii and confidences
-
         self.opts = torch.cat((self.opts, self._downsample(opts)[:, mask]), dim=-1)
         self.gray = torch.cat((self.gray, self._downsample(gray)[:, mask]), dim=-1)
         self.radi = torch.cat((self.radi, self._downsample(radi)[:, mask]), dim=-1)
