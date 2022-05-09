@@ -99,7 +99,7 @@ class SurfelMapTest(unittest.TestCase):
             mlab_rgbd(tpts, colors=timg, size=.025, show_opt=True, fig=fig)
 
         # initialize surfel map
-        surf_map = SurfelMap(opts=self.global_opts, dept=self.global_dept, gray=self.global_gray, normals=self.global_nrml, pmat=torch.eye(4), kmat=self.kmat, upscale=1)
+        surf_map = SurfelMap(opts=self.global_opts, dept=self.global_dept, gray=self.global_gray, normals=self.global_nrml, pmat=torch.eye(4), kmat=self.kmat, upscale=4)
         
         # pass image dimensions and intrinsics
         surf_map.img_shape = self.target_gray.shape[-2:]
@@ -129,7 +129,6 @@ class SurfelMapTest(unittest.TestCase):
         point_num = surf_map.opts.shape[1]
         surf_map.fuse(dept=self.target_dept, gray=self.target_gray, normals=self.target_nrml, pmat=torch.eye(4))
         self.assertTrue(surf_map.opts.shape[1] < point_num*1.01, 'Number of surfel map points changed when passing known frame')
-
         self.assertTrue(surf_map.tick == 2, 'Tick index deviates')
 
         if self.plot_opt:
