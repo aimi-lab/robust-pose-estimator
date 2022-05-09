@@ -105,10 +105,10 @@ class SurfelMap(object):
         global_ipts = forward_project(self.opts, kmat=kmat, rmat=pmat_inv[:3, :3], tvec=pmat_inv[:3, -1][:, None])
         bidx = (global_ipts[0, :] >= 0) & (global_ipts[1, :] >= 0) & (global_ipts[0, :] < self.img_shape[1]*self.upscale-1) & (global_ipts[1, :] < self.img_shape[0]*self.upscale-1)
 
-        # find correspondence by projecting surfels to current frame
+        # get correspondence by assigning projected points to image coordinates
         midx = self.get_match_indices(global_ipts[:, bidx])
 
-        # compute that rejects correspondences for a single unique one
+        # compute mask that rejects correspondences for a single unique one
         vidx, midx = self.get_unique_correspondence_mask(opts=opts, vidx=bidx, midx=midx, normals=normals)
 
         # compute radii
@@ -118,15 +118,15 @@ class SurfelMap(object):
         gamma = opts[2, :]/torch.max(opts[2, :])
         conf = torch.exp(-.5 * gamma**2 / .6**2)[None, :]
 
-        # select corresponding elements
-        ocor, ncor, gcor, rcor, ccor = opts[:, midx], normals[:, midx], gray[:, midx], radi[:, midx], conf[:, midx]
+        # pre-select confidence elements
+        ccor = conf[:, midx]
+        conf_idx = self.conf[:, vidx]
 
         # update existing points, intensities, normals, radii and confidences
-        conf_idx = self.conf[:, vidx]
-        self.opts[:, vidx] = (conf_idx*self.opts[:, vidx] + ccor*ocor) / (conf_idx + ccor)
-        self.gray[:, vidx] = (conf_idx*self.gray[:, vidx] + ccor*gcor) / (conf_idx + ccor)
-        self.radi[:, vidx] = (conf_idx*self.radi[:, vidx] + ccor*rcor) / (conf_idx + ccor)
-        self.nrml[:, vidx] = (conf_idx*self.nrml[:, vidx] + ccor*ncor) / (conf_idx + ccor)
+        self.opts[:, vidx] = (conf_idx*self.opts[:, vidx] + ccor*opts[:, midx]) / (conf_idx + ccor)
+        self.gray[:, vidx] = (conf_idx*self.gray[:, vidx] + ccor*gray[:, midx]) / (conf_idx + ccor)
+        self.radi[:, vidx] = (conf_idx*self.radi[:, vidx] + ccor*radi[:, midx]) / (conf_idx + ccor)
+        self.nrml[:, vidx] = (conf_idx*self.nrml[:, vidx] + ccor*normals[:, midx]) / (conf_idx + ccor)
         self.conf[:, vidx] = conf_idx + ccor
 
         # create mask identifying unmatched indices
@@ -201,7 +201,7 @@ class SurfelMap(object):
         # filter candidate correspondences
         # 1. depth distance constraint
         valid = torch.abs(opts[2, midx] - self.opts[2, vidx]) < d_thresh
-        # 2. normals constraint (20 degrees threshold)
+        # 2. normals constraint (degrees threshold)
         valid &= batched_dot_product(normals[:, midx].T, self.nrml[:, vidx].T) > angle_threshold
         # update indicies
         vidx[vidx.clone()] &= valid
