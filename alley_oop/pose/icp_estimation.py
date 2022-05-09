@@ -81,7 +81,7 @@ class ICPEstimator(torch.nn.Module):
         return lie_se3_to_SE3(x), cost
 
     def plot(self, x, ref_pcl, target_pcl, downsample=1):
-        ref_pcl = ref_pcl.transform_cpy(lie_se3_to_SE3(x[:3], x[3:], homogenous=True))
+        ref_pcl = ref_pcl.transform_cpy(lie_se3_to_SE3(x))
         ref_pts = ref_pcl.opts.T.cpu().numpy()
         trg_pts = target_pcl.opts.T.cpu().numpy()
 
@@ -93,7 +93,7 @@ class ICPEstimator(torch.nn.Module):
         ax.scatter(ref_pts[::downsample, 0], ref_pts[::downsample, 1], ref_pts[::downsample, 2], c='b')
         ax.scatter(trg_pts[::downsample, 0], trg_pts[::downsample, 1], trg_pts[::downsample, 2], c='r')
         # plot point connection
-        for a, b in zip(ref_pcl.grid_pts[self.src_grid_ids].cpu().numpy()[::downsample],
+        for a, b in zip(ref_pcl.opts.T[self.src_ids].cpu().numpy()[::downsample],
                         target_pcl.opts.T[self.trg_ids].cpu().numpy()[::downsample]):
             ax.plot(np.array((a[0], b[0])), np.array((a[1], b[1])), np.array((a[2], b[2])), ':', color='c', linewidth=0.5)
         plt.show()
