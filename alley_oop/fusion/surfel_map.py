@@ -69,12 +69,11 @@ class SurfelMap(object):
 
     def fuse(self, dept: torch.Tensor, gray: torch.Tensor, normals: torch.Tensor, pmat: torch.Tensor, mask: torch.Tensor=None):
         
-        # update image shape
+        # prepare parameters
         self.img_shape = gray.shape[-2:] if self.img_shape is None else self.img_shape
         pmat_inv = torch.linalg.inv(pmat)
         kmat = self.kmat.clone()
-        if mask is None:
-            mask = torch.ones_like(dept).to(torch.bool)
+        mask = torch.ones_like(dept).to(torch.bool) if mask is None else mask
 
         if self.upscale > 1:
             # consider upsampling
@@ -108,7 +107,7 @@ class SurfelMap(object):
         # get correspondence by assigning projected points to image coordinates
         midx = self.get_match_indices(global_ipts[:, bidx])
 
-        # compute mask that rejects correspondences
+        # compute mask that rejects depth and normal outliers
         vidx, midx = self.filter_surfels_by_correspondence(opts=opts, vidx=bidx, midx=midx, normals=normals)
 
         # compute radii
@@ -149,6 +148,8 @@ class SurfelMap(object):
         self.t_created = torch.cat((self.t_created, self.tick*torch.ones(1, mask.sum()).to(self.device)), dim=-1)
 
         self.tick = self.tick + 1
+
+        # remove surfels
         self.remove_surfels_by_confidence_and_time()
 
     def remove_surfels_by_confidence_and_time(self):
@@ -161,7 +162,6 @@ class SurfelMap(object):
         self.nrml = self.nrml[:, ok_pts]
         self.conf = self.conf[:, ok_pts]
         self.t_created = self.t_created[:, ok_pts]
-
 
     def _downsample(self, x):
         x = x.view(-1, self.img_shape[0] * self.upscale, self.img_shape[1] * self.upscale)
