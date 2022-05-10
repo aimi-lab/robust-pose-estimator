@@ -108,8 +108,8 @@ class SurfelMap(object):
         # get correspondence by assigning projected points to image coordinates
         midx = self.get_match_indices(global_ipts[:, bidx])
 
-        # compute mask that rejects correspondences for a single unique one
-        vidx, midx = self.get_unique_correspondence_mask(opts=opts, vidx=bidx, midx=midx, normals=normals)
+        # compute mask that rejects correspondences
+        vidx, midx = self.filter_surfels_by_correspondence(opts=opts, vidx=bidx, midx=midx, normals=normals)
 
         # compute radii
         radi = (opts[2, :] * 2**.5) / (self.flen * abs(normals[2, :]))[None, :]
@@ -181,7 +181,7 @@ class SurfelMap(object):
 
         return midx.long()
 
-    def get_unique_correspondence_mask(
+    def filter_surfels_by_correspondence(
         self,
         opts: torch.Tensor,
         midx: torch.Tensor,
@@ -191,7 +191,7 @@ class SurfelMap(object):
         n_thresh: float = 30,
         ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        yields mask for a unique correspondence assignment to exclude points mapping to the same 2-D pixel location
+        filter correspondences by depth and normal angle
         """
 
         # parameter init
@@ -199,37 +199,62 @@ class SurfelMap(object):
         normals = torch.ones_like(self.opts) if normals is None else normals
         angle_threshold = torch.cos(torch.tensor(n_thresh)/180*torch.pi)
 
-        # filter candidate correspondences
         # 1. depth distance constraint
         valid = torch.abs(opts[2, midx] - self.opts[2, vidx]) < d_thresh
+
         # 2. normals constraint (degrees threshold)
         valid &= batched_dot_product(normals[:, midx].T, self.nrml[:, vidx].T) > angle_threshold
-        # update indicies
+
+        # combine constraints and update indices
         vidx[vidx.clone()] &= valid
         midx = midx[valid]
 
-        # # identify duplicates
-        # oidx, bins = torch.unique(midx, sorted=False, return_counts=True)
-        # duplicates = oidx[bins>1]
-        #
-        # kidx = torch.ones(self.opts[:, vidx].shape[1], dtype=bool)
-        # # TODO vectorize for-loop , this is too slow, I had to comment it out for the moment
-        # for d in duplicates:
-        #     # 3. confidence constraint
-        #     if torch.sum(candidates == torch.min(candidates)) > 1:
-        #         candidates = self.conf[:, vidx][:, midx == d]
-        #     # 4. euclidean distance constraint (if necessary)
-        #     if torch.sum(candidates == torch.min(candidates)) > 1:
-        #         candidates = torch.sum((opts[:, d][:, None] - self.opts[:, vidx][:, midx == d])**2, dim=0)**.5
-        #     # pick first element if there is no unique candidate
-        #     if torch.sum(candidates == torch.min(candidates)) > 1:
-        #         candidates = torch.arange(len(candidates))
-        #     mask = torch.ones(self.opts[:, vidx].shape[1], dtype=bool)
-        #     mask[torch.where(midx==d)[0][torch.argmin(candidates.long())]] = False
-        #     kidx[(midx == d) & mask] = 0
-        #
-        # return kidx
         return vidx, midx
+
+    def get_unique_correspondence_mask(
+        self,
+        opts: torch.Tensor,
+        midx: torch.Tensor,
+        vidx: torch.Tensor = None,
+        normals: torch.Tensor = None,
+        d_thresh: float = 1,
+        n_thresh: float = 20,
+        ) -> torch.Tensor:
+        """
+        yields mask for a unique correspondence assignment to exclude points mapping to the same 2-D pixel location
+        """
+
+        # parameter init
+        vidx = torch.ones(self.opts.shape[1], dtype=bool) if vidx is None else vidx
+        normals = torch.ones(self.opts.shape)
+        angle_threshold = torch.cos(torch.tensor(n_thresh)/180*torch.pi)
+
+        # identify duplicates 
+        oidx, bins = torch.unique(midx, sorted=False, return_counts=True)
+        duplicates = oidx[bins>1]
+
+        kidx = torch.ones(self.opts[:, vidx].shape[1], dtype=bool)
+        # TODO vectorize for-loop
+        for d in duplicates:
+            # 1. depth distance constraint
+            candidates = abs(opts[2, d] - self.opts[2, vidx][midx == d]) < d_thresh
+            # 2. normals constraint (20 degrees threshold)
+            if torch.sum(candidates == torch.min(candidates)) > 1:
+                candidates = batched_dot_product(normals[:, d][:, None].T, self.nrml[:, vidx][:, midx==d].T) > angle_threshold
+            # 3. confidence constraint
+            if torch.sum(candidates == torch.min(candidates)) > 1:
+                candidates = self.conf[:, vidx][:, midx == d]
+            # 4. euclidean distance constraint (if necessary)
+            if torch.sum(candidates == torch.min(candidates)) > 1:
+                candidates = torch.sum((opts[:, d][:, None] - self.opts[:, vidx][:, midx == d])**2, dim=0)**.5
+            # pick first element if there is no unique candidate
+            if torch.sum(candidates == torch.min(candidates)) > 1:
+                candidates = torch.arange(len(candidates))
+            mask = torch.ones(self.opts[:, vidx].shape[1], dtype=bool)
+            mask[torch.where(midx==d)[0][torch.argmin(candidates.long())]] = False
+            kidx[(midx == d) & mask] = 0
+
+        return kidx
 
     @property
     def normals(self):
