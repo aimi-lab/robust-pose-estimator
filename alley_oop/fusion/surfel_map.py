@@ -149,10 +149,11 @@ class SurfelMap(object):
         self.t_created = torch.cat((self.t_created, self.tick*torch.ones(1, mask.sum()).to(self.device)), dim=-1)
 
         self.tick = self.tick + 1
-        self.clean()
+        self.remove_surfels_by_confidence_and_time()
 
-    def clean(self):
-        # remove unstable points that have been created long time ago
+    def remove_surfels_by_confidence_and_time(self):
+        """ remove unstable points that have been created long time ago """
+
         ok_pts = ((self.conf > self.conf_thr) | ((self.tick - self.t_created) < self.t_max)).squeeze()
         self.opts = self.opts[:, ok_pts]
         self.gray = self.gray[:, ok_pts]
