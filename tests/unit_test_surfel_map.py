@@ -194,11 +194,10 @@ class SurfelMapTest(unittest.TestCase):
         # assertion
         self.assertEqual(len(aidx), len(shuffle_idx), 'Number of unique correspondences deviates from ground truth')
         self.assertTrue(torch.allclose(aidx, shuffle_idx), 'Index correspondences do not match with shuffled ground truth')
-        #self.assertTrue(torch.allclose(midx, shuffle_idx), 'Index correspondences do not match with shuffled ground truth')
         self.assertTrue(torch.allclose(gpts[:, midx], ipts[:, kidx]), 'Corresponding points vary in numerical coordinates')
 
     def test_all(self):
-        
+
         self.test_point_fusion()
         self.test_projection_match()
 
