@@ -16,7 +16,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
 """
 
     def __init__(self, img_shape: Tuple, intrinsics: torch.Tensor, icp_weight: float=10.0, n_iter: int=20, Ftol: float=0.001, xtol: float=1e-8,
-                 dist_thr: float=200.0/15, normal_thr: float=0.94, association_mode='projective'):
+                 dist_thr: float=200.0/15, normal_thr: float=20, association_mode='projective'):
         """
 
         :param img_shape: height and width of images to process
