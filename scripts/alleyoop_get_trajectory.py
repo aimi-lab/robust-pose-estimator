@@ -15,6 +15,9 @@ from viewer.viewer3d import Viewer3D
 from other_slam_methods.stereo_slam.disparity.disparity_model import DisparityModel
 from other_slam_methods.stereo_slam.segmentation_network.seg_model import SemanticSegmentationModel
 import open3d
+import matplotlib.pyplot as plt
+from alley_oop.fusion.surfel_map import SurfelMap
+
 
 def save_ply(pcl_array,colors,  path):
     pcl = open3d.geometry.PointCloud()
@@ -69,18 +72,29 @@ def main(input_path, output_path, config, force_cpu, nsamples):
                 config['slam']['kinematics'] = 'fuse'
             pose, scene = slam.processFrame(limg, depth)
             if viewer is not None:
-                viewer(pose, scene.pcl2open3d(stable=config['viewer']['stable']), frame=slam.get_frame(), synth_frame=slam.get_rendered_frame())
+                img, depth = slam._pre_process(limg, depth, mask)[:2]
+                curr_pcl = SurfelMap(dept=depth, kmat=torch.tensor(calib['intrinsics']['left']).float(), img_shape=depth.shape[-2:], pmat=pose).pcl2open3d(stable=False)
+                viewer(pose, scene.pcl2open3d(stable=config['viewer']['stable']), add_pcd=curr_pcl, frame=slam.get_frame(), synth_frame=slam.get_rendered_frame())
             trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number, 'residual': 0.0, 'key_frame': True})
             if len(trajectory) > nsamples:
                 break
+            if (i%50) == 0:
+                pcl = slam.getPointCloud()
+                save_ply(*pcl, os.path.join(output_path, f'map_{i:04d}.ply'))
         os.makedirs(output_path, exist_ok=True)
         with open(os.path.join(output_path, 'trajectory.json'), 'w') as f:
             json.dump(trajectory, f)
         pcl = slam.getPointCloud()
-        slam.plot_recordings(show=True)
+        plt.close()
+        fig, ax = slam.plot_recordings()
+        plt.savefig(os.path.join(output_path, 'optimization_plot.pdf'))
         if pcl is not None:
             save_ply(*pcl, os.path.join(output_path, 'map.ply'))
             print(pcl[0].shape)
+        if viewer is not None:
+            viewer.blocking = True
+            viewer(pose, scene.pcl2open3d(stable=config['viewer']['stable']), frame=slam.get_frame(),
+                   synth_frame=slam.get_rendered_frame())
         print('finished')
 
 
