@@ -113,9 +113,9 @@ class ICPEstimator(torch.nn.Module):
         J[:, 2, 5] = 1
         return J
 
-    def projective_association(self, src_pcl:SurfelMap, target_pcl:SurfelMap, T_est:torch.tensor, src_mask:torch.tensor=None):
+    def projective_association(self, ref_pcl:SurfelMap, target_pcl:SurfelMap, T_est:torch.tensor, src_mask:torch.tensor=None):
         # update image shape
-        src_pcl = src_pcl.transform_cpy(T_est)
+        ref_pcl = ref_pcl.transform_cpy(T_est)
 
         pmat_inv = torch.linalg.inv(T_est)
 
@@ -124,36 +124,35 @@ class ICPEstimator(torch.nn.Module):
                                             tvec=pmat_inv[:3, -1][:, None], img_shape=self.img_shape)
 
         # find correspondence by projecting surfels to current frame
-        midx = src_pcl.get_match_indices(global_ipts[:, bidx], upscale=1)
+        midx = ref_pcl.get_match_indices(global_ipts[:, bidx], upscale=1)
         if src_mask is not None:
             bidx[bidx.clone()] &= (src_mask.view(-1)[midx]).type(torch.bool)
 
         # compute that rejects correspondences for a single unique one
-        vidx, midx = target_pcl.get_unique_correspondence_mask(opts=src_pcl.opts, vidx=bidx, midx=midx,
-                                                               normals=src_pcl.normals, d_thresh=self.dist_thr,
+        vidx, midx = target_pcl.get_unique_correspondence_mask(opts=ref_pcl.opts, vidx=bidx, midx=midx,
+                                                               normals=ref_pcl.normals, d_thresh=self.dist_thr,
                                                                n_thresh=self.normal_thr)
 
         return midx, vidx
 
-    def check_association(self, src_pcl: SurfelMap):
+    def check_association(self, ref_pcl: SurfelMap):
         if self.associate == self.projective_association:
             print("valid ratio:", self.trg_ids.float().mean())
-        print("accuracy: ", (np.abs(src_pcl.grid_pts[self.src_grid_ids][:,0]- src_pcl.opts[:, self.trg_ids][:,0]) == 0).float().mean())
+        print("accuracy: ", (np.abs(ref_pcl.grid_pts[self.src_grid_ids][:, 0] - ref_pcl.opts[:, self.trg_ids][:, 0]) == 0).float().mean())
 
-    def dist_association(self, src_pcl: SurfelMap, target_pcl: SurfelMap, T_est: torch.tensor, src_mask: torch.tensor=None):
+    def dist_association(self, ref_pcl: SurfelMap, target_pcl: SurfelMap, T_est: torch.tensor, src_mask: torch.tensor=None):
         """ closest 3d euclidean distance association"""
 
         # update image shape
-        src_pcl = src_pcl.transform_cpy(T_est)
-        pmat_inv = torch.linalg.inv(T_est)
+        ref_pcl = ref_pcl.transform_cpy(T_est)
 
         # project all surfels to current image frame
         #global_ipts, bidx = forward_project2image(target_pcl.opts, kmat=self.intrinsics, rmat=pmat_inv[:3, :3],
         #                                          tvec=pmat_inv[:3, -1][:, None], img_shape=self.img_shape)
 
-        dists = torch.cdist(src_pcl.opts.T.unsqueeze(0), target_pcl.opts.T.unsqueeze(0)).squeeze()
+        dists = torch.cdist(ref_pcl.opts.T.unsqueeze(0), target_pcl.opts.T.unsqueeze(0)).squeeze()
         closest_pts = torch.argmin(dists, dim=-1)
-        midx = torch.arange(src_pcl.opts.shape[1]).to(src_pcl.device)
+        midx = torch.arange(ref_pcl.opts.shape[1]).to(ref_pcl.device)
         if src_mask is not None:
             pass
 
