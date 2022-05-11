@@ -50,27 +50,6 @@ class PyramidPoseEstimator(torch.nn.Module):
                                                      association_mode=self.config['mode'][pyr_level]).to(self.device)
                 T_cur2last, _ = pose_estimator.estimate_gn(frame_pyr[pyr_level], model_frame_pyr[pyr_level], scene_tlast, init_pose=T_cur2last)
                 self.cost[pyr_level] = pose_estimator.best_cost
-                # print(pose_estimator.best_cost)
-                # ref_pcl = SurfelMap(dept=frame_pyr[pyr_level].depth, kmat=intrinsics_pyr[pyr_level],
-                #                     normals=frame_pyr[pyr_level].normals.view(3, -1),
-                #                     img_shape=frame_pyr[pyr_level].shape[-2:])
-                # from alley_oop.geometry.lie_3d import lie_SE3_to_se3
-                # x = lie_SE3_to_se3(self.last_pose @ T_cur2last)
-                # residuals = pose_estimator.icp_estimator.residual_fun(x, ref_pcl, scene, frame_pyr[pyr_level].mask)
-                # print(pose_estimator.icp_estimator.cost_fun(residuals))
-                #self.plot(T_cur2last, frame, scene, self.pyramid._top_instrinsics)
-
-                # print(pose_estimator.best_cost)
-                # ref_pcl = SurfelMap(dept=frame_pyr[pyr_level].depth, kmat=intrinsics_pyr[pyr_level],
-                #                     normals=frame_pyr[pyr_level].normals.view(3, -1),
-                #                     img_shape=frame_pyr[pyr_level].shape[-2:])
-                # from alley_oop.geometry.lie_3d import lie_SE3_to_se3
-                # x = lie_SE3_to_se3(torch.linalg.inv(T_cur2last))
-                # #model_frame = scene.render(self.pyramid._top_instrinsics)
-                # #model_frame_pyr, _ = self.pyramid(model_frame)
-                # residuals = pose_estimator.rgb_estimator.residual_fun(x, frame_pyr[pyr_level].img_gray, ref_pcl, model_frame_pyr[pyr_level].img_gray, model_frame_pyr[pyr_level].mask, frame_pyr[pyr_level].mask)
-                # print(pose_estimator.rgb_estimator.cost_fun(residuals))
-                # self.plot(T_cur2last, frame, scene, self.pyramid._top_instrinsics)
             pose = self.last_pose @ T_cur2last
             self.last_pose.data = pose
         self.last_frame_pyr = frame_pyr
