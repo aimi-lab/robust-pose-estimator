@@ -127,9 +127,10 @@ class ICPEstimator(torch.nn.Module):
         midx = ref_pcl.get_match_indices(global_ipts[:, bidx], upscale=1)
         if src_mask is not None:
             bidx[bidx.clone()] &= (src_mask.view(-1)[midx]).type(torch.bool)
+            midx = midx[src_mask.view(-1)[midx]]
 
         # compute that rejects correspondences for a single unique one
-        vidx, midx = target_pcl.get_unique_correspondence_mask(opts=ref_pcl.opts, vidx=bidx, midx=midx,
+        vidx, midx = target_pcl.filter_surfels_by_correspondence(opts=ref_pcl.opts, vidx=bidx, midx=midx,
                                                                normals=ref_pcl.normals, d_thresh=self.dist_thr,
                                                                n_thresh=self.normal_thr)
 
