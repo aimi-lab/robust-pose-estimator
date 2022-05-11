@@ -51,10 +51,10 @@ class ICPEstimator(torch.nn.Module):
     def cost_fun(residuals):
         return (residuals**2).mean()
 
-    def residual_fun(self, x, ref_pcl, target_pcl, src_mask=None):
+    def residual_fun(self, x, ref_pcl, target_pcl, ref_mask=None):
         xt = torch.tensor(x).double().to(ref_pcl.opts.device) if not torch.is_tensor(x) else x
         T_est = lie_se3_to_SE3(xt)
-        self.src_ids, self.trg_ids = self.associate(ref_pcl, target_pcl, T_est, src_mask)
+        self.src_ids, self.trg_ids = self.associate(ref_pcl, target_pcl, T_est, ref_mask)
         # compute residuals
         ref_pcl_world_c = ref_pcl.transform_cpy(T_est)
         residuals = batched_dot_product(target_pcl.normals.T[self.trg_ids],
@@ -62,21 +62,21 @@ class ICPEstimator(torch.nn.Module):
                                        self.trg_ids]))
         return residuals
 
-    def jacobian(self, x, ref_pcl, target_pcl, src_mask=None):
+    def jacobian(self, x, ref_pcl, target_pcl, ref_mask=None):
         xt = torch.tensor(x).double() if not torch.is_tensor(x) else x
         T_est = lie_se3_to_SE3(xt)
         ref_pcl_world_c = ref_pcl.transform_cpy(T_est)
         return (target_pcl.normals.T[self.trg_ids].unsqueeze(1) @ self.j_3d(
             ref_pcl_world_c.opts.T[self.src_ids])).squeeze()
 
-    def estimate_lm(self, ref_frame: FrameClass, target_pcl:SurfelMap, src_mask: torch.tensor=None):
+    def estimate_lm(self, ref_frame: FrameClass, target_pcl:SurfelMap, ref_mask: torch.tensor=None):
         """ Levenberg-Marquard estimation."""
-        ref_pcl = SurfelMap(frame=ref_frame, kmat=self.intrinsics)
+        ref_pcl = SurfelMap(frame=ref_frame, kmat=self.intrinsics, ignore_mask=True)
 
         x_list, eps = lsq_lma(torch.zeros(6).to(ref_frame.depth.device).to(ref_frame.depth.dtype), self.residual_fun, self.jacobian,
-                              args=(ref_pcl, target_pcl, src_mask,), max_iter=self.n_iter, tol=self.Ftol, xtol=self.xtol)
+                              args=(ref_pcl, target_pcl, ref_mask,), max_iter=self.n_iter, tol=self.Ftol, xtol=self.xtol)
         x = x_list[-1]
-        cost = self.cost_fun(self.residual_fun(x, ref_pcl, target_pcl, src_mask))
+        cost = self.cost_fun(self.residual_fun(x, ref_pcl, target_pcl, ref_mask))
         return lie_se3_to_SE3(x), cost
 
     def plot(self, x, ref_pcl, target_pcl, downsample=1):
@@ -112,7 +112,7 @@ class ICPEstimator(torch.nn.Module):
         J[:, 2, 5] = 1
         return J
 
-    def projective_association(self, ref_pcl:SurfelMap, target_pcl:SurfelMap, T_est:torch.tensor, src_mask:torch.tensor=None):
+    def projective_association(self, ref_pcl:SurfelMap, target_pcl:SurfelMap, T_est:torch.tensor, ref_mask:torch.tensor=None):
         # update image shape
         ref_pcl = ref_pcl.transform_cpy(T_est)
 
@@ -124,9 +124,9 @@ class ICPEstimator(torch.nn.Module):
 
         # find correspondence by projecting surfels to current frame
         midx = ref_pcl.get_match_indices(global_ipts[:, bidx], upscale=1)
-        if src_mask is not None:
-            bidx[bidx.clone()] &= (src_mask.view(-1)[midx]).type(torch.bool)
-            midx = midx[src_mask.view(-1)[midx]]
+        if ref_mask is not None:
+            bidx[bidx.clone()] &= (ref_mask.view(-1)[midx]).type(torch.bool)
+            midx = midx[ref_mask.view(-1)[midx]]
 
         # compute that rejects correspondences for a single unique one
         vidx, midx = target_pcl.filter_surfels_by_correspondence(opts=ref_pcl.opts, vidx=bidx, midx=midx,
@@ -140,7 +140,7 @@ class ICPEstimator(torch.nn.Module):
             print("valid ratio:", self.trg_ids.float().mean())
         print("accuracy: ", (np.abs(ref_pcl.grid_pts[self.src_grid_ids][:, 0] - ref_pcl.opts[:, self.trg_ids][:, 0]) == 0).float().mean())
 
-    def dist_association(self, ref_pcl: SurfelMap, target_pcl: SurfelMap, T_est: torch.tensor, src_mask: torch.tensor=None):
+    def dist_association(self, ref_pcl: SurfelMap, target_pcl: SurfelMap, T_est: torch.tensor, ref_mask: torch.tensor=None):
         """ closest 3d euclidean distance association"""
 
         # update image shape
@@ -153,7 +153,7 @@ class ICPEstimator(torch.nn.Module):
         dists = torch.cdist(ref_pcl.opts.T.unsqueeze(0), target_pcl.opts.T.unsqueeze(0)).squeeze()
         closest_pts = torch.argmin(dists, dim=-1)
         midx = torch.arange(ref_pcl.opts.shape[1]).to(ref_pcl.device)
-        if src_mask is not None:
+        if ref_mask is not None:
             pass
 
         return midx, closest_pts

@@ -44,16 +44,19 @@ class SurfelMap(object):
             self.device = frame.depth.device
             dtype = frame.depth.dtype
             self.img_shape = frame.shape
+            # check ignore mask option, this is important if points are required in 2D grid shape
+            ignore_mask = kwargs['ignore_mask'] if 'ignore_mask' in kwargs else False
+            mask = torch.ones_like(frame.depth).to(torch.bool) if ignore_mask else frame.mask
             # calculate object points
             ipts = create_img_coords_t(y=self.img_shape[-2], x=self.img_shape[-1]).to(self.device).to(dtype)
             self.opts = reverse_project(ipts=ipts, kmat=self.kmat.to(self.device).to(dtype), rmat=self.pmat[:3, :3].to(self.device).to(dtype),
                                         tvec=self.pmat[:3, 3][..., None].to(self.device).to(dtype),
-                                        dpth=frame.depth.squeeze())[:, frame.mask.view(-1)]
+                                        dpth=frame.depth.squeeze())[:, mask.view(-1)]
 
-            self.gray = frame.img_gray[frame.mask].view(1, -1)
-            self.nrml = frame.normals.view(3, -1)
+            self.gray = frame.img_gray[mask].view(1, -1)
+            self.nrml = frame.normals.view(3, -1)[:, mask.view(-1)]
             # initialize radii
-            self.radi = ((frame.depth.view(-1)) / (self.flen* 2**.5 * abs(self.nrml[2,:]))).unsqueeze(0)[:, frame.mask.view(-1)]
+            self.radi = ((frame.depth[mask].view(-1)) / (self.flen* 2**.5 * abs(self.nrml[2,:]))).unsqueeze(0)
 
         self.kmat = self.kmat.to(self.device).to(dtype)
         self.pmat = self.pmat.to(self.device).to(dtype)
@@ -98,9 +101,8 @@ class SurfelMap(object):
             normals = normals_from_regular_grid(opts.T.reshape((self.img_shape[0]*self.upscale, self.img_shape[1]*self.upscale, 3)), pad_opt=True).T
 
         # consider masked surfels and enforce channel x samples shape
-        opts = opts[:, mask.view(-1)]
-        gray = gray.view(-1)[None, mask.view(-1)]
-        normals = normals.reshape(3, -1)[:, mask.view(-1)]
+        gray = gray.view(1, -1)
+        normals = normals.reshape(3, -1)
 
         # rotate image normals to world-coordinates
         normals = pmat[:3, :3] @ normals
@@ -114,6 +116,9 @@ class SurfelMap(object):
 
         # compute mask that rejects depth and normal outliers
         vidx, midx = self.filter_surfels_by_correspondence(opts=opts, vidx=bidx, midx=midx, normals=normals)
+        # apply frame mask to reject invalid pixels
+        bidx[vidx.clone()] &= (frame.mask.view(-1)[midx]).type(torch.bool)
+        midx = midx[frame.mask.view(-1)[midx]]
 
         # compute radii
         radi = (opts[2, :] * 2**.5) / (self.flen * abs(normals[2, :]))[None, :]
@@ -138,7 +143,8 @@ class SurfelMap(object):
         mask[midx] = 1.0
         # bring mask back to original shape
         mask = ~max_pool2d(mask.view(1,1,self.img_shape[0]*self.upscale, self.img_shape[1]*self.upscale), self.upscale, stride=self.upscale).view(-1).to(torch.bool)
-
+        # avoid fusion with invalid pixels
+        mask &= frame.mask.view(-1)
         if self.dbug_opt:
             # print ratio of added points vs frame resolution
             ratio = mask.float().mean()
