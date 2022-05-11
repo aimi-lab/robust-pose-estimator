@@ -2,6 +2,7 @@ import sys
 sys.path.append('../..')
 from dataset.semantic_dataset import RGBDDataset
 from dataset.scared_dataset import ScaredDataset
+from dataset.tum_dataset import TUMDataset
 from dataset.video_dataset import StereoVideoDataset
 from dataset.rectification import StereoRectifier
 from ElasticFusion import pyElasticFusion
@@ -29,6 +30,7 @@ def save_ply(pcl_array,colors,  path):
 def main(input_path, output_path, config, force_cpu, nsamples):
     device = torch.device('cuda' if (torch.cuda.is_available() & (not force_cpu)) else 'cpu')
     with torch.no_grad():
+        calib_file = None
         if os.path.isfile(os.path.join(input_path, 'camcal.json')):
             calib_file = os.path.join(input_path, 'camcal.json')
         elif os.path.isfile(os.path.join(input_path, 'StereoCalibration.ini')):
@@ -36,24 +38,28 @@ def main(input_path, output_path, config, force_cpu, nsamples):
         elif os.path.isfile(os.path.join(input_path, 'endoscope_calibration.yaml')):
             calib_file = os.path.join(input_path, 'endoscope_calibration.yaml')
         else:
-            raise RuntimeError('no calibration file found')
-
-        rect = StereoRectifier(calib_file, img_size_new=config['img_size'])
-        calib = rect.get_rectified_calib()
-        viewer = Viewer3D((3*config['img_size'][0], 3*config['img_size'][1]), blocking=config['viewer']['blocking']) if config['viewer']['enable'] else None
-
-        try:
-            dataset = RGBDDataset(input_path, calib['bf'], img_size=calib['img_size'])
-        except AssertionError:
             try:
-                dataset = ScaredDataset(input_path, calib['bf'], img_size=calib['img_size'])
+                dataset = TUMDataset(input_path, config['img_size'])
+                calib = {'intrinsics': {'left': dataset.get_intrinsics()}}
             except AssertionError:
-                video_file = glob.glob(os.path.join(input_path, '*.mp4'))[0]
-                pose_file = os.path.join(input_path, 'camera-poses.json')
-                dataset = StereoVideoDataset(video_file, calib_file, pose_file, img_size=calib['img_size'], sample=config['sample'])
-                disp_model = DisparityModel(calibration=calib, device=device, depth_clipping=config['depth_clipping'])
-                seg_model = SemanticSegmentationModel('stereo_slam/segmentation_network/trained/PvtB2_combined_TAM_fold1.pth', device)
+                raise RuntimeError('no calibration file found')
+        if calib_file is not None:
+            rect = StereoRectifier(calib_file, img_size_new=config['img_size'])
+            calib = rect.get_rectified_calib()
 
+            try:
+                dataset = RGBDDataset(input_path, calib['bf'], img_size=calib['img_size'])
+            except AssertionError:
+                try:
+                    dataset = ScaredDataset(input_path, calib['bf'], img_size=calib['img_size'])
+                except AssertionError:
+                    video_file = glob.glob(os.path.join(input_path, '*.mp4'))[0]
+                    pose_file = os.path.join(input_path, 'camera-poses.json')
+                    dataset = StereoVideoDataset(video_file, calib_file, pose_file, img_size=calib['img_size'], sample=config['sample'])
+                    disp_model = DisparityModel(calibration=calib, device=device, depth_clipping=config['depth_clipping'])
+                    seg_model = SemanticSegmentationModel('stereo_slam/segmentation_network/trained/PvtB2_combined_TAM_fold1.pth', device)
+        viewer = Viewer3D((3 * config['img_size'][0], 3 * config['img_size'][1]),
+                          blocking=config['viewer']['blocking']) if config['viewer']['enable'] else None
         #slam = pyElasticFusion(calib['intrinsics']['left'], calib['img_size'][0], calib['img_size'][1], 7.0, True, 15.0)
         slam = SLAM(torch.tensor(calib['intrinsics']['left']), config['slam'])
         trajectory = []
@@ -72,8 +78,7 @@ def main(input_path, output_path, config, force_cpu, nsamples):
                 config['slam']['kinematics'] = 'fuse'
             pose, scene = slam.processFrame(limg, depth)
             if viewer is not None:
-                img, depth = slam._pre_process(limg, depth, mask)[:2]
-                curr_pcl = SurfelMap(dept=depth, kmat=torch.tensor(calib['intrinsics']['left']).float(), img_shape=depth.shape[-2:], pmat=pose).pcl2open3d(stable=False)
+                curr_pcl = SurfelMap(frame=slam.get_frame(), kmat=torch.tensor(calib['intrinsics']['left']).float(), pmat=pose).pcl2open3d(stable=False)
                 viewer(pose, scene.pcl2open3d(stable=config['viewer']['stable']), add_pcd=curr_pcl, frame=slam.get_frame(), synth_frame=slam.get_rendered_frame())
             trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number, 'residual': 0.0, 'key_frame': True})
             if len(trajectory) > nsamples:

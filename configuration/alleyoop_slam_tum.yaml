@@ -1,0 +1,34 @@
+slam:
+  pyramid_levels: 1
+  rot:
+    n_iter: 10
+    Ftol: 1.0e-4
+  icp_weight: 100.0
+  n_iter:
+    - 20
+    - 5
+    - 5
+  Ftol:
+    - 1.0e-4
+    - 1.0e-4
+    - 1.0e-4
+  mode:
+    - 'projective'
+    - 'projective'
+    - 'projective'
+  depth_clipping:
+    - 1
+    - 8000 # in mm
+  debug: False
+
+img_size:
+  - 320
+  - 240
+
+
+
+
+viewer:
+  enable: True
+  blocking: True
+  stable: False

@@ -24,23 +24,23 @@ class PyramidPoseEstimator(torch.nn.Module):
         self.last_pose = torch.nn.Parameter(torch.eye(4, dtype=intrinsics.dtype))
         self.cost = config['pyramid_levels']*[0]
 
-    def estimate(self, frame: FrameClass, model: SurfelMap):
-        # transform model to last camera pose coordinates
-        model = model.transform_cpy(torch.linalg.inv(self.last_pose))
+    def estimate(self, frame: FrameClass, scene: SurfelMap):
+        # transform scene to last camera pose coordinates
+        scene_tlast = scene.transform_cpy(torch.linalg.inv(self.last_pose))
         # apply gaussian pyramid to current and rendered images
         frame_pyr, intrinsics_pyr = self.pyramid(frame)
         model_frame = None
         if self.last_frame_pyr is not None:
-            # render view of model from last camera pose
-            model_frame = model.render(self.pyramid._top_instrinsics)
+            # render view of scene from last camera pose
+            model_frame = scene_tlast.render(self.pyramid._top_instrinsics)
             model_frame_pyr, _ = self.pyramid(model_frame)
             # compute SO(3) pre-alignment from previous image to current image
             rot_estimator = RotationEstimator(frame_pyr[-1].shape, intrinsics_pyr[-1],
                                                self.config['rot']['n_iter'], self.config['rot']['Ftol']).to(self.device)
-            R_last2cur, *_ = rot_estimator.estimate(frame_pyr[-1], self.last_frame_pyr[-1])
+            R_cur2last, *_ = rot_estimator.estimate(frame_pyr[-1], self.last_frame_pyr[-1])
 
-            T_last2cur = torch.eye(4, dtype=R_last2cur.dtype, device=R_last2cur.device)
-            T_last2cur[:3,:3] = R_last2cur  # initial guess is rotation only
+            T_cur2last = torch.eye(4, dtype=R_cur2last.dtype, device=R_cur2last.device)
+            T_cur2last[:3,:3] = R_cur2last  # initial guess is rotation only
             # combined icp + rgb pose estimation
             for pyr_level in range(len(frame_pyr)-1, -1, -1):
                 pose_estimator = RGBICPPoseEstimator(frame_pyr[pyr_level].shape, intrinsics_pyr[pyr_level],
@@ -48,10 +48,30 @@ class PyramidPoseEstimator(torch.nn.Module):
                                                      self.config['n_iter'][pyr_level],
                                                      self.config['Ftol'][pyr_level],
                                                      association_mode=self.config['mode'][pyr_level]).to(self.device)
-                T_last2cur, _ = pose_estimator.estimate_gn(frame_pyr[pyr_level], model_frame_pyr[pyr_level], model, init_pose=T_last2cur)
+                T_cur2last, _ = pose_estimator.estimate_gn(frame_pyr[pyr_level], model_frame_pyr[pyr_level], scene_tlast, init_pose=T_cur2last)
                 self.cost[pyr_level] = pose_estimator.best_cost
-                #self.plot(T_last2cur, frame, model, self.pyramid._top_instrinsics)
-            pose = self.last_pose @ torch.linalg.inv(T_last2cur)
+                # print(pose_estimator.best_cost)
+                # ref_pcl = SurfelMap(dept=frame_pyr[pyr_level].depth, kmat=intrinsics_pyr[pyr_level],
+                #                     normals=frame_pyr[pyr_level].normals.view(3, -1),
+                #                     img_shape=frame_pyr[pyr_level].shape[-2:])
+                # from alley_oop.geometry.lie_3d import lie_SE3_to_se3
+                # x = lie_SE3_to_se3(self.last_pose @ T_cur2last)
+                # residuals = pose_estimator.icp_estimator.residual_fun(x, ref_pcl, scene, frame_pyr[pyr_level].mask)
+                # print(pose_estimator.icp_estimator.cost_fun(residuals))
+                #self.plot(T_cur2last, frame, scene, self.pyramid._top_instrinsics)
+
+                # print(pose_estimator.best_cost)
+                # ref_pcl = SurfelMap(dept=frame_pyr[pyr_level].depth, kmat=intrinsics_pyr[pyr_level],
+                #                     normals=frame_pyr[pyr_level].normals.view(3, -1),
+                #                     img_shape=frame_pyr[pyr_level].shape[-2:])
+                # from alley_oop.geometry.lie_3d import lie_SE3_to_se3
+                # x = lie_SE3_to_se3(torch.linalg.inv(T_cur2last))
+                # #model_frame = scene.render(self.pyramid._top_instrinsics)
+                # #model_frame_pyr, _ = self.pyramid(model_frame)
+                # residuals = pose_estimator.rgb_estimator.residual_fun(x, frame_pyr[pyr_level].img_gray, ref_pcl, model_frame_pyr[pyr_level].img_gray, model_frame_pyr[pyr_level].mask, frame_pyr[pyr_level].mask)
+                # print(pose_estimator.rgb_estimator.cost_fun(residuals))
+                # self.plot(T_cur2last, frame, scene, self.pyramid._top_instrinsics)
+            pose = self.last_pose @ T_cur2last
             self.last_pose.data = pose
         self.last_frame_pyr = frame_pyr
         return self.last_pose, model_frame
@@ -61,9 +81,7 @@ class PyramidPoseEstimator(torch.nn.Module):
         return self.last_pose.device
 
     def plot(self, T, ref_frame, model, intrinsics):
-        ref_pcl = SurfelMap(dept=ref_frame.depth, kmat=intrinsics, normals=ref_frame.normals.view(3, -1),
-                            gray=ref_frame.img_gray.view(-1),
-                            img_shape=ref_frame.shape)
+        ref_pcl = SurfelMap(frame=ref_frame, kmat=intrinsics)
 
         ref_pcl.transform(torch.linalg.inv(T))
 
