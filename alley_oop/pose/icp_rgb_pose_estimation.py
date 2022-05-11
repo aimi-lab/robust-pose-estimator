@@ -54,22 +54,22 @@ class RGBICPPoseEstimator(torch.nn.Module):
             icp_residuals = self.icp_estimator.residual_fun(x, ref_pcl, target_pcl, ref_frame.mask)
             icp_jacobian = self.icp_estimator.jacobian(x, ref_pcl, target_pcl, ref_frame.mask)
             # photometric
-            rgb_residuals = self.rgb_estimator.residual_fun(x, ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
-            rgb_jacobian = self.rgb_estimator.jacobian(x, ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
+            rgb_residuals = self.rgb_estimator.residual_fun(-x, ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
+            rgb_jacobian = self.rgb_estimator.jacobian(-x, ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
 
             # normal equations to be solved
-            A = self.icp_weight*icp_jacobian.T @ icp_jacobian + rgb_jacobian.T @ rgb_jacobian
-            b = self.icp_weight*icp_jacobian.T @ icp_residuals + rgb_jacobian.T @ rgb_residuals
+            A = self.icp_weight*icp_jacobian.T @ icp_jacobian - rgb_jacobian.T @ rgb_jacobian #
+            b = self.icp_weight*icp_jacobian.T @ icp_residuals + rgb_jacobian.T @ rgb_residuals #
 
             # Todo try several optimizer methods, this may be synchronized with CPU (cholesky, QR etc)
             x0 = torch.linalg.lstsq(A,b).solution
-
-            #self.rgb_estimator.plot(x, ref_img, ref_depth, target_img)
-            #self.icp_estimator.plot_correspondence(x, ref_img, ref_depth, target_img)
-            #self.icp_estimator.plot(x, ref_pcl, target_pcl)
             icp_cost = self.icp_estimator.cost_fun(icp_residuals)
             rgb_cost = self.rgb_estimator.cost_fun(rgb_residuals)
-            cost = self.icp_weight*icp_cost + rgb_cost
+            cost = self.icp_weight * icp_cost + rgb_cost
+
+            #self.icp_estimator.plot_correspondence(x, ref_img, ref_depth, target_img)
+            #self.icp_estimator.plot(x, ref_pcl, target_pcl)
+
             if cost < best_sol[1]:
                 best_sol = (x.clone(), cost)
                 self.best_cost = (cost, self.icp_weight*icp_cost, rgb_cost)
