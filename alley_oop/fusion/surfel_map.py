@@ -3,7 +3,6 @@ from torch.nn.functional import max_pool2d
 from typing import Union, Tuple
 
 from alley_oop.geometry.pinhole_transforms import forward_project2image, reverse_project, create_img_coords_t, forward_project
-from alley_oop.interpol.img_mappings import img_map_torch
 from alley_oop.interpol.sparse_img_interpolation import SparseImgInterpolator
 from alley_oop.geometry.normals import normals_from_regular_grid
 from alley_oop.utils.pytorch import batched_dot_product
@@ -70,12 +69,11 @@ class SurfelMap(object):
 
     def fuse(self, dept: torch.Tensor, gray: torch.Tensor, normals: torch.Tensor, pmat: torch.Tensor, mask: torch.Tensor=None):
         
-        # update image shape
+        # prepare parameters
         self.img_shape = gray.shape[-2:] if self.img_shape is None else self.img_shape
         pmat_inv = torch.linalg.inv(pmat)
         kmat = self.kmat.clone()
-        if mask is None:
-            mask = torch.ones_like(dept).to(torch.bool)
+        mask = torch.ones_like(dept).to(torch.bool) if mask is None else mask
 
         if self.upscale > 1:
             # consider upsampling
@@ -86,6 +84,7 @@ class SurfelMap(object):
 
         # prepare image and object coordinates
         ipts = create_img_coords_t(y=self.img_shape[-2]*self.upscale, x=self.img_shape[-1]*self.upscale).to(dept.dtype).to(dept.device)
+
         # project depth to 3d-points in world coordinates
         opts = reverse_project(ipts=ipts, dpth=dept, rmat=pmat[:3, :3], tvec=pmat[:3, -1][..., None], kmat=kmat)
 
@@ -93,10 +92,11 @@ class SurfelMap(object):
         if normals is None or self.upscale > 1:
             normals = normals_from_regular_grid(opts.T.reshape((self.img_shape[0]*self.upscale, self.img_shape[1]*self.upscale, 3)), pad_opt=True).T
 
+        # consider masked surfels and enforce channel x samples shape
         opts = opts[:, mask.view(-1)]
-        # enforce channel x samples shape
         gray = gray.flatten()[None, mask.view(-1)]
         normals = normals.reshape(3, -1)[:, mask.view(-1)]
+
         # rotate image normals to world-coordinates
         normals = pmat[:3, :3] @ normals
 
@@ -104,11 +104,11 @@ class SurfelMap(object):
         global_ipts = forward_project(self.opts, kmat=kmat, rmat=pmat_inv[:3, :3], tvec=pmat_inv[:3, -1][:, None])
         bidx = (global_ipts[0, :] >= 0) & (global_ipts[1, :] >= 0) & (global_ipts[0, :] < self.img_shape[1]*self.upscale-1) & (global_ipts[1, :] < self.img_shape[0]*self.upscale-1)
 
-        # find correspondence by projecting surfels to current frame
+        # get correspondence by assigning projected points to image coordinates
         midx = self.get_match_indices(global_ipts[:, bidx])
 
-        # compute that rejects correspondences for a single unique one
-        vidx, midx = self.get_unique_correspondence_mask(opts=opts, vidx=bidx, midx=midx, normals=normals)
+        # compute mask that rejects depth and normal outliers
+        vidx, midx = self.filter_surfels_by_correspondence(opts=opts, vidx=bidx, midx=midx, normals=normals)
 
         # compute radii
         radi = (opts[2, :] * 2**.5) / (self.flen * abs(normals[2, :]))[None, :]
@@ -117,15 +117,15 @@ class SurfelMap(object):
         gamma = opts[2, :]/torch.max(opts[2, :])
         conf = torch.exp(-.5 * gamma**2 / .6**2)[None, :]
 
-        # select corresponding elements
-        ocor, ncor, gcor, rcor, ccor = opts[:, midx], normals[:, midx], gray[:, midx], radi[:, midx], conf[:, midx]
+        # pre-select confidence elements
+        ccor = conf[:, midx]
+        conf_idx = self.conf[:, vidx]
 
         # update existing points, intensities, normals, radii and confidences
-        conf_idx = self.conf[:, vidx]
-        self.opts[:, vidx] = (conf_idx*self.opts[:, vidx] + ccor*ocor) / (conf_idx + ccor)
-        self.gray[:, vidx] = (conf_idx*self.gray[:, vidx]+ ccor*gcor) / (conf_idx + ccor)
-        self.radi[:, vidx] = (conf_idx*self.radi[:, vidx] + ccor*rcor) / (conf_idx + ccor)
-        self.nrml[:, vidx] = (conf_idx*self.nrml[:, vidx] + ccor*ncor) / (conf_idx + ccor)
+        self.opts[:, vidx] = (conf_idx*self.opts[:, vidx] + ccor*opts[:, midx]) / (conf_idx + ccor)
+        self.gray[:, vidx] = (conf_idx*self.gray[:, vidx] + ccor*gray[:, midx]) / (conf_idx + ccor)
+        self.radi[:, vidx] = (conf_idx*self.radi[:, vidx] + ccor*radi[:, midx]) / (conf_idx + ccor)
+        self.nrml[:, vidx] = (conf_idx*self.nrml[:, vidx] + ccor*normals[:, midx]) / (conf_idx + ccor)
         self.conf[:, vidx] = conf_idx + ccor
 
         # create mask identifying unmatched indices
@@ -140,7 +140,6 @@ class SurfelMap(object):
             print(ratio)
 
         # concatenate unmatched points, intensities, normals, radii and confidences
-
         self.opts = torch.cat((self.opts, self._downsample(opts)[:, mask]), dim=-1)
         self.gray = torch.cat((self.gray, self._downsample(gray)[:, mask]), dim=-1)
         self.radi = torch.cat((self.radi, self._downsample(radi)[:, mask]), dim=-1)
@@ -149,10 +148,13 @@ class SurfelMap(object):
         self.t_created = torch.cat((self.t_created, self.tick*torch.ones(1, mask.sum()).to(self.device)), dim=-1)
 
         self.tick = self.tick + 1
-        self.clean()
 
-    def clean(self):
-        # remove unstable points that have been created long time ago
+        # remove surfels
+        self.remove_surfels_by_confidence_and_time()
+
+    def remove_surfels_by_confidence_and_time(self):
+        """ remove unstable points that have been created long time ago """
+
         ok_pts = ((self.conf > self.conf_thr) | ((self.tick - self.t_created) < self.t_max)).squeeze()
         self.opts = self.opts[:, ok_pts]
         self.gray = self.gray[:, ok_pts]
@@ -160,7 +162,6 @@ class SurfelMap(object):
         self.nrml = self.nrml[:, ok_pts]
         self.conf = self.conf[:, ok_pts]
         self.t_created = self.t_created[:, ok_pts]
-
 
     def _downsample(self, x):
         x = x.view(-1, self.img_shape[0] * self.upscale, self.img_shape[1] * self.upscale)
@@ -183,7 +184,7 @@ class SurfelMap(object):
 
         return midx.long()
 
-    def get_unique_correspondence_mask(
+    def filter_surfels_by_correspondence(
         self,
         opts: torch.Tensor,
         midx: torch.Tensor,
@@ -194,7 +195,7 @@ class SurfelMap(object):
         remove_duplicates: bool = False
         ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        yields mask for a unique correspondence assignment to exclude points mapping to the same 2-D pixel location
+        filter correspondences by depth and normal angle
         """
 
         # parameter init
@@ -202,12 +203,13 @@ class SurfelMap(object):
         normals = torch.ones_like(self.opts) if normals is None else normals
         angle_threshold = torch.cos(torch.tensor(n_thresh)/180*torch.pi)
 
-        # filter candidate correspondences
         # 1. depth distance constraint
         valid = torch.abs(opts[2, midx] - self.opts[2, vidx]) < d_thresh
-        # 2. normals constraint (20 degrees threshold)
+
+        # 2. normals constraint (degrees threshold)
         valid &= torch.abs(batched_dot_product(normals[:, midx].T, self.nrml[:, vidx].T)) > angle_threshold
-        # update indicies
+
+        # combine constraints and update indices
         vidx[vidx.clone()] &= valid
         midx = midx[valid]
 
