@@ -117,8 +117,8 @@ class SurfelMap(object):
         # compute mask that rejects depth and normal outliers
         vidx, midx = self.filter_surfels_by_correspondence(opts=opts, vidx=bidx, midx=midx, normals=normals)
         # apply frame mask to reject invalid pixels
-        bidx[vidx.clone()] &= (frame.mask.view(-1)[midx]).type(torch.bool)
-        midx = midx[frame.mask.view(-1)[midx]]
+        bidx[vidx.clone()] &= (frame.mask.view(-1)[(midx/self.upscale**2).long()]).type(torch.bool)
+        midx = midx[frame.mask.view(-1)[(midx/self.upscale**2).long()]]
 
         # compute radii
         radi = (opts[2, :] * 2**.5) / (self.flen * abs(normals[2, :]))[None, :]
