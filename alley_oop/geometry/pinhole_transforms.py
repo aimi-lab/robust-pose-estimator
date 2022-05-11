@@ -18,9 +18,14 @@ def forward_project(
     lib = get_lib(opts)
 
     # init values potentially missing
-    rmat = lib.eye(3) if rmat is None else rmat
-    tvec = lib.zeros([3, 1]) if tvec is None else tvec
-    opts = lib.vstack([opts, lib.ones(opts.shape[1])]) if opts.shape[0] == 3 else opts
+    if lib == torch:
+        rmat = torch.eye(3, device=opts.device) if rmat is None else rmat
+        tvec = torch.zeros([3, 1], device=opts.device) if tvec is None else tvec
+        opts = torch.vstack([opts, lib.ones(opts.shape[1], device=opts.device)]) if opts.shape[0] == 3 else opts
+    else:
+        rmat = lib.eye(3) if rmat is None else rmat
+        tvec = lib.zeros([3, 1]) if tvec is None else tvec
+        opts = lib.vstack([opts, lib.ones(opts.shape[1])]) if opts.shape[0] == 3 else opts
 
     # compose projection matrix
     pmat = compose_projection_matrix(kmat, rmat, tvec)
