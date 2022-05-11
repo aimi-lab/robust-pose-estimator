@@ -5,6 +5,7 @@ from alley_oop.pose.frame_class import FrameClass
 from typing import Union
 from numpy import ndarray
 from torch import tensor
+import numpy as np
 import cv2
 
 
@@ -57,13 +58,13 @@ class SLAM(object):
     def _pre_process(self, img:ndarray, depth:ndarray, mask:ndarray=None):
         img = (torch.tensor(img).permute(2,0,1).unsqueeze(0)/255.0).to(self.dtype).to(self.device)
         depth = cv2.bilateralFilter(depth, None, sigmaColor=10, sigmaSpace=10)
-        depth = (torch.tensor(depth).unsqueeze(0).unsqueeze(0)).to(self.dtype).to(self.device)
-        if mask is None:
-            mask = torch.ones_like(depth).to(torch.bool)
-        else:
-            mask = (torch.tensor(mask).unsqueeze(0).unsqueeze(0)).to(self.dtype).to(self.device)
+        mask = np.ones_like(depth).astype(bool) if mask is None else mask
         # depth clipping
         mask &= (depth > self.depth_clipping[0]) & (depth < self.depth_clipping[1])
+        # border points are usually unstable
+        mask = cv2.erode(mask.astype(np.uint8), kernel=np.ones((7,7)))
+        depth = (torch.tensor(depth).unsqueeze(0).unsqueeze(0)).to(self.dtype).to(self.device)
+        mask = (torch.tensor(mask).unsqueeze(0).unsqueeze(0)).to(torch.bool).to(self.device)
 
         return img, depth, mask
 
