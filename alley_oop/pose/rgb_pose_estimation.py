@@ -76,17 +76,17 @@ class RGBPoseEstimator(torch.nn.Module):
         cost = self.cost_fun(self.residual_fun(x, ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask))
         return lie_se3_to_SE3(x), cost
 
-    def plot(self, x, ref_img, ref_depth, target_img):
+    def plot(self, x, ref_img, ref_depth, target_img, cost):
         T = lie_se3_to_SE3(x.cpu())
         warped_img = synth_view(ref_img.cpu().float(), ref_depth.float().cpu(), T[:3,:3].float(),
                                 T[:3,3].unsqueeze(1).float(), self.intrinsics.float().cpu()).squeeze()
 
         fig, ax = plt.subplots(1,3)
-        ax[0].imshow(ref_img.cpu(), vmin=0, vmax=1)
-        ax[0].set_title('reference')
-        ax[1].imshow(target_img.cpu(), vmin=0, vmax=1)
+        ax[0].imshow(ref_img.squeeze().cpu(), vmin=0, vmax=1)
+        ax[0].set_title(f'reference: cost={cost}')
+        ax[1].imshow(target_img.squeeze().cpu(), vmin=0, vmax=1)
         ax[1].set_title('target')
-        ax[2].imshow(warped_img.cpu(), vmin=0, vmax=1)
+        ax[2].imshow(warped_img.squeeze().cpu(), vmin=0, vmax=1)
         ax[2].set_title('estimated')
         for a in ax:
             a.axis('off')
