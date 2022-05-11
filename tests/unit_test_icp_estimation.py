@@ -47,7 +47,7 @@ class IcpEstimationTester(unittest.TestCase):
         img = img.permute(2, 0, 1).unsqueeze(0)
         frame = FrameClass(img.double(), depth.unsqueeze(0).unsqueeze(0), intrinsics=intrinsics)
 
-        ref_pcl = SurfelMap(dept=frame.depth, kmat=intrinsics, normals=frame.normals.view(3,-1), img_shape=frame.shape)
+        ref_pcl = SurfelMap(frame=frame, kmat=intrinsics)
 
         target_pcl = ref_pcl.transform_cpy(T_true)
 

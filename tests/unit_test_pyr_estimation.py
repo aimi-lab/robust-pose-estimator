@@ -27,7 +27,8 @@ class PyramidPoseEstimatorTester(unittest.TestCase):
                 'rot': {'n_iter': 50, 'Ftol': 1e-3},
                 'icp_weight': 0.0000001,
                 'n_iter': [12, 13, 20],
-                'Ftol': [1e-2, 1e-2, 1e-2]
+                'Ftol': [1e-2, 1e-2, 1e-2],
+                'mode': ['projective','projective','projective']
             }
             scale = 2
             disparity, _ = load_pfm(str(Path.cwd() / 'tests' / 'test_data' / '0006.pfm'))
@@ -55,8 +56,7 @@ class PyramidPoseEstimatorTester(unittest.TestCase):
             img = img.permute(2, 0, 1).unsqueeze(0)
             ref_frame = FrameClass(img, depth.unsqueeze(0).unsqueeze(0), intrinsics=intrinsics)
 
-            ref_pcl = SurfelMap(dept=ref_frame.depth, kmat=intrinsics, normals=ref_frame.normals.view(3,-1), gray=ref_frame.img_gray.view(1, -1),
-                                img_shape=ref_frame.shape)
+            ref_pcl = SurfelMap(frame=ref_frame, kmat=intrinsics)
 
             target_pcl = ref_pcl.transform_cpy(torch.linalg.inv(T_true))
             target_frame = target_pcl.render(intrinsics)

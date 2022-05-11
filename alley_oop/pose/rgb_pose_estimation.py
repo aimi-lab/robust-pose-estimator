@@ -66,8 +66,7 @@ class RGBPoseEstimator(torch.nn.Module):
 
     def estimate_lm(self, ref_frame: FrameClass, target_frame: FrameClass):
         """ Levenberg-Marquard estimation."""
-        ref_pcl = SurfelMap(dept=ref_frame.depth, kmat=self.intrinsics, normals=ref_frame.normals.view(3, -1),
-                            img_shape=self.img_shape)
+        ref_pcl = SurfelMap(frame=ref_frame, kmat=self.intrinsics)
         x_list, eps = lsq_lma(torch.zeros(6).to(ref_frame.depth.device).to(ref_frame.depth.dtype),
                               self.residual_fun, self.jacobian,
                               args=(ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask,),

@@ -46,7 +46,7 @@ class RGBICPPoseEstimatorTester(unittest.TestCase):
                                 t_true.unsqueeze(1).float(), intrinsics.float())
         mask = (target_img[0, 0] != 0)
         target_frame = FrameClass(target_img, depth.unsqueeze(0).unsqueeze(0), intrinsics=intrinsics)
-        ref_pcl = SurfelMap(dept=ref_frame.depth, kmat=intrinsics, normals=ref_frame.normals.view(3,-1), img_shape=ref_frame.shape)
+        ref_pcl = SurfelMap(frame=ref_frame, kmat=intrinsics)
         target_pcl = ref_pcl.transform_cpy(T_true)
 
         estimator = RGBICPPoseEstimator(img.shape[-2:], intrinsics, icp_weight=0.001, n_iter=100).to(device)

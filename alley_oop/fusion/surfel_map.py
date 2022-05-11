@@ -16,77 +16,82 @@ class SurfelMap(object):
         http://thomaswhelan.ie/Whelan16ijrr.pdf
         """
         super().__init__()
-
-        # consider input arguments
-        self.opts = kwargs['opts'] if 'opts' in kwargs else torch.Tensor()
-        dept = kwargs['dept'] if 'dept' in kwargs else torch.Tensor()
-        self.device = self.opts.device if self.opts.numel() > 0 else dept.device
-        dtype = self.opts.dtype if self.opts.numel() > 0 else dept.dtype
-        mask = kwargs['mask'] if 'mask' in kwargs else torch.ones_like(dept).to(torch.bool)
-        self.gray = kwargs['gray'] if 'gray' in kwargs else torch.Tensor().to(self.device)
-        self.pmat = kwargs['pmat'] if 'pmat' in kwargs else torch.eye(4, dtype=dtype, device=self.device)  # extrinsics
-        self.kmat = kwargs['kmat'] if 'kmat' in kwargs else torch.eye(3, dtype=dtype, device=self.device)     # intrinsics
-        self.radi = kwargs['radi'] if 'radi' in kwargs else torch.Tensor().to(self.device)
-        self.nrml = kwargs['normals'] if 'normals' in kwargs else torch.Tensor().to(self.device)
+        self.pmat = kwargs['pmat'] if 'pmat' in kwargs else torch.eye(4)  # extrinsics
+        self.kmat = kwargs['kmat'] if 'kmat' in kwargs else torch.eye(3)  # intrinsics
         self.conf_thr = kwargs['conf_thr'] if 'conf_thr' in kwargs else 10
         self.t_max = kwargs['t_max'] if 't_max' in kwargs else 15
-        self.img_shape = kwargs['img_shape'] if 'img_shape' in kwargs else None
         self.upscale = kwargs['upscale'] if 'upscale' in kwargs else 4
         self.dbug_opt = False
         self.interpolate = SparseImgInterpolator(5, 2, 0)
-
-
-        # calculate object points
-        if dept.numel() > 0 and self.img_shape is not None:
-            ipts = create_img_coords_t(y=self.img_shape[-2], x=self.img_shape[-1]).to(self.device).to(dtype)
-            self.opts = reverse_project(ipts=ipts, kmat=self.kmat, rmat=self.pmat[:3,:3],
-                                        tvec=self.pmat[:3,3][..., None],
-                                        dpth=dept.reshape(self.img_shape))[:, mask.view(-1)]
-        elif dept.numel() == 0 and self.opts.numel() > 0 and self.radi.numel() == 0 and self.img_shape is not None:
-            # rotate, translate and forward-project points
-            dept = self.render().depth
-
         # initiliaze focal length
         self.flen = (self.kmat[0, 0] + self.kmat[1, 1]) / 2
 
-        # initialize radii
-        if self.radi.numel() == 0:
-            if dept.numel() > 0 and self.nrml.numel() == 3*dept.numel():
-                self.radi = ((dept.view(-1)) / (self.flen* 2**.5 * abs(self.nrml[2,:]))).unsqueeze(0)[:, mask.view(-1)]
-            elif self.opts.numel() > 0:
-                self.radi = torch.ones((1, self.opts.shape[1])).to(self.device)
+        # either provide opts, normals and color or a frame class
+        if 'opts' in kwargs:
+            assert 'normals' in kwargs
+            assert 'gray' in kwargs
+            self.opts = kwargs['opts']
+            self.device = self.opts.device
+            dtype = self.opts.dtype
+            self.gray = kwargs['gray']
+            self.nrml = kwargs['normals']
+            self.radi = kwargs['radi'] if 'radi' in kwargs else torch.ones((1, self.opts.shape[1])).to(self.device)
+            self.img_shape = kwargs['img_shape'] if 'img_shape' in kwargs else None
+
+        else:
+            assert 'frame' in kwargs
+            frame = kwargs['frame']
+            self.device = frame.depth.device
+            dtype = frame.depth.dtype
+            self.img_shape = frame.shape
+            # calculate object points
+            ipts = create_img_coords_t(y=self.img_shape[-2], x=self.img_shape[-1]).to(self.device).to(dtype)
+            self.opts = reverse_project(ipts=ipts, kmat=self.kmat.to(self.device).to(dtype), rmat=self.pmat[:3, :3].to(self.device).to(dtype),
+                                        tvec=self.pmat[:3, 3][..., None].to(self.device).to(dtype),
+                                        dpth=frame.depth.squeeze())[:, frame.mask.view(-1)]
+
+            self.gray = frame.img_gray[frame.mask].view(1, -1)
+            self.nrml = frame.normals.view(3, -1)
+            # initialize radii
+            self.radi = ((frame.depth.view(-1)) / (self.flen* 2**.5 * abs(self.nrml[2,:]))).unsqueeze(0)[:, frame.mask.view(-1)]
+
+        self.kmat = self.kmat.to(self.device).to(dtype)
+        self.pmat = self.pmat.to(self.device).to(dtype)
 
         # initialize confidence
-        self.conf = torch.Tensor()
-        if self.opts.numel() > 0:
-            gamma = self.opts[2].flatten()/torch.max(self.opts[2])
-            self.conf = torch.exp(-.5 * gamma**2 / .6**2)[None ,:]
+        gamma = self.opts[2].flatten()/torch.max(self.opts[2])
+        self.conf = torch.exp(-.5 * gamma**2 / .6**2)[None ,:]
 
         # intialize tick as timestamp
         self.tick = 0
-        if self.opts.numel() > 0:
-            self.t_created = torch.zeros(1,self.opts.shape[1]).to(self.device)
+        self.t_created = torch.zeros(1,self.opts.shape[1]).to(self.device)
 
-    def fuse(self, dept: torch.Tensor, gray: torch.Tensor, normals: torch.Tensor, pmat: torch.Tensor, mask: torch.Tensor=None):
-        
+    def fuse(self, frame: FrameClass, pmat: torch.Tensor):
+        assert pmat.shape == (4,4)
+
         # prepare parameters
-        self.img_shape = gray.shape[-2:] if self.img_shape is None else self.img_shape
+        self.img_shape = frame.shape
         pmat_inv = torch.linalg.inv(pmat)
         kmat = self.kmat.clone()
-        mask = torch.ones_like(dept).to(torch.bool) if mask is None else mask
+
+        gray = frame.img_gray
+        depth = frame.depth
+        mask = frame.mask
+        normals = frame.normals
+        dtype = depth.dtype
 
         if self.upscale > 1:
             # consider upsampling
             gray = torch.nn.functional.interpolate(gray, scale_factor=self.upscale, mode='bilinear', align_corners=None)
-            dept = torch.nn.functional.interpolate(dept, scale_factor=self.upscale, mode='bilinear', align_corners=None)
+            depth = torch.nn.functional.interpolate(depth, scale_factor=self.upscale, mode='bilinear', align_corners=None)
             mask = torch.nn.functional.interpolate(mask.float(), scale_factor=self.upscale, mode='nearest', align_corners=None).to(torch.bool)
             kmat[:2] *= self.upscale
 
         # prepare image and object coordinates
-        ipts = create_img_coords_t(y=self.img_shape[-2]*self.upscale, x=self.img_shape[-1]*self.upscale).to(dept.dtype).to(dept.device)
+        ipts = create_img_coords_t(y=self.img_shape[-2]*self.upscale, x=self.img_shape[-1]*self.upscale).to(dtype).to(self.device)
 
         # project depth to 3d-points in world coordinates
-        opts = reverse_project(ipts=ipts, dpth=dept, rmat=pmat[:3, :3], tvec=pmat[:3, -1][..., None], kmat=kmat)
+        opts = reverse_project(ipts=ipts, dpth=depth, rmat=pmat[:3, :3], tvec=pmat[:3, -1][..., None], kmat=kmat)
 
         # update normals (if necessary)
         if normals is None or self.upscale > 1:
@@ -94,7 +99,7 @@ class SurfelMap(object):
 
         # consider masked surfels and enforce channel x samples shape
         opts = opts[:, mask.view(-1)]
-        gray = gray.flatten()[None, mask.view(-1)]
+        gray = gray.view(-1)[None, mask.view(-1)]
         normals = normals.reshape(3, -1)[:, mask.view(-1)]
 
         # rotate image normals to world-coordinates

@@ -4,16 +4,15 @@ from pathlib import Path
 import torch
 import imageio
 import matplotlib.pyplot as plt
-from mayavi import mlab
 
 from alley_oop.utils.pfm_handler import load_pfm
 from alley_oop.geometry.pinhole_transforms import reverse_project, create_img_coords_t, disp2depth
 from alley_oop.geometry.lie_3d import lie_se3_to_SE3
-from alley_oop.fusion.surfel_map import SurfelMap
+from alley_oop.fusion.surfel_map import SurfelMap, FrameClass
 from alley_oop.utils.rgb2gray import rgb2gray_t
 from alley_oop.geometry.normals import normals_from_regular_grid
 from alley_oop.interpol.img_mappings import img_map_torch
-from alley_oop.utils.mlab_plot import mlab_rgbd
+
 
 
 class SurfelMapTest(unittest.TestCase):
@@ -24,6 +23,9 @@ class SurfelMapTest(unittest.TestCase):
     def setUp(self):
 
         self.plot_opt = False
+        if self.plot_opt:
+            from mayavi import mlab
+            from alley_oop.utils.mlab_plot import mlab_rgbd
 
         self.kmat = torch.eye(3)
         self.pmat = torch.eye(4)
@@ -99,14 +101,15 @@ class SurfelMapTest(unittest.TestCase):
             mlab_rgbd(tpts, colors=timg, size=.025, show_opt=True, fig=fig)
 
         # initialize surfel map
-        surf_map = SurfelMap(opts=self.global_opts, dept=self.global_dept, gray=self.global_gray, normals=self.global_nrml, pmat=torch.eye(4), kmat=self.kmat, upscale=4)
+        surf_map = SurfelMap(opts=self.global_opts, gray=self.global_gray, normals=self.global_nrml, pmat=torch.eye(4), kmat=self.kmat, upscale=4)
         
         # pass image dimensions and intrinsics
         surf_map.img_shape = self.target_gray.shape[-2:]
         surf_map.kmat[:2, -1] = torch.tensor([self.target_gray.shape[-1]//2, self.target_gray.shape[-2]//2])
 
         # update surfel map
-        surf_map.fuse(dept=self.target_dept, gray=self.target_gray, normals=self.target_nrml, pmat=torch.eye(4))
+        target_frame = FrameClass(img=self.target_gray, depth=self.target_dept, normals=self.target_nrml.reshape(1,3, *self.target_dept.shape[-2:]))
+        surf_map.fuse(target_frame, pmat=torch.eye(4))
 
         # test assertions
         self.assertTrue(surf_map.opts.shape[1] > self.global_opts.shape[1], 'Number of surfel map points too little')
@@ -127,7 +130,7 @@ class SurfelMapTest(unittest.TestCase):
 
         # pass existing data to surfel map
         point_num = surf_map.opts.shape[1]
-        surf_map.fuse(dept=self.target_dept, gray=self.target_gray, normals=self.target_nrml, pmat=torch.eye(4))
+        surf_map.fuse(target_frame, pmat=torch.eye(4))
         self.assertTrue(surf_map.opts.shape[1] < point_num*1.01, 'Number of surfel map points changed when passing known frame')
         self.assertTrue(surf_map.tick == 2, 'Tick index deviates')
 
@@ -175,11 +178,9 @@ class SurfelMapTest(unittest.TestCase):
         ipts = torch.cat((opts, gpts[:, :20]), dim=-1)   # attach identical points to mimic correspondence duplicates
 
         # create surfel map and find index correspondences
-        surf_map = SurfelMap(upscale=1)
+        surf_map = SurfelMap(opts=ipts, normals=torch.ones(ipts.shape), gray=torch.ones((1,ipts.shape[-1])), upscale=1)
         surf_map.img_shape = torch.Size((y_res, x_res))
-        surf_map.opts = ipts
         surf_map.conf = torch.ones((1, ipts.shape[1]))
-        surf_map.nrml = torch.ones(surf_map.opts.shape)
         surf_map.t_created = torch.zeros_like(surf_map.conf)
 
         midx = surf_map.get_match_indices(ipts)
