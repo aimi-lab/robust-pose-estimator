@@ -310,20 +310,23 @@ class SurfelMap(object):
         colors = self.interpolate(colors[None,None,...])
         return FrameClass(colors, depth, intrinsics=intrinsics, mask=mask).to(intrinsics.device)
 
-    def pcl2open3d(self, stable: bool=True):
+    def pcl2open3d(self, stable: bool=True, filter: torch.Tensor=None):
         """
         convert SurfelMap points to open3D PointCloud object for visualization
         :param stable: if True return only stable surfels
         """
         import open3d
         pcd = open3d.geometry.PointCloud()
+        if filter is None:
+            filter = torch.ones_like(self.conf, dtype=torch.bool).squeeze()
         if stable:
-            stable_pts = (self.conf > self.conf_thr).squeeze()
+            stable_pts = (self.conf[:,filter] > self.conf_thr).squeeze()
         else:
-            stable_pts = torch.ones_like(self.conf, dtype=torch.bool).squeeze()
-        pcd.points = open3d.utility.Vector3dVector(self.opts.T[stable_pts].cpu().numpy())
+            stable_pts = torch.ones_like(self.conf[:,filter], dtype=torch.bool).squeeze()
+
+        pcd.points = open3d.utility.Vector3dVector(self.opts.T[filter][stable_pts].cpu().numpy())
         if self.gray.numel() > 0:
-            rgb = self.gray.repeat((3,1)).T[stable_pts]
+            rgb = self.gray.repeat((3,1)).T[filter][stable_pts]
             pcd.colors = open3d.utility.Vector3dVector(rgb.cpu().numpy())
         return pcd
 
