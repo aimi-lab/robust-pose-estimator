@@ -3,10 +3,11 @@ slam:
   rot:
     n_iter: 10
     Ftol: 1.0e-4
-  icp_weight: 0.01
+  icp_weight:  10.0
+  dist_thr: 0.02 # relative distance threshold for data association
   n_iter:
-    - 5
-    - 5
+    - 10
+    - 4
     - 5
   Ftol:
     - 1.0e-4
@@ -15,20 +16,20 @@ slam:
   mode:
     - 'projective'
     - 'projective'
-    - 'euclidean'
+    - 'projective'
   depth_clipping:
-    - 0
+    - 1
     - 300 # in mm
   debug: False
 
 img_size:
-  - 320
-  - 256
+  - 640
+  - 512
 
 
 
 
 viewer:
-  enable: False
-  blocking: True
+  enable: True
+  blocking: False
   stable: False

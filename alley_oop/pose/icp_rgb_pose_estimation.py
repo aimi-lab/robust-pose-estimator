@@ -43,19 +43,20 @@ class RGBICPPoseEstimator(torch.nn.Module):
     def estimate_gn(self, ref_frame: FrameClass, target_frame: FrameClass, target_pcl:SurfelMap, init_pose: torch.Tensor=None):
         """ Minimize combined energy using Gauss-Newton and solving the normal equations."""
         ref_pcl = SurfelMap(frame=ref_frame, kmat=self.icp_estimator.intrinsics, ignore_mask=True)
-        x = torch.zeros(6, dtype=ref_frame.depth.dtype, device=ref_frame.depth.device)
+        x = torch.zeros(6, dtype=torch.float64, device=ref_frame.depth.device)
         if init_pose is not None:
-            x = lie_SE3_to_se3(init_pose)
-        optim_results = {'combined': [],'icp':[], 'rgb':[], 'icp_pts': [], 'rgb_pts': [], 'best_iter': 0}
+            x = lie_SE3_to_se3(init_pose.double())
+        optim_results = {'combined': [],'icp':[], 'rgb':[], 'icp_pts': [], 'rgb_pts': [], 'best_iter': 0, 'dx': []}
         converged = False
         best_sol = (x.clone(), torch.inf)
         for i in range(self.n_iter):
             # geometric
-            icp_residuals = self.icp_estimator.residual_fun(x, ref_pcl, target_pcl, ref_frame.mask)
-            icp_jacobian = self.icp_estimator.jacobian(x, ref_pcl, target_pcl, ref_frame.mask)
+            xfloat = x.float()
+            icp_residuals = self.icp_estimator.residual_fun(xfloat, ref_pcl, target_pcl, ref_frame.mask)
+            icp_jacobian = self.icp_estimator.jacobian(xfloat, ref_pcl, target_pcl, ref_frame.mask)
             # photometric
-            rgb_residuals = self.rgb_estimator.residual_fun(-x, ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
-            rgb_jacobian = self.rgb_estimator.jacobian(-x, ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
+            rgb_residuals = self.rgb_estimator.residual_fun(-xfloat, ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
+            rgb_jacobian = self.rgb_estimator.jacobian(-xfloat, ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
 
             # normal equations to be solved
             if (len(icp_residuals) == 0) | (len(rgb_residuals) == 0):
@@ -63,21 +64,18 @@ class RGBICPPoseEstimator(torch.nn.Module):
             A = self.icp_weight*icp_jacobian.T @ icp_jacobian - rgb_jacobian.T @ rgb_jacobian #
             b = self.icp_weight*icp_jacobian.T @ icp_residuals + rgb_jacobian.T @ rgb_residuals #
 
-            # Todo try several optimizer methods, this may be synchronized with CPU (cholesky, QR etc)
-            x0 = torch.linalg.lstsq(A,b).solution
+            x0 = torch.linalg.lstsq(A.double(),b.double()).solution
             optim_results['icp'].append(self.icp_weight * self.icp_estimator.cost_fun(icp_residuals))
             optim_results['rgb'].append(self.rgb_estimator.cost_fun(rgb_residuals))
             optim_results['icp_pts'].append(len(icp_residuals))
             optim_results['rgb_pts'].append(len(rgb_residuals))
             cost = optim_results['icp'][-1] + optim_results['rgb'][-1]
             optim_results['combined'].append(cost)
+            optim_results['dx'].append(torch.linalg.norm(x0,ord=2))
 
-            #self.icp_estimator.plot_correspondence(x, ref_img, ref_depth, target_img)
-            #self.icp_estimator.plot(x, ref_pcl, target_pcl)
-
-            if cost < best_sol[1]:
+            if cost/optim_results['icp_pts'][-1] < best_sol[1]:
                 optim_results['best_iter'] = i
-                best_sol = (x.clone(), cost)
+                best_sol = (x.clone(), cost/optim_results['icp_pts'][-1])
                 self.best_cost = (cost, optim_results['icp'][-1], optim_results['rgb'][-1])
             if cost < self.Ftol:
                 converged = True
@@ -88,4 +86,4 @@ class RGBICPPoseEstimator(torch.nn.Module):
             x -= x0
         if not converged:
             warnings.warn(f"not converged after {self.n_iter}", RuntimeWarning)
-        return lie_se3_to_SE3(best_sol[0]), best_sol[1], optim_results
+        return lie_se3_to_SE3(best_sol[0]).to(ref_frame.depth.dtype), best_sol[1], optim_results

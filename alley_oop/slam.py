@@ -25,7 +25,8 @@ class SLAM(object):
         self.cnt = 0
         self.rendered_frame = None
         self.frame = None
-        self.depth_clipping = config['depth_clipping']
+        self.depth_scale = 1/config['depth_clipping'][1]
+        self.depth_min = config['depth_clipping'][0]*self.depth_scale  # internal normalization of depth
         self.dbg_opt = config['debug']
         self.recorder = OptimizationRecordings(config['pyramid_levels'])
         self.optim_res = None
@@ -45,7 +46,7 @@ class SLAM(object):
             if self.scene is None:
                 # initialize scene with first frame
                 self.scene = SurfelMap(frame=self.frame, kmat=self.intrinsics, upscale=1,
-                                       d_thresh=self.config['dist_thr'])
+                                       d_thresh=self.config['dist_thr'], depth_scale=self.depth_scale)
             pose, self.rendered_frame = self.pose_estimator.estimate(self.frame, self.scene)
             if self.dbg_opt:
                 print(f"optimization costs: {self.pose_estimator.cost}")
@@ -57,14 +58,17 @@ class SLAM(object):
                 self.recorder(self.scene, self.pose_estimator)
                 self.optim_res = self.pose_estimator.optim_res
             self.cnt += 1
-            return pose, self.scene
+            pose_scaled = pose.clone()
+            pose_scaled[:3,3] /= self.depth_scale  # de-normalize depth scaling
+            return pose_scaled, self.scene
 
     def _pre_process(self, img:ndarray, depth:ndarray, mask:ndarray=None):
         img = (torch.tensor(img).permute(2,0,1).unsqueeze(0)/255.0).to(self.dtype).to(self.device)
-        depth = cv2.bilateralFilter(depth, None, sigmaColor=10, sigmaSpace=10)
+        depth = depth * self.depth_scale  # normalize depth for numerical stability
+        depth = cv2.bilateralFilter(depth, None, sigmaColor=0.01, sigmaSpace=10)
         mask = np.ones_like(depth).astype(bool) if mask is None else mask
         # depth clipping
-        mask &= (depth > self.depth_clipping[0]) & (depth < self.depth_clipping[1])
+        mask &= (depth > self.depth_min) & (depth < 1.0)
         # border points are usually unstable
         mask = cv2.erode(mask.astype(np.uint8), kernel=np.ones((7,7)))
         depth = (torch.tensor(depth).unsqueeze(0).unsqueeze(0)).to(self.dtype).to(self.device)
@@ -80,7 +84,7 @@ class SLAM(object):
         return self
 
     def getPointCloud(self):
-        return self.scene.opts.T, self.scene.gray.T
+        return self.scene.opts.T/self.depth_scale, self.scene.gray.T/self.depth_scale
 
     def get_rendered_frame(self):
         return self.rendered_frame

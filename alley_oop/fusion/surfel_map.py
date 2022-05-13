@@ -26,6 +26,7 @@ class SurfelMap(object):
         self.interpolate = SparseImgInterpolator(5, 2, 0)
         # initiliaze focal length
         self.flen = (self.kmat[0, 0] + self.kmat[1, 1]) / 2
+        self.depth_scale = kwargs['depth_scale'] if 'depth_scale' in kwargs else 1.0  # only used for open3d pcl
 
         # either provide opts, normals and color or a frame class
         if 'opts' in kwargs:
@@ -270,7 +271,7 @@ class SurfelMap(object):
         opts = transform[:3,:3]@self.opts + transform[:3,3,None]
         normals = transform[:3,:3] @ self.nrml
         return SurfelMap(opts=opts, normals=normals, kmat=self.kmat, gray=self.gray, img_shape=self.img_shape,
-                         radi=self.radi).to(self.device)
+                         radi=self.radi, depth_scale=self.depth_scale).to(self.device)
 
     @property
     def grid_pts(self):
@@ -324,7 +325,7 @@ class SurfelMap(object):
         else:
             stable_pts = torch.ones_like(self.conf[:,filter], dtype=torch.bool).squeeze()
 
-        pcd.points = open3d.utility.Vector3dVector(self.opts.T[filter][stable_pts].cpu().numpy())
+        pcd.points = open3d.utility.Vector3dVector(self.opts.T[filter][stable_pts].cpu().numpy()/self.depth_scale)
         if self.gray.numel() > 0:
             rgb = self.gray.repeat((3,1)).T[filter][stable_pts]
             pcd.colors = open3d.utility.Vector3dVector(rgb.cpu().numpy())
