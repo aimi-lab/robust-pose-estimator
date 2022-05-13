@@ -33,6 +33,7 @@ def normals_from_regular_grid(oarr: Union[np.ndarray, torch.Tensor], pad_opt: bo
 
     # normalize vector length
     norm = lib.sum(narr**2, axis=-1)**.5
+    norm[norm == 0.0] = 1.0
     narr /= norm[..., None]
 
     return narr
