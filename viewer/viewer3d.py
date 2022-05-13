@@ -32,17 +32,38 @@ class Viewer3D(object):
     def exit_loop_callback(self, dummy):
         self.exit_loop = True
 
-    def __call__(self, pose, pcd=None, add_pcd=None, zoom=0.5, frame=None, synth_frame=None):
-        # define viewer
-        if frame is not None:
-            if synth_frame is not None:
+    def __call__(self, pose, pcd=None, add_pcd=None, zoom=0.5, frame=None, synth_frame=None, optim_results=None):
+        # plot input frame and synthesized frame
+        if (optim_results is not None) | (frame is not None):
+            if optim_results is not None:
+                fig, ax = plt.subplots(len(optim_results) + 1, 1, num=1, clear=True, figsize=(8,16))
+            else:
+                fig, ax = plt.subplots(1, 1, num=1, clear=True, figsize=(8,16))
+            if (frame is not None) & (synth_frame is not None):
                 img = frame.to_numpy()[1]
                 img_synth = synth_frame.to_numpy()[1]
                 img_view = np.concatenate((img, img_synth), axis=1)
-                plt.imshow(img_view)
-                plt.axis('off')
-                plt.draw()
-                plt.pause(0.0001)
+                ax[0].imshow(img_view)
+                ax[0].axis('off')
+            # plot optimization results
+            if optim_results is not None:
+                for lv, i in enumerate(range(len(optim_results), 0, -1)):
+                    ax[i].set_title(f'Optimization Cost at Pyramid Lv {lv}')
+                    ax[i].plot(optim_results[lv]['combined'], marker='.')
+                    ax[i].plot(optim_results[lv]['icp'], marker='.')
+                    ax[i].plot(optim_results[lv]['rgb'], marker='.')
+                    ax2 = ax[i].twinx()
+                    ax2.plot(optim_results[lv]['icp_pts'], 'r--', marker='*')
+                    ax2.legend(['# icp points'])
+                    ax[i].grid()
+                    ax[i].axline((optim_results[lv]['best_iter'], 0),
+                                 (optim_results[lv]['best_iter'], max(optim_results[lv]['combined'])))
+                ax[1].legend(['combined', 'icp', 'rgb'])
+                ax[-1].set_xlabel('iterations')
+                plt.tight_layout()
+            plt.draw()
+            plt.pause(0.0001)
+
         self.exit_loop = not self.blocking
         if self.blocking:
             print('blocking mode: press q to continue')

@@ -28,6 +28,7 @@ class SLAM(object):
         self.depth_clipping = config['depth_clipping']
         self.dbg_opt = config['debug']
         self.recorder = OptimizationRecordings(config['pyramid_levels'])
+        self.optim_res = None
 
     def processFrame(self, img: Union[ndarray, tensor], depth:Union[ndarray, tensor], mask:Union[ndarray, tensor]=None):
         """
@@ -52,6 +53,7 @@ class SLAM(object):
                 if self.dbg_opt:
                     print(f"number of surfels: {self.scene.opts.shape[1]}, stable: {(self.scene.conf > self.scene.conf_thr).sum().item()}")
                 self.recorder(self.scene, self.pose_estimator)
+                self.optim_res = self.pose_estimator.optim_res
             self.cnt += 1
             return pose, self.scene
 
@@ -83,6 +85,9 @@ class SLAM(object):
 
     def get_frame(self):
         return self.frame
+
+    def get_optimization_res(self):
+        return self.optim_res
 
     def plot_recordings(self, show=False):
         return self.recorder.plot(show)
