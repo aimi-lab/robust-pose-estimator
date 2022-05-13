@@ -21,6 +21,7 @@ class SurfelMap(object):
         self.conf_thr = kwargs['conf_thr'] if 'conf_thr' in kwargs else 10
         self.t_max = kwargs['t_max'] if 't_max' in kwargs else 15
         self.upscale = kwargs['upscale'] if 'upscale' in kwargs else 4
+        self.d_thresh = kwargs['d_thresh'] if 'd_thresh' in kwargs else 100.0
         self.dbug_opt = False
         self.interpolate = SparseImgInterpolator(5, 2, 0)
         # initiliaze focal length
@@ -115,7 +116,7 @@ class SurfelMap(object):
         midx = self.get_match_indices(global_ipts[:, bidx])
 
         # compute mask that rejects depth and normal outliers
-        vidx, midx = self.filter_surfels_by_correspondence(opts=opts, vidx=bidx, midx=midx, normals=normals)
+        vidx, midx = self.filter_surfels_by_correspondence(opts=opts, vidx=bidx, midx=midx, normals=normals, d_thresh=self.d_thresh)
         # apply frame mask to reject invalid pixels
         bidx[vidx.clone()] &= (frame.mask.view(-1)[(midx/self.upscale**2).long()]).type(torch.bool)
         midx = midx[frame.mask.view(-1)[(midx/self.upscale**2).long()]]
@@ -202,7 +203,7 @@ class SurfelMap(object):
         vidx: torch.Tensor = None,
         normals: torch.Tensor = None,
         d_thresh: float = 3,
-        n_thresh: float = 30,
+        n_thresh: float = 20,
         remove_duplicates: bool = False
         ) -> Tuple[torch.Tensor, torch.Tensor]:
         """

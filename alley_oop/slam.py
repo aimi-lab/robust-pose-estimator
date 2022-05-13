@@ -29,6 +29,7 @@ class SLAM(object):
         self.dbg_opt = config['debug']
         self.recorder = OptimizationRecordings(config['pyramid_levels'])
         self.optim_res = None
+        self.config = config
 
     def processFrame(self, img: Union[ndarray, tensor], depth:Union[ndarray, tensor], mask:Union[ndarray, tensor]=None):
         """
@@ -43,7 +44,8 @@ class SLAM(object):
             self.frame = FrameClass(img, depth, intrinsics=self.intrinsics, mask=mask)
             if self.scene is None:
                 # initialize scene with first frame
-                self.scene = SurfelMap(frame=self.frame, kmat=self.intrinsics, upscale=1)
+                self.scene = SurfelMap(frame=self.frame, kmat=self.intrinsics, upscale=1,
+                                       d_thresh=self.config['dist_thr'])
             pose, self.rendered_frame = self.pose_estimator.estimate(self.frame, self.scene)
             if self.dbg_opt:
                 print(f"optimization costs: {self.pose_estimator.cost}")

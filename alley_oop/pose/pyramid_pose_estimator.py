@@ -48,6 +48,7 @@ class PyramidPoseEstimator(torch.nn.Module):
                                                      self.config['icp_weight'],
                                                      self.config['n_iter'][pyr_level],
                                                      self.config['Ftol'][pyr_level],
+                                                     dist_thr=self.config['dist_thr'],
                                                      association_mode=self.config['mode'][pyr_level]).to(self.device)
                 T_cur2last, _, optim_res = pose_estimator.estimate_gn(frame_pyr[pyr_level], model_frame_pyr[pyr_level], scene_tlast, init_pose=T_cur2last)
                 self.cost[pyr_level] = pose_estimator.best_cost

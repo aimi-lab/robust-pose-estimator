@@ -1,12 +1,13 @@
 slam:
-  pyramid_levels: 1
+  pyramid_levels: 3
   rot:
     n_iter: 10
     Ftol: 1.0e-4
-  icp_weight: 100.0
+  icp_weight:  0.0255
+  dist_thr: 100.0
   n_iter:
-    - 20
-    - 5
+    - 10
+    - 4
     - 5
   Ftol:
     - 1.0e-4
@@ -22,13 +23,13 @@ slam:
   debug: False
 
 img_size:
-  - 320
-  - 240
+  - 640
+  - 480
 
 
 
 
 viewer:
   enable: True
-  blocking: True
+  blocking: False
   stable: False
