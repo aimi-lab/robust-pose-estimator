@@ -46,7 +46,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
         x = torch.zeros(6, dtype=ref_frame.depth.dtype, device=ref_frame.depth.device)
         if init_pose is not None:
             x = lie_SE3_to_se3(init_pose)
-        cost = None
+        optim_results = {'combined': [],'icp':[], 'rgb':[], 'icp_pts': [], 'rgb_pts': [], 'best_iter': 0}
         converged = False
         best_sol = (x.clone(), torch.inf)
         for i in range(self.n_iter):
@@ -65,16 +65,20 @@ class RGBICPPoseEstimator(torch.nn.Module):
 
             # Todo try several optimizer methods, this may be synchronized with CPU (cholesky, QR etc)
             x0 = torch.linalg.lstsq(A,b).solution
-            icp_cost = self.icp_estimator.cost_fun(icp_residuals)
-            rgb_cost = self.rgb_estimator.cost_fun(rgb_residuals)
-            cost = self.icp_weight * icp_cost + rgb_cost
+            optim_results['icp'].append(self.icp_weight * self.icp_estimator.cost_fun(icp_residuals))
+            optim_results['rgb'].append(self.rgb_estimator.cost_fun(rgb_residuals))
+            optim_results['icp_pts'].append(len(icp_residuals))
+            optim_results['rgb_pts'].append(len(rgb_residuals))
+            cost = optim_results['icp'][-1] + optim_results['rgb'][-1]
+            optim_results['combined'].append(cost)
 
             #self.icp_estimator.plot_correspondence(x, ref_img, ref_depth, target_img)
             #self.icp_estimator.plot(x, ref_pcl, target_pcl)
 
             if cost < best_sol[1]:
+                optim_results['best_iter'] = i
                 best_sol = (x.clone(), cost)
-                self.best_cost = (cost, self.icp_weight*icp_cost, rgb_cost)
+                self.best_cost = (cost, optim_results['icp'][-1], optim_results['rgb'][-1])
             if cost < self.Ftol:
                 converged = True
                 break
@@ -84,4 +88,4 @@ class RGBICPPoseEstimator(torch.nn.Module):
             x -= x0
         if not converged:
             warnings.warn(f"not converged after {self.n_iter}", RuntimeWarning)
-        return lie_se3_to_SE3(best_sol[0]), best_sol[1]
+        return lie_se3_to_SE3(best_sol[0]), best_sol[1], optim_results
