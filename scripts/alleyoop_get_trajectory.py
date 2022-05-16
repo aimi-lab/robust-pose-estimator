@@ -27,7 +27,7 @@ def main(input_path, output_path, config, device_sel, nsamples):
             warnings.warn('No GPU available, fallback to CPU')
 
     dataset, calib = get_data(input_path, config['img_size'])
-    slam = SLAM(torch.tensor(calib['intrinsics']['left']), config['slam']).to(device)
+    slam = SLAM(torch.tensor(calib['intrinsics']['left']), config['slam'], img_shape=config['img_size']).to(device)
     dataset.transform = Compose([dataset.transform, slam.pre_process])  # add pre-processing to data loading (CPU)
     loader = DataLoader(dataset, num_workers=1, pin_memory=True)
 

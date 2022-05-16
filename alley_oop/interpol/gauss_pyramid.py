@@ -119,3 +119,23 @@ class FrameGaussPyramid(GaussPyramid):
         # check padding for input with odd-shape
         padding = (x.shape[-2]%2, x.shape[-1]%2)
         return (-max_pool2d(-x.float(), kernel_size=self._ds_step, stride=self._ds_step, padding=padding)).to(torch.bool)
+
+    def get_pyr_shapes(self, shape=None):
+        if shape is None:
+            assert self._top_level_frame is not None
+            shape = self._top_level_frame.shape
+
+        shapes = [shape]
+        for _ in range(self._level_num):
+            shapes.append((shapes[-1][0]//self._ds_step, shapes[-1][1]//self._ds_step))
+        return shapes
+
+    def get_intrinsics(self, intrinsics: torch.Tensor=None):
+        intrinsics = self._top_instrinsics if intrinsics is None else intrinsics
+        self.intrinsics_levels = [intrinsics]
+
+        # iterate through pyramid levels
+        for _ in range(self._level_num):
+            self.intrinsics_levels.append(self.create_next_intrinsics(self.intrinsics_levels[-1]))
+        return self.intrinsics_levels
+

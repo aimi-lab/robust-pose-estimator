@@ -73,7 +73,7 @@ class ICPEstimator(torch.nn.Module):
         """ Levenberg-Marquard estimation."""
         ref_pcl = SurfelMap(frame=ref_frame, kmat=self.intrinsics, ignore_mask=True)
 
-        x_list, eps = lsq_lma(torch.zeros(6).to(ref_frame.depth.device).to(ref_frame.depth.dtype), self.residual_fun, self.jacobian,
+        x_list, eps = lsq_lma(torch.zeros(6, device=ref_frame.depth.device, dtype=ref_frame.depth.dtype), self.residual_fun, self.jacobian,
                               args=(ref_pcl, target_pcl, ref_mask,), max_iter=self.n_iter, tol=self.Ftol, xtol=self.xtol)
         x = x_list[-1]
         cost = self.cost_fun(self.residual_fun(x, ref_pcl, target_pcl, ref_mask))
@@ -100,7 +100,7 @@ class ICPEstimator(torch.nn.Module):
     @staticmethod
     def j_3d(points3d): #ToDo precomputing n^T @ J_3d might speed up things
         # product of J_T*J_x for se(3)
-        J = torch.zeros((len(points3d), 3, 6), dtype=points3d.dtype).to(points3d.device)
+        J = torch.zeros((len(points3d), 3, 6), dtype=points3d.dtype, device=points3d.device)
         J[:, 0, 1] = points3d[:, 2]
         J[:, 0, 2] = -points3d[:, 1]
         J[:, 0, 3] = 1
@@ -152,7 +152,7 @@ class ICPEstimator(torch.nn.Module):
 
         dists = torch.cdist(ref_pcl.opts.T.unsqueeze(0), target_pcl.opts.T.unsqueeze(0)).squeeze()
         closest_pts = torch.argmin(dists, dim=-1)
-        midx = torch.arange(ref_pcl.opts.shape[1]).to(ref_pcl.device)
+        midx = torch.arange(ref_pcl.opts.shape[1], device=ref_pcl.device)
         if ref_mask is not None:
             pass
 

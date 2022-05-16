@@ -2,7 +2,7 @@ import torch
 from alley_oop.fusion.surfel_map import SurfelMap
 from alley_oop.pose.pyramid_pose_estimator import PyramidPoseEstimator
 from alley_oop.pose.frame_class import FrameClass
-from typing import Union
+from typing import Union, Tuple
 from numpy import ndarray
 from torch import tensor
 import numpy as np
@@ -10,7 +10,7 @@ import cv2
 
 
 class SLAM(object):
-    def __init__(self, intrinsics:torch.tensor, config:dict):
+    def __init__(self, intrinsics:torch.tensor, config:dict, img_shape: Tuple):
         """
         Alley-OOP SLAM (imitation of ElasticFusion)
         :param intrinsics: camera intrinsics tensor
@@ -21,7 +21,7 @@ class SLAM(object):
         self.device = intrinsics.device
         self.dtype = torch.float32
         self.intrinsics = intrinsics.to(self.dtype)
-        self.pose_estimator = PyramidPoseEstimator(intrinsics=self.intrinsics, config=config)
+        self.pose_estimator = PyramidPoseEstimator(intrinsics=self.intrinsics, config=config, img_shape=img_shape)
         self.cnt = 0
         self.rendered_frame = None
         self.frame = None

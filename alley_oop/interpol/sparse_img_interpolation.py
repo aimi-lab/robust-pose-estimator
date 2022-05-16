@@ -20,7 +20,7 @@ class SparseImgInterpolator(torch.nn.Module):
 
         :param x: 2D tensor shape NxCxHxW with nan as missing values
         """
-        mask = torch.isnan(x).to(x.device)
+        mask = torch.isnan(x)
         x[mask] = self.prior_val
         channels = x.shape[1]
         padnum = self._kernel_size // 2

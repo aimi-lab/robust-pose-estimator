@@ -37,9 +37,9 @@ class FrameClass:
             self.normals = normals
         else:
             assert intrinsics is not None
-            rmat = torch.eye(3).to(depth.dtype).to(depth.device)
-            tvec = torch.zeros((3,1)).to(depth.dtype).to(depth.device)
-            img_pts = create_img_coords_t(depth.shape[-2], depth.shape[-1]).to(depth.dtype).to(depth.device)
+            rmat = torch.eye(3, dtype=depth.dtype, device=depth.device)
+            tvec = torch.zeros((3,1), dtype=depth.dtype, device=depth.device)
+            img_pts = create_img_coords_t(depth.shape[-2], depth.shape[-1], device=depth.device)
             pts = reverse_project(img_pts, intrinsics, rmat, tvec, dpth=depth.squeeze()).T
             normals = normals_from_regular_grid(pts.view((*self.depth.shape[-2:], 3)))
             # pad normals

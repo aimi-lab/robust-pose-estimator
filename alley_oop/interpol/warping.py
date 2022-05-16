@@ -144,8 +144,8 @@ class HomographyWarper(nn.Module):
         self.normalized_coordinates: bool = normalized_coordinates
 
         # create base grid to compute the flow
-        self.grid: torch.Tensor = create_meshgrid(
-            height, width, normalized_coordinates=normalized_coordinates)
+        self.grid: torch.Tensor = nn.Parameter(create_meshgrid(
+            height, width, normalized_coordinates=normalized_coordinates), requires_grad=False)
 
     def warp_grid(self, dst_homo_src: torch.Tensor) -> torch.Tensor:
         r"""Computes the grid to warp the coordinates grid by an homography.
@@ -159,8 +159,6 @@ class HomographyWarper(nn.Module):
             torch.Tensor: the transformed grid of shape :math:`(N, H, W, 2)`.
         """
         batch_size: int = dst_homo_src.shape[0]
-        device: torch.device = dst_homo_src.device
-        dtype: torch.dtype = dst_homo_src.dtype
         # expand grid to match the input batch size
         grid: torch.Tensor = self.grid.expand(batch_size, -1, -1, -1)  # NxHxWx2
         if len(dst_homo_src.shape) == 3:  # local homography case
@@ -168,7 +166,7 @@ class HomographyWarper(nn.Module):
         # perform the actual grid transformation,
         # the grid is copied to input device and casted to the same type
         flow: torch.Tensor = transform_points(
-            dst_homo_src, grid.to(device).to(dtype))  # NxHxWx2
+            dst_homo_src, grid)  # NxHxWx2
         return flow.view(batch_size, self.height, self.width, 2)  # NxHxWx2
 
     def forward(  # type: ignore

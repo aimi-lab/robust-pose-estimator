@@ -67,7 +67,7 @@ class RGBPoseEstimator(torch.nn.Module):
     def estimate_lm(self, ref_frame: FrameClass, target_frame: FrameClass):
         """ Levenberg-Marquard estimation."""
         ref_pcl = SurfelMap(frame=ref_frame, kmat=self.intrinsics, ignore_mask=True)
-        x_list, eps = lsq_lma(torch.zeros(6).to(ref_frame.depth.device).to(ref_frame.depth.dtype),
+        x_list, eps = lsq_lma(torch.zeros(6, device=ref_frame.depth.device, dtype=ref_frame.depth.dtype),
                               self.residual_fun, self.jacobian,
                               args=(ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask,),
                               max_iter=self.n_iter, tol=self.Ftol, xtol=self.xtol)
@@ -96,20 +96,19 @@ class RGBPoseEstimator(torch.nn.Module):
     def _image_jacobian(img: torch.Tensor):
         sobel = [[-0.125, -0.25, -0.125], [0, 0, 0], [0.125, 0.25, 0.125]]
         batch, channels, h, w = img.shape
-        sobel_kernely = torch.tensor(sobel, dtype=torch.float32).unsqueeze(0).expand(1, channels, 3, 3).to(img.device)
-        sobel_kernelx = torch.tensor(sobel, dtype=torch.float32).unsqueeze(0).expand(1, channels, 3, 3).transpose(2,
-                                                                                                                  3).to(
-            img.device)
-        x_grad = pad(conv2d(img, sobel_kernelx.to(img.dtype), stride=1, padding='valid', groups=channels)[..., 1:-1, 1:-1],
+        sobel_kernely = torch.tensor(sobel, dtype=img.dtype, device=img.device).unsqueeze(0).expand(1, channels, 3, 3)
+        sobel_kernelx = torch.tensor(sobel, dtype=img.dtype, device=img.device).unsqueeze(0).expand(1, channels, 3, 3).transpose(2,
+                                                                                                                  3)
+        x_grad = pad(conv2d(img, sobel_kernelx, stride=1, padding='valid', groups=channels)[..., 1:-1, 1:-1],
                      (2, 2, 2, 2)).reshape(batch, channels, -1)
-        y_grad = pad(conv2d(img, sobel_kernely.to(img.dtype), stride=1, padding='valid', groups=channels)[..., 1:-1, 1:-1],
+        y_grad = pad(conv2d(img, sobel_kernely, stride=1, padding='valid', groups=channels)[..., 1:-1, 1:-1],
                      (2, 2, 2, 2)).reshape(batch, channels, -1)
         jacobian = torch.stack((x_grad, y_grad), dim=-1)
         return jacobian
 
     def j_wt(self, points3d):
         # jacobian of projection and transform for se(3) (J_w*J_T)
-        J = torch.zeros((len(points3d), 2, 6), dtype=points3d.dtype).to(points3d.device)
+        J = torch.zeros((len(points3d), 2, 6), dtype=points3d.dtype, device=points3d.device)
         x = points3d[:, 0]
         y = points3d[:, 1]
         zinv = 1/points3d[:, 2]

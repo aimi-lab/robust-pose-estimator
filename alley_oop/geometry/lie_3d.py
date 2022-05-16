@@ -23,7 +23,7 @@ def lie_so3_to_SO3(
     lib = get_lib(wvec)
     
     # define identity matrix in advance to account for torch device
-    eye_3 = lib.eye(3, dtype=wvec.dtype).to(wvec.device) if lib == torch else lib.eye(3, dtype=wvec.dtype)
+    eye_3 = lib.eye(3, dtype=wvec.dtype, device=wvec.device) if lib == torch else lib.eye(3, dtype=wvec.dtype)
 
     # check if vector of zeros
     if not wvec.any():
@@ -91,7 +91,7 @@ def lie_se3_to_SE3(
     lib = get_lib(pvec)
 
     # define identity matrix in advance to account for torch device
-    eye_3 = lib.eye(3, dtype=pvec.dtype).to(pvec.device) if lib == torch else lib.eye(3, dtype=pvec.dtype)
+    eye_3 = lib.eye(3, dtype=pvec.dtype, device=pvec.device) if lib == torch else lib.eye(3, dtype=pvec.dtype)
 
     # compute scale from vector norm
     theta = (pvec[:3] @ pvec[:3])**.5
@@ -115,7 +115,7 @@ def lie_se3_to_SE3(
 
     tvec = vmat @ pvec[3:]
 
-    pmat = lib.eye(4, dtype=pvec.dtype).to(pvec.device) if lib == torch else lib.eye(4, dtype=pvec.dtype)
+    pmat = lib.eye(4, dtype=pvec.dtype, device=pvec.device) if lib == torch else lib.eye(4, dtype=pvec.dtype)
     pmat[:3, :3] = rmat
     pmat[:3, -1] = tvec
 
@@ -148,7 +148,7 @@ def lie_SE3_to_se3(
 
     # construct hat-map which is so(3)
     wmat = lie_hatmap(wvec_norm)
-    Eye = lib.eye(3, dtype=wmat.dtype).to(wmat.device) if lib == torch else lib.eye(3, dtype=wmat.dtype)
+    Eye = lib.eye(3, dtype=wmat.dtype, device=wmat.device) if lib == torch else lib.eye(3, dtype=wmat.dtype)
     vmat_inv = Eye - .5*theta*wmat + mul_term * wmat @ wmat
     uvec = vmat_inv @ pmat[:3, -1]
 
@@ -176,10 +176,6 @@ def lie_hatmap(
         [+wvec[2], 0, -wvec[0]],
         [-wvec[1], +wvec[0], 0],
     ])
-
-    # consider torch device
-    if isinstance(wvec, torch.Tensor):
-        wmat = wmat.to(wvec.device)
 
     return wmat
 

@@ -72,8 +72,8 @@ class RotationEstimator(torch.nn.Module):
     def _image_jacobian(img:torch.Tensor):
         sobel = [[-0.125, -0.25, -0.125], [0, 0, 0], [0.125, 0.25, 0.125]]
         batch, channels, h, w= img.shape
-        sobel_kernely = torch.tensor(sobel, dtype=img.dtype).unsqueeze(0).expand(1, channels, 3, 3).to(img.device)
-        sobel_kernelx = torch.tensor(sobel, dtype=img.dtype).unsqueeze(0).expand(1, channels, 3, 3).transpose(2,3).to(img.device)
+        sobel_kernely = torch.tensor(sobel, dtype=img.dtype, device=img.device).unsqueeze(0).expand(1, channels, 3, 3)
+        sobel_kernelx = torch.tensor(sobel, dtype=img.dtype, device=img.device).unsqueeze(0).expand(1, channels, 3, 3).transpose(2,3)
         x_grad = pad(conv2d(img, sobel_kernelx, stride=1, padding='valid', groups=channels)[...,1:-1,1:-1], (2,2,2,2)).reshape(batch, channels, -1)
         y_grad = pad(conv2d(img, sobel_kernely, stride=1, padding='valid', groups=channels)[...,1:-1,1:-1], (2,2,2,2)).reshape(batch, channels, -1)
         jacobian = torch.stack((x_grad, y_grad), dim=-1)
@@ -86,9 +86,9 @@ class RotationEstimator(torch.nn.Module):
             adapted from https://www.robots.ox.ac.uk/~cmei/articles/single_view_track_ITRO.pdf where H(x) = K R(x) K'
             """
         assert K.shape == (3,3)
-        u, v = torch.meshgrid(torch.arange(img_shape[-1]), torch.arange(img_shape[-2]))
-        u = u.T.reshape(-1).to(K.device)
-        v = v.T.reshape(-1).to(K.device)
+        u, v = torch.meshgrid(torch.arange(img_shape[-1], device=K.device), torch.arange(img_shape[-2], device=K.device))
+        u = u.T.reshape(-1)
+        v = v.T.reshape(-1)
 
         # intrinsics
         cu = K[0,2]
@@ -96,7 +96,7 @@ class RotationEstimator(torch.nn.Module):
         f = K[0,0]
 
         # fast
-        J2 = torch.zeros((img_shape[-1] * img_shape[-2], 2, 9)).to(K.device)
+        J2 = torch.zeros((img_shape[-1] * img_shape[-2], 2, 9), device=K.device)
         J2[:, 0, 0] = u -cu
         J2[:, 0, 1] = v -cv
         J2[:, 0, 2] = f
