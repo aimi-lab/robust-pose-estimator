@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 from alley_oop.fusion.surfel_map import SurfelMap
 from alley_oop.utils.trajectory import save_trajectory
 from dataset.dataset_utils import get_data, StereoVideoDataset
+from dataset.transforms import Compose
 import warnings
 from torch.utils.data import DataLoader
 
@@ -25,7 +26,11 @@ def main(input_path, output_path, config, device_sel, nsamples):
         else:
             warnings.warn('No GPU available, fallback to CPU')
 
-    dataset, calib = get_data(input_path, config['img_size'], config['sample'])
+    dataset, calib = get_data(input_path, config['img_size'])
+    slam = SLAM(torch.tensor(calib['intrinsics']['left']), config['slam']).to(device)
+    dataset.transform = Compose([dataset.transform, slam.pre_process])  # add pre-processing to data loading (CPU)
+    loader = DataLoader(dataset, num_workers=1, pin_memory=True)
+
     if isinstance(dataset, StereoVideoDataset):
         disp_model = DisparityModel(calibration=calib, device=device, depth_clipping=config['depth_clipping'])
         seg_model = SemanticSegmentationModel('stereo_slam/segmentation_network/trained/PvtB2_combined_TAM_fold1.pth',
@@ -33,9 +38,9 @@ def main(input_path, output_path, config, device_sel, nsamples):
     with torch.inference_mode():
         viewer = Viewer3D((3 * config['img_size'][0], 3 * config['img_size'][1]),
                           blocking=config['viewer']['blocking']) if config['viewer']['enable'] else None
-        slam = SLAM(torch.tensor(calib['intrinsics']['left']), config['slam']).to(device)
+
         trajectory = []
-        for i, data in enumerate(tqdm(dataset, total=len(dataset))):
+        for i, data in enumerate(tqdm(loader, total=len(dataset))):
             if isinstance(dataset, StereoVideoDataset):
                 limg, rimg, pose_kinematics, img_number = data
                 depth, depth_valid = disp_model(limg, rimg)
@@ -43,7 +48,7 @@ def main(input_path, output_path, config, device_sel, nsamples):
                 mask &= depth_valid  # mask tools and non-valid depth
             else:
                 limg, depth, mask, img_number = data
-            pose, scene = slam.processFrame(limg, depth)
+            pose, scene = slam.processFrame(limg.to(device), depth.to(device), mask.to(device))
 
             if viewer is not None:
                 curr_pcl = SurfelMap(frame=slam.get_frame(), kmat=torch.tensor(calib['intrinsics']['left']).float(), pmat=pose).pcl2open3d(stable=False)

@@ -26,13 +26,14 @@ class SLAM(object):
         self.rendered_frame = None
         self.frame = None
         self.depth_scale = 1/config['depth_clipping'][1]
-        self.depth_min = config['depth_clipping'][0]*self.depth_scale  # internal normalization of depth
+        depth_min = config['depth_clipping'][0]*self.depth_scale  # internal normalization of depth
         self.dbg_opt = config['debug']
         self.recorder = OptimizationRecordings(config['pyramid_levels'])
         self.optim_res = None
         self.config = config
+        self.pre_process = PreProcess(self.depth_scale, depth_min, self.dtype)
 
-    def processFrame(self, img: Union[ndarray, tensor], depth:Union[ndarray, tensor], mask:Union[ndarray, tensor]=None):
+    def processFrame(self, img: tensor, depth:tensor, mask:tensor=None):
         """
         track frame and fuse points to SurfelMap
         :param img: RGB input image
@@ -40,8 +41,6 @@ class SLAM(object):
         :param mask: input mask (to mask out tools)
         """
         with torch.inference_mode():
-            if not torch.is_tensor(img):
-                img, depth, mask = self._pre_process(img, depth, mask)
             self.frame = FrameClass(img, depth, intrinsics=self.intrinsics, mask=mask)
             if self.scene is None:
                 # initialize scene with first frame
@@ -61,20 +60,6 @@ class SLAM(object):
             pose_scaled = pose.clone()
             pose_scaled[:3,3] /= self.depth_scale  # de-normalize depth scaling
             return pose_scaled, self.scene
-
-    def _pre_process(self, img:ndarray, depth:ndarray, mask:ndarray=None):
-        img = (torch.tensor(img).permute(2,0,1).unsqueeze(0)/255.0).to(self.dtype).to(self.device)
-        depth = depth * self.depth_scale  # normalize depth for numerical stability
-        depth = cv2.bilateralFilter(depth, None, sigmaColor=0.01, sigmaSpace=10)
-        mask = np.ones_like(depth).astype(bool) if mask is None else mask
-        # depth clipping
-        mask &= (depth > self.depth_min) & (depth < 1.0)
-        # border points are usually unstable
-        mask = cv2.erode(mask.astype(np.uint8), kernel=np.ones((7,7)))
-        depth = (torch.tensor(depth).unsqueeze(0).unsqueeze(0)).to(self.dtype).to(self.device)
-        mask = (torch.tensor(mask).unsqueeze(0).unsqueeze(0)).to(torch.bool).to(self.device)
-
-        return img, depth, mask
 
     def to(self, device: torch.device):
         self.device = device
@@ -138,4 +123,25 @@ class OptimizationRecordings():
         if show:
             plt.show()
         return fig, ax
+
+
+class PreProcess(object):
+    def __init__(self, scale, depth_min, dtype=torch.float32):
+        self.depth_scale = scale
+        self.depth_min = depth_min
+        self.dtype = dtype
+
+    def __call__(self, img:ndarray, depth:ndarray, mask:ndarray=None, dummy_label=None):
+        img = (torch.tensor(img).permute(2, 0, 1) / 255.0).to(self.dtype)
+        depth = depth * self.depth_scale  # normalize depth for numerical stability
+        depth = cv2.bilateralFilter(depth, None, sigmaColor=0.01, sigmaSpace=10)
+        mask = np.ones_like(depth).astype(bool) if mask is None else mask
+        # depth clipping
+        mask &= (depth > self.depth_min) & (depth < 1.0)
+        # border points are usually unstable
+        mask = cv2.erode(mask.astype(np.uint8), kernel=np.ones((7, 7)))
+        depth = (torch.tensor(depth).unsqueeze(0)).to(self.dtype)
+        mask = (torch.tensor(mask).unsqueeze(0)).to(torch.bool)
+
+        return img, depth, mask
 
