@@ -117,4 +117,4 @@ if __name__ == '__main__':
     if args.outpath is None:
         args.outpath = os.path.join(args.input, 'data','alleyoop')
 
-    main(args.input, args.outpath, config, args.device is not None, args.nsamples)
+    main(args.input, args.outpath, config, args.device, args.nsamples)
