@@ -2,6 +2,7 @@ from alley_oop.interpol.gauss_pyramid import FrameGaussPyramid
 from alley_oop.pose.frame_class import FrameClass
 from alley_oop.pose.icp_rgb_pose_estimation import RGBICPPoseEstimator
 from alley_oop.pose.rotation_estimation import RotationEstimator
+from alley_oop.geometry.pinhole_transforms import inv_transform
 import torch
 from typing import Tuple
 import numpy as np
@@ -42,7 +43,7 @@ class PyramidPoseEstimator(torch.nn.Module):
 
     def estimate(self, frame: FrameClass, scene: SurfelMap):
         # transform scene to last camera pose coordinates
-        scene_tlast = scene.transform_cpy(torch.linalg.inv(self.last_pose))
+        scene_tlast = scene.transform_cpy(inv_transform(self.last_pose))
         # apply gaussian pyramid to current and rendered images
         frame_pyr, intrinsics_pyr = self.pyramid(frame)
         model_frame = None
@@ -71,12 +72,3 @@ class PyramidPoseEstimator(torch.nn.Module):
     @property
     def device(self):
         return self.last_pose.device
-
-    def plot(self, T, ref_frame, model, intrinsics):
-        ref_pcl = SurfelMap(frame=ref_frame, kmat=intrinsics)
-
-        ref_pcl.transform(torch.linalg.inv(T))
-
-        from viewer.view_render import Render
-        viewer = Render(model.pcl2open3d(), blocking=True)
-        viewer.render(np.eye(4),add_pcd=ref_pcl.pcl2open3d() )

@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import warnings
 from alley_oop.geometry.lie_3d import lie_se3_to_SE3
-from alley_oop.geometry.pinhole_transforms import forward_project2image, forward_project
+from alley_oop.geometry.pinhole_transforms import forward_project2image, forward_project, inv_transform
 from alley_oop.pose.frame_class import FrameClass
 from alley_oop.fusion.surfel_map import SurfelMap
 from alley_oop.utils.pytorch import batched_dot_product
@@ -52,8 +52,7 @@ class ICPEstimator(torch.nn.Module):
         return (residuals**2).mean()
 
     def residual_fun(self, x, ref_pcl, target_pcl, ref_mask=None):
-        xt = torch.tensor(x).double().to(ref_pcl.opts.device) if not torch.is_tensor(x) else x
-        T_est = lie_se3_to_SE3(xt)
+        T_est = lie_se3_to_SE3(x)
         self.src_ids, self.trg_ids = self.associate(ref_pcl, target_pcl, T_est, ref_mask)
         # compute residuals
         ref_pcl_world_c = ref_pcl.transform_cpy(T_est)
@@ -63,8 +62,7 @@ class ICPEstimator(torch.nn.Module):
         return residuals
 
     def jacobian(self, x, ref_pcl, target_pcl, ref_mask=None):
-        xt = torch.tensor(x).double() if not torch.is_tensor(x) else x
-        T_est = lie_se3_to_SE3(xt)
+        T_est = lie_se3_to_SE3(x)
         ref_pcl_world_c = ref_pcl.transform_cpy(T_est)
         return (target_pcl.normals.T[self.trg_ids].unsqueeze(1) @ self.j_3d(
             ref_pcl_world_c.opts.T[self.src_ids])).squeeze()
@@ -116,7 +114,7 @@ class ICPEstimator(torch.nn.Module):
         # update image shape
         ref_pcl = ref_pcl.transform_cpy(T_est)
 
-        pmat_inv = torch.linalg.inv(T_est)
+        pmat_inv = inv_transform(T_est)
 
         # project all surfels to current image frame
         global_ipts, bidx = forward_project2image(target_pcl.opts, kmat=self.intrinsics, rmat=pmat_inv[:3, :3],

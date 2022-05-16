@@ -181,3 +181,10 @@ def disp2depth(
     dept = (base * flen) / disp.flatten()
 
     return dept
+
+
+def inv_transform(mat:torch.Tensor):
+    mat_inv = mat.clone()
+    mat_inv[:3, :3] = mat[:3, :3].T
+    mat_inv[:3, 3] = -mat[:3, 3]
+    return mat_inv
