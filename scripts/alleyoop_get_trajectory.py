@@ -1,11 +1,10 @@
 import sys
-sys.path.append('../..')
+sys.path.append('../')
 from dataset.semantic_dataset import RGBDDataset
 from dataset.scared_dataset import ScaredDataset
 from dataset.tum_dataset import TUMDataset
 from dataset.video_dataset import StereoVideoDataset
 from dataset.rectification import StereoRectifier
-from ElasticFusion import pyElasticFusion
 from alley_oop.slam import SLAM
 import os, glob
 import json
@@ -19,13 +18,7 @@ import open3d
 import matplotlib.pyplot as plt
 from alley_oop.fusion.surfel_map import SurfelMap
 import warnings
-
-
-def save_ply(pcl_array,colors,  path):
-    pcl = open3d.geometry.PointCloud()
-    pcl.points = open3d.utility.Vector3dVector(pcl_array.cpu().numpy())
-    pcl.colors = open3d.utility.Vector3dVector(colors.repeat(1,3).cpu().numpy())
-    open3d.io.write_point_cloud(path, pcl)
+from torch.utils.data import DataLoader
 
 
 def main(input_path, output_path, config, device_sel, nsamples):
@@ -88,8 +81,8 @@ def main(input_path, output_path, config, device_sel, nsamples):
             if len(trajectory) > nsamples:
                 break
             if (i%50) == 0:
-                pcl = slam.getPointCloud()
-                save_ply(*pcl, os.path.join(output_path, f'map_{i:04d}.ply'))
+                pcl = scene.pcl2open3d(stable=True)
+                open3d.io.write_point_cloud(os.path.join(output_path, f'map_{i:04d}.ply'), pcl)
         os.makedirs(output_path, exist_ok=True)
         with open(os.path.join(output_path, 'trajectory.json'), 'w') as f:
             json.dump(trajectory, f)
