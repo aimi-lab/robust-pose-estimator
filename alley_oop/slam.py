@@ -46,7 +46,7 @@ class SLAM(object):
             if self.scene is None:
                 # initialize scene with first frame
                 self.scene = SurfelMap(frame=self.frame, kmat=self.intrinsics, upscale=1,
-                                       d_thresh=self.config['dist_thr'], depth_scale=self.depth_scale)
+                                       d_thresh=self.config['dist_thr'], depth_scale=self.depth_scale).to(self.device)
             pose, self.rendered_frame = self.pose_estimator.estimate(self.frame, self.scene)
             if self.dbg_opt:
                 print(f"optimization costs: {self.pose_estimator.cost}")
@@ -78,7 +78,8 @@ class SLAM(object):
 
     def to(self, device: torch.device):
         self.device = device
-        self.scene = self.scene.to(device)
+        if self.scene is not None:
+            self.scene = self.scene.to(device)
         self.pose_estimator = self.pose_estimator.to(device)
         self.intrinsics = self.intrinsics.to(device)
         return self

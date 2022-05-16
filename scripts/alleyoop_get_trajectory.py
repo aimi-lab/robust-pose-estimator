@@ -18,6 +18,7 @@ from other_slam_methods.stereo_slam.segmentation_network.seg_model import Semant
 import open3d
 import matplotlib.pyplot as plt
 from alley_oop.fusion.surfel_map import SurfelMap
+import warnings
 
 
 def save_ply(pcl_array,colors,  path):
@@ -27,9 +28,15 @@ def save_ply(pcl_array,colors,  path):
     open3d.io.write_point_cloud(path, pcl)
 
 
-def main(input_path, output_path, config, force_cpu, nsamples):
-    device = torch.device('cuda' if (torch.cuda.is_available() & (not force_cpu)) else 'cpu')
-    with torch.no_grad():
+def main(input_path, output_path, config, device_sel, nsamples):
+    device = torch.device('cpu')
+    if device_sel == 'gpu':
+        if torch.cuda.is_available():
+            device = torch.device('cuda')
+        else:
+            warnings.warn('No GPU available, fallback to CPU')
+
+    with torch.inference_mode():
         calib_file = None
         if os.path.isfile(os.path.join(input_path, 'camcal.json')):
             calib_file = os.path.join(input_path, 'camcal.json')
@@ -60,22 +67,17 @@ def main(input_path, output_path, config, force_cpu, nsamples):
                     seg_model = SemanticSegmentationModel('stereo_slam/segmentation_network/trained/PvtB2_combined_TAM_fold1.pth', device)
         viewer = Viewer3D((3 * config['img_size'][0], 3 * config['img_size'][1]),
                           blocking=config['viewer']['blocking']) if config['viewer']['enable'] else None
-        #slam = pyElasticFusion(calib['intrinsics']['left'], calib['img_size'][0], calib['img_size'][1], 7.0, True, 15.0)
-        slam = SLAM(torch.tensor(calib['intrinsics']['left']), config['slam'])
+
+        slam = SLAM(torch.tensor(calib['intrinsics']['left']), config['slam']).to(device)
         trajectory = []
-        last_pose = np.eye(4)
         for i, data in enumerate(tqdm(dataset, total=len(dataset))):
             if isinstance(dataset, StereoVideoDataset):
                 limg, rimg, pose_kinematics, img_number = data
                 depth, depth_valid = disp_model(limg, rimg)
                 mask = seg_model.get_mask(limg)[0]
                 mask &= depth_valid  # mask tools and non-valid depth
-                diff_pose = np.linalg.pinv(last_pose)@pose_kinematics if config['slam']['kinematics'] != 'none' else np.eye(4)
-                last_pose = pose_kinematics
             else:
                 limg, depth, mask, img_number = data
-                diff_pose = np.eye(4)
-                config['slam']['kinematics'] = 'fuse'
             pose, scene = slam.processFrame(limg, depth)
             if viewer is not None:
                 curr_pcl = SurfelMap(frame=slam.get_frame(), kmat=torch.tensor(calib['intrinsics']['left']).float(), pmat=pose).pcl2open3d(stable=False)
@@ -127,8 +129,10 @@ if __name__ == '__main__':
         help='Configuration file.'
     )
     parser.add_argument(
-        '--force_cpu',
-        help='force use of CPU.'
+        '--device',
+        choices=['cpu', 'gpu'],
+        default='cpu',
+        help='select cpu or gpu to run slam.'
     )
     parser.add_argument(
         '--nsamples',
@@ -142,4 +146,4 @@ if __name__ == '__main__':
     if args.outpath is None:
         args.outpath = os.path.join(args.input, 'data','alleyoop')
 
-    main(args.input, args.outpath, config, args.force_cpu is not None, args.nsamples)
+    main(args.input, args.outpath, config, args.device is not None, args.nsamples)
