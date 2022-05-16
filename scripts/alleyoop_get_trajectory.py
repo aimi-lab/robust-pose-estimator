@@ -1,13 +1,7 @@
 import sys
 sys.path.append('../')
-from dataset.semantic_dataset import RGBDDataset
-from dataset.scared_dataset import ScaredDataset
-from dataset.tum_dataset import TUMDataset
-from dataset.video_dataset import StereoVideoDataset
-from dataset.rectification import StereoRectifier
 from alley_oop.slam import SLAM
-import os, glob
-import json
+import os
 import torch
 import numpy as np
 from tqdm import tqdm
@@ -18,6 +12,7 @@ import open3d
 import matplotlib.pyplot as plt
 from alley_oop.fusion.surfel_map import SurfelMap
 from alley_oop.utils.trajectory import save_trajectory
+from dataset.dataset_utils import get_data, StereoVideoDataset
 import warnings
 from torch.utils.data import DataLoader
 
@@ -30,38 +25,14 @@ def main(input_path, output_path, config, device_sel, nsamples):
         else:
             warnings.warn('No GPU available, fallback to CPU')
 
+    dataset, calib = get_data(input_path, config['img_size'], config['sample'])
+    if isinstance(dataset, StereoVideoDataset):
+        disp_model = DisparityModel(calibration=calib, device=device, depth_clipping=config['depth_clipping'])
+        seg_model = SemanticSegmentationModel('stereo_slam/segmentation_network/trained/PvtB2_combined_TAM_fold1.pth',
+                                              device)
     with torch.inference_mode():
-        calib_file = None
-        if os.path.isfile(os.path.join(input_path, 'camcal.json')):
-            calib_file = os.path.join(input_path, 'camcal.json')
-        elif os.path.isfile(os.path.join(input_path, 'StereoCalibration.ini')):
-            calib_file = os.path.join(input_path, 'StereoCalibration.ini')
-        elif os.path.isfile(os.path.join(input_path, 'endoscope_calibration.yaml')):
-            calib_file = os.path.join(input_path, 'endoscope_calibration.yaml')
-        else:
-            try:
-                dataset = TUMDataset(input_path, config['img_size'])
-                calib = {'intrinsics': {'left': dataset.get_intrinsics()}}
-            except AssertionError:
-                raise RuntimeError('no calibration file found')
-        if calib_file is not None:
-            rect = StereoRectifier(calib_file, img_size_new=config['img_size'])
-            calib = rect.get_rectified_calib()
-
-            try:
-                dataset = RGBDDataset(input_path, calib['bf'], img_size=calib['img_size'])
-            except AssertionError:
-                try:
-                    dataset = ScaredDataset(input_path, calib['bf'], img_size=calib['img_size'])
-                except AssertionError:
-                    video_file = glob.glob(os.path.join(input_path, '*.mp4'))[0]
-                    pose_file = os.path.join(input_path, 'camera-poses.json')
-                    dataset = StereoVideoDataset(video_file, calib_file, pose_file, img_size=calib['img_size'], sample=config['sample'])
-                    disp_model = DisparityModel(calibration=calib, device=device, depth_clipping=config['depth_clipping'])
-                    seg_model = SemanticSegmentationModel('stereo_slam/segmentation_network/trained/PvtB2_combined_TAM_fold1.pth', device)
         viewer = Viewer3D((3 * config['img_size'][0], 3 * config['img_size'][1]),
                           blocking=config['viewer']['blocking']) if config['viewer']['enable'] else None
-
         slam = SLAM(torch.tensor(calib['intrinsics']['left']), config['slam']).to(device)
         trajectory = []
         for i, data in enumerate(tqdm(dataset, total=len(dataset))):
@@ -73,6 +44,7 @@ def main(input_path, output_path, config, device_sel, nsamples):
             else:
                 limg, depth, mask, img_number = data
             pose, scene = slam.processFrame(limg, depth)
+
             if viewer is not None:
                 curr_pcl = SurfelMap(frame=slam.get_frame(), kmat=torch.tensor(calib['intrinsics']['left']).float(), pmat=pose).pcl2open3d(stable=False)
                 curr_pcl.paint_uniform_color([0.5,0.5,0.5])
