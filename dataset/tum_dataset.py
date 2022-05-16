@@ -24,7 +24,7 @@ class TUMDataset(Dataset):
 
     def __getitem__(self, item):
         img = cv2.cvtColor(cv2.imread(self.imgs[item]), cv2.COLOR_BGR2RGB)
-        img_number = int(os.path.basename(self.imgs[item]).split('.')[1])
+        img_number = os.path.basename(self.imgs[item]).split('.png')[0]
         # find depth map according to file-look up
         depth = cv2.imread(self.depth[item], cv2.IMREAD_ANYDEPTH)
         depth = depth.astype(np.float32) / 5.0

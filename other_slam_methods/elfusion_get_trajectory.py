@@ -2,6 +2,7 @@ import sys
 sys.path.append('../..')
 from dataset.semantic_dataset import RGBDDataset
 from dataset.scared_dataset import ScaredDataset
+from dataset.tum_dataset import TUMDataset
 from dataset.video_dataset import StereoVideoDataset
 from dataset.rectification import StereoRectifier
 from ElasticFusion import pyElasticFusion
@@ -24,32 +25,38 @@ def save_ply(pcl_array, path):
 
 def main(input_path, output_path, config, force_cpu, nsamples):
     device = torch.device('cuda' if (torch.cuda.is_available() & (not force_cpu)) else 'cpu')
-    if os.path.isfile(os.path.join(input_path, 'camcal.json')):
-        calib_file = os.path.join(input_path, 'camcal.json')
-    elif os.path.isfile(os.path.join(input_path, 'StereoCalibration.ini')):
-        calib_file = os.path.join(input_path, 'StereoCalibration.ini')
-    elif os.path.isfile(os.path.join(input_path, 'endoscope_calibration.yaml')):
-        calib_file = os.path.join(input_path, 'endoscope_calibration.yaml')
-    else:
-        raise RuntimeError('no calibration file found')
+    with torch.no_grad():
+        calib_file = None
+        if os.path.isfile(os.path.join(input_path, 'camcal.json')):
+            calib_file = os.path.join(input_path, 'camcal.json')
+        elif os.path.isfile(os.path.join(input_path, 'StereoCalibration.ini')):
+            calib_file = os.path.join(input_path, 'StereoCalibration.ini')
+        elif os.path.isfile(os.path.join(input_path, 'endoscope_calibration.yaml')):
+            calib_file = os.path.join(input_path, 'endoscope_calibration.yaml')
+        else:
+            try:
+                dataset = TUMDataset(input_path, config['img_size'])
+                calib = {'intrinsics': {'left': dataset.get_intrinsics()}, 'img_size': config['img_size']}
+            except AssertionError:
+                raise RuntimeError('no calibration file found')
+        if calib_file is not None:
+            rect = StereoRectifier(calib_file, img_size_new=config['img_size'])
+            calib = rect.get_rectified_calib()
 
-    rect = StereoRectifier(calib_file, img_size_new=config['img_size'])
-    calib = rect.get_rectified_calib()
-    viewer = SlamViewer(calib['intrinsics']['left'], config['viewer']) if config['viewer']['enable'] else None
-
-    try:
-        dataset = RGBDDataset(input_path, calib['bf'], img_size=calib['img_size'])
-    except AssertionError:
-        try:
-            dataset = ScaredDataset(input_path, calib['bf'], img_size=calib['img_size'])
-        except AssertionError:
-            video_file = glob.glob(os.path.join(input_path, '*.mp4'))[0]
-            pose_file = os.path.join(input_path, 'camera-poses.json')
-            dataset = StereoVideoDataset(video_file, calib_file, pose_file, img_size=calib['img_size'], sample=config['sample'])
-            disp_model = DisparityModel(calibration=calib, device=device, depth_clipping=config['depth_clipping'])
-            seg_model = SemanticSegmentationModel('stereo_slam/segmentation_network/trained/PvtB2_combined_TAM_fold1.pth', device)
-
-    slam = pyElasticFusion(calib['intrinsics']['left'], calib['img_size'][0], calib['img_size'][1], 7.0, True, 15.0)
+            try:
+                dataset = RGBDDataset(input_path, calib['bf'], img_size=calib['img_size'])
+            except AssertionError:
+                try:
+                    dataset = ScaredDataset(input_path, calib['bf'], img_size=calib['img_size'])
+                except AssertionError:
+                    video_file = glob.glob(os.path.join(input_path, '*.mp4'))[0]
+                    pose_file = os.path.join(input_path, 'camera-poses.json')
+                    dataset = StereoVideoDataset(video_file, calib_file, pose_file, img_size=calib['img_size'],
+                                                 sample=config['sample'])
+                    disp_model = DisparityModel(calibration=calib, device=device, depth_clipping=config['depth_clipping'])
+                    seg_model = SemanticSegmentationModel(
+                        'stereo_slam/segmentation_network/trained/PvtB2_combined_TAM_fold1.pth', device)
+    slam = pyElasticFusion(calib['intrinsics']['left'], calib['img_size'][0], calib['img_size'][1], 7.0, True, 1.0)
     trajectory = []
     last_pose = np.eye(4)
     for i, data in enumerate(tqdm(dataset, total=len(dataset))):

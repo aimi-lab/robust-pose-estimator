@@ -3,13 +3,13 @@ slam:
 
 img_size:
   - 640
-  - 512
+  - 480
 
 sample: 10
 
 depth_clipping:
   - 0
-  - 300 # in mm
+  - 8000 # in mm
 
 viewer:
   enable: True

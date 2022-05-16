@@ -17,6 +17,7 @@ from other_slam_methods.stereo_slam.segmentation_network.seg_model import Semant
 import open3d
 import matplotlib.pyplot as plt
 from alley_oop.fusion.surfel_map import SurfelMap
+from alley_oop.utils.trajectory import save_trajectory
 import warnings
 from torch.utils.data import DataLoader
 
@@ -84,15 +85,15 @@ def main(input_path, output_path, config, device_sel, nsamples):
                 pcl = scene.pcl2open3d(stable=True)
                 open3d.io.write_point_cloud(os.path.join(output_path, f'map_{i:04d}.ply'), pcl)
         os.makedirs(output_path, exist_ok=True)
-        with open(os.path.join(output_path, 'trajectory.json'), 'w') as f:
-            json.dump(trajectory, f)
-        pcl = slam.getPointCloud()
+        save_trajectory(trajectory, output_path)
+
         plt.close()
         fig, ax = slam.plot_recordings()
         plt.savefig(os.path.join(output_path, 'optimization_plot.pdf'))
-        if pcl is not None:
-            pcl = scene.pcl2open3d(stable=True)
-            open3d.io.write_point_cloud(os.path.join(output_path, f'map.ply'), pcl)
+
+        pcl = scene.pcl2open3d(stable=True)
+        open3d.io.write_point_cloud(os.path.join(output_path, f'map.ply'), pcl)
+
         if viewer is not None:
             viewer.blocking = True
             viewer(pose, scene.pcl2open3d(stable=config['viewer']['stable']), frame=slam.get_frame(),
