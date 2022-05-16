@@ -91,8 +91,8 @@ def main(input_path, output_path, config, device_sel, nsamples):
         fig, ax = slam.plot_recordings()
         plt.savefig(os.path.join(output_path, 'optimization_plot.pdf'))
         if pcl is not None:
-            save_ply(*pcl, os.path.join(output_path, 'map.ply'))
-            print(pcl[0].shape)
+            pcl = scene.pcl2open3d(stable=True)
+            open3d.io.write_point_cloud(os.path.join(output_path, f'map.ply'), pcl)
         if viewer is not None:
             viewer.blocking = True
             viewer(pose, scene.pcl2open3d(stable=config['viewer']['stable']), frame=slam.get_frame(),
