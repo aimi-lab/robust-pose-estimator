@@ -103,6 +103,9 @@ class OptimizationRecordings():
             self.costs_rgb[i].append(estimator.cost[i][2])
 
     def plot(self, show=False):
+        if not show:
+            import matplotlib as mpl
+            mpl.use('Agg')
         import matplotlib.pyplot as plt
         fig, ax = plt.subplots(self.pyramid_levels+1,1)
 
