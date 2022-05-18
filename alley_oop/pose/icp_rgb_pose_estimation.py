@@ -7,6 +7,7 @@ import warnings
 from alley_oop.pose.rgb_pose_estimation import RGBPoseEstimator
 from alley_oop.pose.icp_estimation import ICPEstimator
 from torch.profiler import profile, record_function
+from torchimize.functions import lsq_gna_parallel
 
 
 class RGBICPPoseEstimator(torch.nn.Module):
@@ -41,7 +42,41 @@ class RGBICPPoseEstimator(torch.nn.Module):
         self.xtol = xtol
         self.best_cost = (0,0,0)
 
-    def estimate_gn(self, ref_frame: FrameClass, target_frame: FrameClass, target_pcl:SurfelMap, init_pose: torch.Tensor=None):
+    def multi_cost_fun(self, xfloat, ref_pcl, target_pcl, ref_frame, target_frame):
+
+        icp_residuals = self.icp_estimator.residual_fun(xfloat, ref_pcl, target_pcl, ref_frame.mask)
+        rgb_residuals = self.rgb_estimator.residual_fun(-xfloat, ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
+    
+        return torch.stack([icp_residuals, rgb_residuals], dim=0)[None, ...]
+
+    def multi_jaco_fun(self, xfloat, ref_pcl, target_pcl, ref_frame, target_frame):
+
+        icp_jacobian = self.icp_estimator.jacobian(xfloat, ref_pcl, target_pcl, ref_frame.mask)
+        rgb_jacobian = self.rgb_estimator.jacobian(-xfloat, ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
+
+        return torch.stack([icp_jacobian, rgb_jacobian], dim=0)[None, ...]
+
+    def estimate_gn(self, xfloat, ref_pcl, target_pcl, ref_frame, target_frame):
+
+        # parallel levenberg-marquardt for batch-optimization at multiple costs
+        coeffs_list = lsq_gna_parallel(
+                            p = xfloat,
+                            function = self.multi_cost_fun,
+                            jac_function = self.multi_jaco_fun,
+                            args = (ref_pcl, target_pcl, ref_frame, target_frame,),
+                            wvec = torch.ones(2, device='cuda', dtype=torch.float64),
+                            ftol = 1e-8,
+                            ptol = 1e-8,
+                            gtol = 1e-8,
+                            l = .1,
+                            max_iter = self.n_iter,
+                        )
+
+        pmat = lie_se3_to_SE3(coeffs_list[-1]).to(ref_frame.depth.dtype)
+        
+        return pmat, None, None
+
+    def _estimate_gn(self, ref_frame: FrameClass, target_frame: FrameClass, target_pcl:SurfelMap, init_pose: torch.Tensor=None):
         """ Minimize combined energy using Gauss-Newton and solving the normal equations."""
         ref_pcl = SurfelMap(frame=ref_frame, kmat=self.icp_estimator.intrinsics, ignore_mask=True)
         x = torch.zeros(6, dtype=torch.float64, device=ref_frame.depth.device)
