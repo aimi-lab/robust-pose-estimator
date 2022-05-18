@@ -6,6 +6,7 @@ from typing import Tuple
 import warnings
 from alley_oop.pose.rgb_pose_estimation import RGBPoseEstimator
 from alley_oop.pose.icp_estimation import ICPEstimator
+from torch.profiler import profile, record_function
 
 
 class RGBICPPoseEstimator(torch.nn.Module):
@@ -59,12 +60,10 @@ class RGBICPPoseEstimator(torch.nn.Module):
             rgb_jacobian = self.rgb_estimator.jacobian(-xfloat, ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
 
             # normal equations to be solved
-            if (len(icp_residuals) == 0) | (len(rgb_residuals) == 0):
-                break
             A = self.icp_weight*icp_jacobian.T @ icp_jacobian - rgb_jacobian.T @ rgb_jacobian #
             b = self.icp_weight*icp_jacobian.T @ icp_residuals + rgb_jacobian.T @ rgb_residuals #
 
-            x0 = torch.linalg.lstsq(A.double(),b.double()).solution
+            x0 = torch.linalg.lstsq(A.double(),b.double(), driver='gels').solution
             optim_results['icp'].append(self.icp_weight * self.icp_estimator.cost_fun(icp_residuals))
             optim_results['rgb'].append(self.rgb_estimator.cost_fun(rgb_residuals))
             optim_results['icp_pts'].append(len(icp_residuals))
@@ -73,17 +72,15 @@ class RGBICPPoseEstimator(torch.nn.Module):
             optim_results['combined'].append(cost)
             optim_results['dx'].append(torch.linalg.norm(x0,ord=2))
 
-            if cost/optim_results['icp_pts'][-1] < best_sol[1]:
-                optim_results['best_iter'] = i
-                best_sol = (x.clone(), cost/optim_results['icp_pts'][-1])
-                self.best_cost = (cost, optim_results['icp'][-1], optim_results['rgb'][-1])
-            if cost < self.Ftol:
-                converged = True
-                break
-            if torch.linalg.norm(x0,ord=2) < self.xtol*(self.xtol + torch.linalg.norm(x,ord=2)):
-                converged = True
-                break
+            # if cost/optim_results['icp_pts'][-1] < best_sol[1]:
+            #     optim_results['best_iter'] = i
+            #     best_sol = (x.clone(), cost/optim_results['icp_pts'][-1])
+            #     self.best_cost = (cost, optim_results['icp'][-1], optim_results['rgb'][-1])
+            # if cost < self.Ftol:
+            #     converged = True
+            #     break
+            # if torch.linalg.norm(x0,ord=2) < self.xtol*(self.xtol + torch.linalg.norm(x,ord=2)):
+            #     converged = True
+            #     break
             x -= x0
-        if not converged:
-            warnings.warn(f"not converged after {self.n_iter}", RuntimeWarning)
-        return lie_se3_to_SE3(best_sol[0]).to(ref_frame.depth.dtype), best_sol[1], optim_results
+        return lie_se3_to_SE3(x).to(ref_frame.depth.dtype), cost, optim_results

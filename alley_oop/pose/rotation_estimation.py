@@ -35,8 +35,6 @@ class RotationEstimator(torch.nn.Module):
         ref_img = ref_frame.img_gray
         target_img = target_frame.img_gray
         x = torch.zeros(3, device=self.d.device, dtype=ref_img.dtype)
-        residuals = None
-        warped_img = None
         converged = False
         best_sol = (x.clone(), torch.inf)
         for i in range(self.n_iter):
