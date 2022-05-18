@@ -44,7 +44,6 @@ class RGBPoseEstimator(torch.nn.Module):
         return (residuals**2).mean()
 
     def residual_fun(self, x, ref_img, ref_pcl, trg_img, trg_mask=None, ref_mask=None):
-        x = torch.tensor(x, dtype=ref_img.dtype, device=ref_img.device) if not torch.is_tensor(x) else x
         T_est = lie_se3_to_SE3(x)
         self.warped_img, self.valid = self._warp_img(ref_img, ref_pcl, T_est)
         residuals = self.warped_img - trg_img.view(-1)[self.valid]
