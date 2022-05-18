@@ -9,6 +9,6 @@ open3d
 torch==1.11.0+cpu
 torchvision==0.12.0+cpu
 numpy==1.18
-opencv-python==4.3.0.36
+opencv-python==4.5.3.56
 segmentation-models-pytorch
 plyfile
