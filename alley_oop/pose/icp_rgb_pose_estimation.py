@@ -60,7 +60,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
             rgb_jacobian = self.rgb_estimator.jacobian(-xfloat, ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
 
             # normal equations to be solved
-            if (icp_residuals.numel() == 0) | (rgb_residuals.numel() == 0):
+            if (icp_residuals.ndim == 0) | (rgb_residuals.ndim == 0) | (icp_jacobian.ndim == 0)| (rgb_jacobian.ndim == 0):
                 break
             A = self.icp_weight*icp_jacobian.T @ icp_jacobian - rgb_jacobian.T @ rgb_jacobian #
             b = self.icp_weight*icp_jacobian.T @ icp_residuals + rgb_jacobian.T @ rgb_residuals #
