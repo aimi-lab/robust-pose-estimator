@@ -49,7 +49,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
             x = lie_SE3_to_se3(init_pose.double())
         optim_results = {'combined': [],'icp':[], 'rgb':[], 'icp_pts': [], 'rgb_pts': [], 'best_iter': 0, 'dx': []}
         converged = False
-        best_sol = (x.clone(), torch.inf)
+        best_sol = [x.clone(), torch.inf*torch.ones(1, device=x.device).squeeze()]
         for i in range(self.n_iter):
             # geometric
             xfloat = x.float()
@@ -68,14 +68,14 @@ class RGBICPPoseEstimator(torch.nn.Module):
             optim_results['rgb'].append(self.rgb_estimator.cost_fun(rgb_residuals))
             optim_results['icp_pts'].append(len(icp_residuals))
             optim_results['rgb_pts'].append(len(rgb_residuals))
-            cost = optim_results['icp'][-1] + optim_results['rgb'][-1]
+            cost = (optim_results['icp'][-1] + optim_results['rgb'][-1]) / optim_results['icp_pts'][-1]
             optim_results['combined'].append(cost)
             optim_results['dx'].append(torch.linalg.norm(x0,ord=2))
 
-            # if cost/optim_results['icp_pts'][-1] < best_sol[1]:
-            #     optim_results['best_iter'] = i
-            #     best_sol = (x.clone(), cost/optim_results['icp_pts'][-1])
-            #     self.best_cost = (cost, optim_results['icp'][-1], optim_results['rgb'][-1])
+            costs = torch.stack([cost, best_sol[1]])  # if cost < best_sol[1]: best_sol = (x.clone(), cost)
+            xs = torch.stack([x, best_sol[0]])
+            best_ids = torch.argmin(costs)
+            best_sol = [xs[best_ids], costs[best_ids]]
             # if cost < self.Ftol:
             #     converged = True
             #     break
@@ -83,4 +83,4 @@ class RGBICPPoseEstimator(torch.nn.Module):
             #     converged = True
             #     break
             x -= x0
-        return lie_se3_to_SE3(x).to(ref_frame.depth.dtype), cost, optim_results
+        return lie_se3_to_SE3(best_sol[0]).to(ref_frame.depth.dtype), best_sol[1], optim_results

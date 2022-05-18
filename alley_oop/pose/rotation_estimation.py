@@ -36,7 +36,7 @@ class RotationEstimator(torch.nn.Module):
         target_img = target_frame.img_gray
         x = torch.zeros(3, device=self.d.device, dtype=ref_img.dtype)
         converged = False
-        best_sol = (x.clone(), torch.inf)
+        best_sol = [x.clone(), torch.inf*torch.ones(1, device=self.d.device).squeeze()]
         for i in range(self.n_iter):
             # compute residuals f(x)
             warped_img = self._warp_img(ref_img, x)
@@ -48,14 +48,17 @@ class RotationEstimator(torch.nn.Module):
             # compute update parameter x0
             x0 = torch.linalg.lstsq(J, residuals).solution
 
-            if cost < best_sol[1]:
-                best_sol = (x.clone(), cost)
-            if cost < self.Ftol:
-                converged = True
-                break
-            if torch.linalg.norm(x0, ord=2) < self.xtol * (self.xtol + torch.linalg.norm(x, ord=2)):
-                converged = True
-                break
+            costs = torch.stack([cost, best_sol[1]]) # if cost < best_sol[1]: best_sol = (x.clone(), cost)
+            xs = torch.stack([x, best_sol[0]])
+            best_ids = torch.argmin(costs)
+            best_sol = [xs[best_ids], costs[best_ids]]
+
+            # if cost < self.Ftol:
+            #     converged = True
+            #     break
+            # if torch.linalg.norm(x0, ord=2) < self.xtol * (self.xtol + torch.linalg.norm(x, ord=2)):
+            #     converged = True
+            #     break
             # update rotation estimate
             x += x0.squeeze()
         if not converged:
