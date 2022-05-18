@@ -10,7 +10,7 @@ from typing import Tuple
 
 
 class ScaredDataset(Dataset):
-    def __init__(self, input_folder:str, baseline:float, img_size: Tuple):
+    def __init__(self, input_folder:str, baseline_orig:float, img_size: Tuple):
         super().__init__()
         self.imgs = sorted(glob.glob(os.path.join(input_folder, 'data','video_frames', '*l.png')))
         self.disparity = sorted(glob.glob(os.path.join(input_folder, 'data','disparity_frames', '*.pfm')))
@@ -18,7 +18,7 @@ class ScaredDataset(Dataset):
         assert len(self.imgs) > 0
 
         self.transform = ResizeRGBD(img_size, disparity=False)
-        self.baseline = baseline
+        self.baseline = baseline_orig
 
     def __getitem__(self, item):
         img = cv2.cvtColor(cv2.imread(self.imgs[item]), cv2.COLOR_BGR2RGB)

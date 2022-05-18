@@ -31,10 +31,10 @@ def get_data(input_path: str, img_size: Tuple, sample_video: int=1):
         calib = rect.get_rectified_calib()
 
         try:
-            dataset = RGBDDataset(input_path, calib['bf'], img_size=calib['img_size'])
+            dataset = RGBDDataset(input_path, calib['bf_orig'], img_size=calib['img_size'])
         except AssertionError:
             try:
-                dataset = ScaredDataset(input_path, calib['bf'], img_size=calib['img_size'])
+                dataset = ScaredDataset(input_path, calib['bf_orig'], img_size=calib['img_size'])
             except AssertionError:
                 video_file = glob.glob(os.path.join(input_path, '*.mp4'))[0]
                 pose_file = os.path.join(input_path, 'camera-poses.json')

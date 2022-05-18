@@ -17,12 +17,13 @@ class StereoRectifier(object):
         else:
             raise NotImplementedError
 
+        self.scale = 1.0
         if img_size_new is not None:
             # scale intrinsics
-            scale = img_size_new[0]/cal['img_size'][0]
-            assert scale == img_size_new[1]/cal['img_size'][1]
-            cal['lkmat'][:2] *= scale
-            cal['rkmat'][:2] *= scale
+            self.scale = img_size_new[0]/cal['img_size'][0]
+            assert self.scale == img_size_new[1]/cal['img_size'][1]
+            cal['lkmat'][:2] *= self.scale
+            cal['rkmat'][:2] *= self.scale
             cal['img_size'] = img_size_new
         self.img_size = cal['img_size']
 
@@ -46,6 +47,7 @@ class StereoRectifier(object):
         calib_rectifed['extrinsics'] = np.eye(4)
         calib_rectifed['extrinsics'][:3,3] = np.array([self.r_intr[0, 3] / self.r_intr[0, 0], 0., 0.]) # Tx*f, see cv2 website
         calib_rectifed['bf'] = np.sqrt(np.sum(calib_rectifed['extrinsics'][:3, 3] ** 2))*self.l_intr[0, 0]
+        calib_rectifed['bf_orig'] = calib_rectifed['bf']/self.scale
         calib_rectifed['img_size'] = self.img_size
         return calib_rectifed
 
