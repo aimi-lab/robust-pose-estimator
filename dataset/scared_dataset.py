@@ -22,7 +22,7 @@ class ScaredDataset(Dataset):
 
     def __getitem__(self, item):
         img = cv2.cvtColor(cv2.imread(self.imgs[item]), cv2.COLOR_BGR2RGB)
-        img_number = int(os.path.basename(self.imgs[item]).split('l.png')[0])
+        img_number = os.path.basename(self.imgs[item]).split('l.png')[0]
         # find depth map according to file-look up
         disparity = cv2.imread(self.disparity[item], cv2.IMREAD_UNCHANGED)
         depth = self.baseline / disparity  # get depth from disparity (fc * baseline) / disparity

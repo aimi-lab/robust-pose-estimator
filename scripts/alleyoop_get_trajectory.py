@@ -53,9 +53,9 @@ def main(input_path, output_path, config, device_sel, nsamples):
             if viewer is not None:
                 curr_pcl = SurfelMap(frame=slam.get_frame(), kmat=torch.tensor(calib['intrinsics']['left']).float(), pmat=pose).pcl2open3d(stable=False)
                 curr_pcl.paint_uniform_color([0.5,0.5,0.5])
-                viewer(pose, scene.pcl2open3d(stable=config['viewer']['stable']), add_pcd=curr_pcl,
+                viewer(pose.cpu().numpy(), scene.pcl2open3d(stable=config['viewer']['stable']), add_pcd=curr_pcl,
                        frame=slam.get_frame(), synth_frame=slam.get_rendered_frame(), optim_results=slam.get_optimization_res())
-            trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number, 'residual': 0.0, 'key_frame': True})
+            trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
             if len(trajectory) > nsamples:
                 break
             if (i%50) == 0:
