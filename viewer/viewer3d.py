@@ -2,6 +2,7 @@ import open3d as o3d
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
+from alley_oop.geometry.pinhole_transforms import inv_transform
 
 
 class Viewer3D(object):
@@ -26,7 +27,7 @@ class Viewer3D(object):
         plt.show()
 
     def pose2view(self, pose):
-        self.ref_view.extrinsic = np.linalg.pinv(pose)
+        self.ref_view.extrinsic = inv_transform(pose).numpy()
         return self.ref_view
 
     def exit_loop_callback(self, dummy):
@@ -38,7 +39,7 @@ class Viewer3D(object):
             if optim_results is not None:
                 fig, ax = plt.subplots(len(optim_results) + 1, 1, num=1, clear=True, figsize=(8,16))
             else:
-                fig, ax = plt.subplots(1, 1, num=1, clear=True, figsize=(8,16))
+                fig, ax = plt.subplots(2, 1, num=1, clear=True, figsize=(8,16))
             if (frame is not None) & (synth_frame is not None):
                 img = frame.to_numpy()[1]
                 img_synth = synth_frame.to_numpy()[1]
