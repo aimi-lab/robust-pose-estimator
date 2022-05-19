@@ -18,7 +18,7 @@ class SurfelMap(object):
         super().__init__()
         self.pmat = kwargs['pmat'] if 'pmat' in kwargs else torch.eye(4)  # extrinsics
         self.kmat = kwargs['kmat'] if 'kmat' in kwargs else torch.eye(3)  # intrinsics
-        self.conf_thr = kwargs['conf_thr'] if 'conf_thr' in kwargs else 10
+        self.conf_thr = kwargs['conf_thr'] if 'conf_thr' in kwargs else 7
         self.t_max = kwargs['t_max'] if 't_max' in kwargs else 15
         self.upscale = kwargs['upscale'] if 'upscale' in kwargs else 4
         self.d_thresh = kwargs['d_thresh'] if 'd_thresh' in kwargs else 100.0
