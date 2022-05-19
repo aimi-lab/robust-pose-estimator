@@ -66,12 +66,13 @@ class RGBICPPoseEstimator(torch.nn.Module):
             b = self.icp_weight*icp_jacobian.T @ icp_residuals + rgb_jacobian.T @ rgb_residuals #
 
             x0 = torch.linalg.lstsq(A.double(),b.double(), driver='gels').solution
+            cost_icp, cost_rgb = self.icp_weight * self.icp_estimator.cost_fun(icp_residuals), self.rgb_estimator.cost_fun(rgb_residuals)
+            cost = (cost_icp + cost_rgb) / len(icp_residuals)
             if self.dbg_opt:
-                optim_results['icp'].append(self.icp_weight * self.icp_estimator.cost_fun(icp_residuals))
-                optim_results['rgb'].append(self.rgb_estimator.cost_fun(rgb_residuals))
+                optim_results['icp'].append(cost_icp)
+                optim_results['rgb'].append(cost_rgb)
                 optim_results['icp_pts'].append(len(icp_residuals))
                 optim_results['rgb_pts'].append(len(rgb_residuals))
-                cost = (optim_results['icp'][-1] + optim_results['rgb'][-1]) / optim_results['icp_pts'][-1]
                 optim_results['combined'].append(cost)
                 optim_results['dx'].append(torch.linalg.norm(x0,ord=2))
                 optim_results['cond'].append(torch.linalg.cond(A))
