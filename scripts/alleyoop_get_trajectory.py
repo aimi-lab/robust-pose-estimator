@@ -40,6 +40,7 @@ def main(input_path, output_path, config, device_sel, nsamples):
                           blocking=config['viewer']['blocking']) if config['viewer']['enable'] else None
 
         trajectory = []
+        os.makedirs(output_path, exist_ok=True)
         for i, data in enumerate(tqdm(loader, total=len(dataset))):
             if isinstance(dataset, StereoVideoDataset):
                 limg, rimg, pose_kinematics, img_number = data
@@ -61,7 +62,7 @@ def main(input_path, output_path, config, device_sel, nsamples):
             if (i%50) == 0:
                 pcl = scene.pcl2open3d(stable=True)
                 open3d.io.write_point_cloud(os.path.join(output_path, f'map_{i:04d}.ply'), pcl)
-        os.makedirs(output_path, exist_ok=True)
+
         save_trajectory(trajectory, output_path)
 
         plt.close()
