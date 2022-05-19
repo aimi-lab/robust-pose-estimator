@@ -8,7 +8,6 @@ from alley_oop.fusion.surfel_map import SurfelMap
 from alley_oop.utils.pytorch import batched_dot_product
 from typing import Tuple
 import matplotlib.pyplot as plt
-from torchimize.functions import lsq_lma
 
 
 class ICPEstimator(torch.nn.Module):
