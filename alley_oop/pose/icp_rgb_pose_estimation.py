@@ -1,5 +1,4 @@
 import torch
-from alley_oop.geometry.lie_3d import lie_se3_to_SE3, lie_SE3_to_se3
 from alley_oop.fusion.surfel_map import SurfelMap
 from alley_oop.pose.frame_class import FrameClass
 from typing import Tuple
@@ -17,7 +16,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
 """
 
     def __init__(self, img_shape: Tuple, intrinsics: torch.Tensor, icp_weight: float=10.0, n_iter: int=20, Ftol: float=0.001, xtol: float=1e-8,
-                 dist_thr: float=200.0/15, normal_thr: float=20, association_mode='projective'):
+                 dist_thr: float=200.0/15, normal_thr: float=20, association_mode='projective', dbg_opt=False):
         """
 
         :param img_shape: height and width of images to process
@@ -40,14 +39,15 @@ class RGBICPPoseEstimator(torch.nn.Module):
         self.Ftol = Ftol
         self.xtol = xtol
         self.best_cost = (0,0,0)
+        self.dbg_opt = dbg_opt
 
-    def estimate_gn(self, ref_frame: FrameClass, target_frame: FrameClass, target_pcl:SurfelMap, init_pose: torch.Tensor=None):
+    def estimate_gn(self, ref_frame: FrameClass, target_frame: FrameClass, target_pcl:SurfelMap, init_x: torch.Tensor=None):
         """ Minimize combined energy using Gauss-Newton and solving the normal equations."""
         ref_pcl = SurfelMap(frame=ref_frame, kmat=self.icp_estimator.intrinsics, ignore_mask=True)
         x = torch.zeros(6, dtype=torch.float64, device=ref_frame.depth.device)
-        if init_pose is not None:
-            x = lie_SE3_to_se3(init_pose.double())
-        optim_results = {'combined': [],'icp':[], 'rgb':[], 'icp_pts': [], 'rgb_pts': [], 'best_iter': 0, 'dx': []}
+        if init_x is not None:
+            x = init_x.double()
+        optim_results = {'combined': [],'icp':[], 'rgb':[], 'icp_pts': [], 'rgb_pts': [], 'best_iter': 0, 'dx': [], 'cond': []}
         converged = False
         best_sol = [x.clone(), torch.inf*torch.ones(1, device=x.device).squeeze()]
         for i in range(self.n_iter):
@@ -66,13 +66,15 @@ class RGBICPPoseEstimator(torch.nn.Module):
             b = self.icp_weight*icp_jacobian.T @ icp_residuals + rgb_jacobian.T @ rgb_residuals #
 
             x0 = torch.linalg.lstsq(A.double(),b.double(), driver='gels').solution
-            optim_results['icp'].append(self.icp_weight * self.icp_estimator.cost_fun(icp_residuals))
-            optim_results['rgb'].append(self.rgb_estimator.cost_fun(rgb_residuals))
-            optim_results['icp_pts'].append(len(icp_residuals))
-            optim_results['rgb_pts'].append(len(rgb_residuals))
-            cost = (optim_results['icp'][-1] + optim_results['rgb'][-1]) / optim_results['icp_pts'][-1]
-            optim_results['combined'].append(cost)
-            optim_results['dx'].append(torch.linalg.norm(x0,ord=2))
+            if self.dbg_opt:
+                optim_results['icp'].append(self.icp_weight * self.icp_estimator.cost_fun(icp_residuals))
+                optim_results['rgb'].append(self.rgb_estimator.cost_fun(rgb_residuals))
+                optim_results['icp_pts'].append(len(icp_residuals))
+                optim_results['rgb_pts'].append(len(rgb_residuals))
+                cost = (optim_results['icp'][-1] + optim_results['rgb'][-1]) / optim_results['icp_pts'][-1]
+                optim_results['combined'].append(cost)
+                optim_results['dx'].append(torch.linalg.norm(x0,ord=2))
+                optim_results['cond'].append(torch.linalg.cond(A))
 
             costs = torch.stack([cost, best_sol[1]])  # if cost < best_sol[1]: best_sol = (x.clone(), cost)
             xs = torch.stack([x, best_sol[0]])
@@ -85,4 +87,4 @@ class RGBICPPoseEstimator(torch.nn.Module):
             #     converged = True
             #     break
             x -= x0
-        return lie_se3_to_SE3(best_sol[0]).to(ref_frame.depth.dtype), best_sol[1], optim_results
+        return best_sol[0], best_sol[1], optim_results
