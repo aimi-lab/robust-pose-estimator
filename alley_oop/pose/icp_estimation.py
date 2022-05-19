@@ -51,17 +51,16 @@ class ICPEstimator(torch.nn.Module):
         return (residuals**2).mean()
 
     def residual_fun(self, x, ref_pcl, target_pcl, ref_mask=None):
-        T_est = lie_se3_to_SE3(x)
+        T_est = lie_se3_to_SE3(-x)
         self.src_ids, self.trg_ids = self.associate(ref_pcl, target_pcl, T_est, ref_mask)
         # compute residuals
         ref_pcl_world_c = ref_pcl.transform_cpy(T_est)
         residuals = batched_dot_product(target_pcl.normals.T[self.trg_ids],
-                                   (ref_pcl_world_c.opts.T[self.src_ids] - target_pcl.opts.T[
-                                       self.trg_ids]))
+                                   (target_pcl.opts.T[self.trg_ids] - ref_pcl_world_c.opts.T[self.src_ids]))
         return residuals
 
     def jacobian(self, x, ref_pcl, target_pcl, ref_mask=None):
-        T_est = lie_se3_to_SE3(x)
+        T_est = lie_se3_to_SE3(-x)
         ref_pcl_world_c = ref_pcl.transform_cpy(T_est)
         return (target_pcl.normals.T[self.trg_ids].unsqueeze(1) @ self.j_3d(
             ref_pcl_world_c.opts.T[self.src_ids])).squeeze()

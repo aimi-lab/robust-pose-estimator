@@ -57,7 +57,7 @@ class PyramidPoseEstimator(torch.nn.Module):
             pose_rot_lie, *_ = self.rot_estimator.estimate(frame_pyr[-1], self.last_frame_pyr[-1])
 
             pose_cur2last_lie = torch.zeros(6, dtype=pose_rot_lie.dtype, device=pose_rot_lie.device)
-            pose_cur2last_lie[:3] = pose_rot_lie  # initial guess is rotation only
+            pose_cur2last_lie[:3] = -pose_rot_lie  # initial guess is rotation only
             # combined icp + rgb pose estimation
             for pyr_level in range(len(frame_pyr)-1, -1, -1):
                 pose_cur2last_lie_old = pose_cur2last_lie.clone()
@@ -69,9 +69,10 @@ class PyramidPoseEstimator(torch.nn.Module):
                     pose_cur2last_lie = pose_cur2last_lie_old
                 self.cost[pyr_level] = self.pose_estimator[pyr_level].best_cost
                 self.optim_res[pyr_level] = optim_res
-            pose = self.last_pose_lie + pose_cur2last_lie
+            pose = self.last_pose_lie - pose_cur2last_lie
             self.last_pose_lie.data = pose
         self.last_frame_pyr = frame_pyr
+        print(self.last_pose)
         return self.last_pose, model_frame
 
     @property
