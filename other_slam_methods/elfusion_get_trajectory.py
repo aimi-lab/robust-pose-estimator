@@ -5,11 +5,10 @@ from dataset.video_dataset import StereoVideoDataset
 from dataset.rectification import StereoRectifier
 from ElasticFusion import pyElasticFusion
 import os, glob
-import json
 import torch
 import numpy as np
 from tqdm import tqdm
-from viewer.slam_viewer import SlamViewer
+from alley_oop.utils.trajectory import save_trajectory
 from other_slam_methods.stereo_slam.disparity.disparity_model import DisparityModel
 from other_slam_methods.stereo_slam.segmentation_network.seg_model import SemanticSegmentationModel
 import open3d
@@ -31,7 +30,7 @@ def main(input_path, output_path, config, device_sel, nsamples):
         else:
             warnings.warn('No GPU available, fallback to CPU')
     dataset, calib = get_data(input_path, config['img_size'])
-    slam = pyElasticFusion(calib['intrinsics']['left'], calib['img_size'][0], calib['img_size'][1], 7.0, True, 20.0)
+    slam = pyElasticFusion(calib['intrinsics']['left'], config['img_size'][0], config['img_size'][1], 7.0, True, config['depth_scaling'])
 
     if isinstance(dataset, StereoVideoDataset):
         disp_model = DisparityModel(calibration=calib, device=device, depth_clipping=config['depth_clipping'])
@@ -56,14 +55,13 @@ def main(input_path, output_path, config, device_sel, nsamples):
         #if (i == 0) & (viewer is not None): viewer.set_reference(limg, depth)
         if mask is None:
             mask = np.ones_like(depth)
-        pose= slam.processFrame(limg, depth.astype(np.uint16),(mask == 0).astype(np.uint8) , int(img_number), diff_pose, config['slam']['kinematics'] == 'fuse')
+        pose= slam.processFrame(limg, depth.astype(np.uint16),(mask == 0).astype(np.uint8) , i, diff_pose, config['slam']['kinematics'] == 'fuse')
         trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number, 'residual': 0.0, 'key_frame': True})
         if len(trajectory) > nsamples:
             break
         #if viewer is not None: viewer(limg, *slam.get_matching_res(), pose)
     os.makedirs(output_path, exist_ok=True)
-    with open(os.path.join(output_path, 'trajectory.json'), 'w') as f:
-        json.dump(trajectory, f)
+    save_trajectory(trajectory, output_path)
     pcl = slam.getPointCloud()
     if pcl is not None:
         save_ply(pcl, os.path.join(output_path, 'map.ply'))
@@ -89,12 +87,14 @@ if __name__ == '__main__':
     parser.add_argument(
         '--config',
         type=str,
-        default='stereo_slam/configuration/efusion_slam.yaml',
+        default='stereo_slam/configuration/efusion_tum.yaml',
         help='Configuration file.'
     )
     parser.add_argument(
-        '--force_cpu',
-        help='force use of CPU.'
+        '--device',
+        choices=['cpu', 'gpu'],
+        default='cpu',
+        help='select cpu or gpu to run slam.'
     )
     parser.add_argument(
         '--nsamples',
@@ -108,4 +108,4 @@ if __name__ == '__main__':
     if args.outpath is None:
         args.outpath = os.path.join(args.input, 'data','efusion')
 
-    main(args.input, args.outpath, config, args.force_cpu is not None, args.nsamples)
+    main(args.input, args.outpath, config, args.device, args.nsamples)

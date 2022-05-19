@@ -10,7 +10,7 @@ sample: 10
 depth_clipping:
   - 0
   - 8000 # in mm
-
+depth_scaling: 1.0
 viewer:
   enable: True
   show: True

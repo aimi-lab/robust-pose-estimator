@@ -1,0 +1,18 @@
+slam:
+  kinematics: 'none' # fuse, none, replace
+
+img_size:
+  - 640
+  - 480
+
+sample: 10
+
+depth_clipping:
+  - 0
+  - 8000 # in mm
+depth_scaling: 20.0
+viewer:
+  enable: True
+  show: True
+  matches: True
+  view_synthesis: True
