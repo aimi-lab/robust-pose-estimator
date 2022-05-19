@@ -64,7 +64,6 @@ class RGBICPPoseEstimator(torch.nn.Module):
                 break
             A = self.icp_weight*icp_jacobian.T @ icp_jacobian + rgb_jacobian.T @ rgb_jacobian #
             b = self.icp_weight*icp_jacobian.T @ icp_residuals + rgb_jacobian.T @ rgb_residuals #
-            print(A)
 
             x0 = torch.linalg.lstsq(A.double(),b.double(), driver='gels').solution
             icp_cost = self.icp_weight * self.icp_estimator.cost_fun(icp_residuals)
