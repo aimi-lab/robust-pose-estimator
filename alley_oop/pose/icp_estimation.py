@@ -53,7 +53,7 @@ class ICPEstimator(torch.nn.Module):
 
     def residual_fun(self, x, ref_pcl, target_pcl, ref_mask=None):
         T_est = lie_se3_to_SE3(x)
-        self.src_ids, self.trg_ids = self.associate(ref_pcl, target_pcl, inv_transform(T_est), ref_mask)
+        self.src_ids, self.trg_ids = self.associate(ref_pcl, target_pcl, T_est, ref_mask)
         # compute residuals
         target_pcl_t = target_pcl.transform_cpy(T_est)
         residuals = batched_dot_product(target_pcl_t.normals.T[self.trg_ids],
@@ -112,13 +112,11 @@ class ICPEstimator(torch.nn.Module):
 
     def projective_association(self, ref_pcl:SurfelMap, target_pcl:SurfelMap, T_est:torch.tensor, ref_mask:torch.tensor=None):
         # update image shape
-        ref_pcl = ref_pcl.transform_cpy(T_est)
-
-        pmat_inv = inv_transform(T_est)
+        ref_pcl = ref_pcl.transform_cpy(inv_transform(T_est))
 
         # project all surfels to current image frame
-        global_ipts, bidx = forward_project2image(target_pcl.opts, kmat=self.intrinsics, rmat=pmat_inv[:3, :3],
-                                            tvec=pmat_inv[:3, -1][:, None], img_shape=self.img_shape)
+        global_ipts, bidx = forward_project2image(target_pcl.opts, kmat=self.intrinsics, rmat=T_est[:3, :3],
+                                            tvec=T_est[:3, -1][:, None], img_shape=self.img_shape)
 
         # find correspondence by projecting surfels to current frame
         midx = ref_pcl.get_match_indices(global_ipts[:, bidx], upscale=1)
