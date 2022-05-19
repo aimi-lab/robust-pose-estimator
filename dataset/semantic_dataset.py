@@ -282,7 +282,7 @@ class RGBDecoder(object):
 
 
 class RGBDDataset(Dataset):
-    def __init__(self, input_folder:str, baseline:float, img_size:Tuple, ret_disparity=False):
+    def __init__(self, input_folder:str, baseline:float, img_size:Tuple):
         super().__init__()
         self.imgs = sorted(glob.glob(os.path.join(input_folder, 'video_frames_10.0fps', '*l.png')))
         self.disparity = sorted(glob.glob(os.path.join(input_folder, 'disparity_frames_10.0fps_hires', '*.pfm')))
@@ -291,28 +291,22 @@ class RGBDDataset(Dataset):
         assert len(self.imgs) == len(self.semantics)
         assert len(self.imgs) > 0
 
-        self.transform = ResizeRGBD(img_size)
+        self.transform = ResizeRGBD(img_size, disparity=False)
         self.baseline = baseline
-        self.ret_disparity = ret_disparity
         self.rgb_decoder = RGBDecoder()
 
     def __getitem__(self, item):
         img = cv2.cvtColor(cv2.imread(self.imgs[item]), cv2.COLOR_BGR2RGB)
-        img_number = int(os.path.basename(self.imgs[item]).split('l.png')[0])
+        img_number = os.path.basename(self.imgs[item]).split('l.png')[0]
         # find depth map according to file-look up
         disparity = cv2.imread(self.disparity[item], cv2.IMREAD_UNCHANGED)
         semantic = cv2.cvtColor(cv2.imread(self.semantics[item]), cv2.COLOR_BGR2RGB)
         semantic_or_mask = self.rgb_decoder.getToolMask(semantic)
-
+        # get depth from disparity (fc * baseline) / disparity
+        depth = self.baseline / disparity
         if self.transform is not None:
-            img, disparity, semantic_or_mask, semantic_label = self.transform(img, disparity, semantic_or_mask)
-
-        if self.ret_disparity:
-            return img, disparity, semantic_or_mask, img_number
-        else:
-            # get depth from disparity (fc * baseline) / disparity
-            depth = self.baseline / disparity
-            return img, depth, semantic_or_mask, img_number
+            img, depth, semantic_or_mask = self.transform(img, depth, semantic_or_mask)
+        return img, depth, semantic_or_mask, img_number
 
     def __len__(self):
         return len(self.imgs)
