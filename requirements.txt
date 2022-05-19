@@ -12,3 +12,4 @@ numpy==1.18
 opencv-python==4.5.3.56
 segmentation-models-pytorch
 plyfile
+torchimize==0.0.5
