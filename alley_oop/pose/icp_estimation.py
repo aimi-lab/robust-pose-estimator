@@ -45,7 +45,6 @@ class ICPEstimator(torch.nn.Module):
         self.d = torch.nn.Parameter(torch.empty(0))  # dummy device store
         self.trg_ids = None
         self.src_ids = None
-        self.ref_pcl_w = None
 
     @staticmethod
     def cost_fun(residuals):
@@ -55,16 +54,17 @@ class ICPEstimator(torch.nn.Module):
         T_est = lie_se3_to_SE3(x)
         self.src_ids, self.trg_ids = self.associate(ref_pcl, target_pcl, T_est, ref_mask)
         # compute residuals
-        self.ref_pcl_w  = ref_pcl.transform_cpy(inv_transform(T_est))
+        ref_pcl_world_c = ref_pcl.transform_cpy(T_est)
         residuals = batched_dot_product(target_pcl.normals.T[self.trg_ids],
-                                   (self.ref_pcl_w .opts.T[self.src_ids] - target_pcl.opts.T[
+                                   (ref_pcl_world_c.opts.T[self.src_ids] - target_pcl.opts.T[
                                        self.trg_ids]))
         return residuals
 
     def jacobian(self, x, ref_pcl, target_pcl, ref_mask=None):
-
+        T_est = lie_se3_to_SE3(x)
+        ref_pcl_world_c = ref_pcl.transform_cpy(T_est)
         return (target_pcl.normals.T[self.trg_ids].unsqueeze(1) @ self.j_3d(
-            self.ref_pcl_w .opts.T[self.src_ids])).squeeze()
+            ref_pcl_world_c.opts.T[self.src_ids])).squeeze()
 
     def estimate_lm(self, ref_frame: FrameClass, target_pcl:SurfelMap, ref_mask: torch.tensor=None):
         """ Levenberg-Marquard estimation."""
