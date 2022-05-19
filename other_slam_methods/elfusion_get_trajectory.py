@@ -1,8 +1,6 @@
 import sys
 sys.path.append('../..')
-from dataset.semantic_dataset import RGBDDataset
-from dataset.scared_dataset import ScaredDataset
-from dataset.tum_dataset import TUMDataset
+from dataset.dataset_utils import get_data
 from dataset.video_dataset import StereoVideoDataset
 from dataset.rectification import StereoRectifier
 from ElasticFusion import pyElasticFusion
@@ -15,6 +13,8 @@ from viewer.slam_viewer import SlamViewer
 from other_slam_methods.stereo_slam.disparity.disparity_model import DisparityModel
 from other_slam_methods.stereo_slam.segmentation_network.seg_model import SemanticSegmentationModel
 import open3d
+import warnings
+
 
 def save_ply(pcl_array, path):
     pcl = open3d.geometry.PointCloud()
@@ -23,40 +23,22 @@ def save_ply(pcl_array, path):
     open3d.io.write_point_cloud(path, pcl)
 
 
-def main(input_path, output_path, config, force_cpu, nsamples):
-    device = torch.device('cuda' if (torch.cuda.is_available() & (not force_cpu)) else 'cpu')
-    with torch.no_grad():
-        calib_file = None
-        if os.path.isfile(os.path.join(input_path, 'camcal.json')):
-            calib_file = os.path.join(input_path, 'camcal.json')
-        elif os.path.isfile(os.path.join(input_path, 'StereoCalibration.ini')):
-            calib_file = os.path.join(input_path, 'StereoCalibration.ini')
-        elif os.path.isfile(os.path.join(input_path, 'endoscope_calibration.yaml')):
-            calib_file = os.path.join(input_path, 'endoscope_calibration.yaml')
+def main(input_path, output_path, config, device_sel, nsamples):
+    device = torch.device('cpu')
+    if device_sel == 'gpu':
+        if torch.cuda.is_available():
+            device = torch.device('cuda')
         else:
-            try:
-                dataset = TUMDataset(input_path, config['img_size'])
-                calib = {'intrinsics': {'left': dataset.get_intrinsics()}, 'img_size': config['img_size']}
-            except AssertionError:
-                raise RuntimeError('no calibration file found')
-        if calib_file is not None:
-            rect = StereoRectifier(calib_file, img_size_new=config['img_size'])
-            calib = rect.get_rectified_calib()
+            warnings.warn('No GPU available, fallback to CPU')
+    dataset, calib = get_data(input_path, config['img_size'])
+    slam = pyElasticFusion(calib['intrinsics']['left'], calib['img_size'][0], calib['img_size'][1], 7.0, True, 20.0)
 
-            try:
-                dataset = RGBDDataset(input_path, calib['bf'], img_size=calib['img_size'])
-            except AssertionError:
-                try:
-                    dataset = ScaredDataset(input_path, calib['bf'], img_size=calib['img_size'])
-                except AssertionError:
-                    video_file = glob.glob(os.path.join(input_path, '*.mp4'))[0]
-                    pose_file = os.path.join(input_path, 'camera-poses.json')
-                    dataset = StereoVideoDataset(video_file, calib_file, pose_file, img_size=calib['img_size'],
-                                                 sample=config['sample'])
-                    disp_model = DisparityModel(calibration=calib, device=device, depth_clipping=config['depth_clipping'])
-                    seg_model = SemanticSegmentationModel(
-                        'stereo_slam/segmentation_network/trained/PvtB2_combined_TAM_fold1.pth', device)
-    slam = pyElasticFusion(calib['intrinsics']['left'], calib['img_size'][0], calib['img_size'][1], 7.0, True, 1.0)
+    if isinstance(dataset, StereoVideoDataset):
+        disp_model = DisparityModel(calibration=calib, device=device, depth_clipping=config['depth_clipping'])
+        seg_model = SemanticSegmentationModel('stereo_slam/segmentation_network/trained/PvtB2_combined_TAM_fold1.pth',
+                                              device)
+
+
     trajectory = []
     last_pose = np.eye(4)
     for i, data in enumerate(tqdm(dataset, total=len(dataset))):
@@ -74,7 +56,7 @@ def main(input_path, output_path, config, force_cpu, nsamples):
         #if (i == 0) & (viewer is not None): viewer.set_reference(limg, depth)
         if mask is None:
             mask = np.ones_like(depth)
-        pose= slam.processFrame(limg, depth.astype(np.uint16),(mask == 0).astype(np.uint8) , img_number, diff_pose, config['slam']['kinematics'] == 'fuse')
+        pose= slam.processFrame(limg, depth.astype(np.uint16),(mask == 0).astype(np.uint8) , int(img_number), diff_pose, config['slam']['kinematics'] == 'fuse')
         trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number, 'residual': 0.0, 'key_frame': True})
         if len(trajectory) > nsamples:
             break
