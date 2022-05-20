@@ -6,7 +6,7 @@ import warnings
 from alley_oop.pose.rgb_pose_estimation import RGBPoseEstimator
 from alley_oop.pose.icp_estimation import ICPEstimator
 from torch.profiler import profile, record_function
-from torchimize.functions import lsq_gna_parallel
+from torchimize.functions import lsq_gna_parallel_plain
 
 
 class RGBICPPoseEstimator(torch.nn.Module):
@@ -44,8 +44,8 @@ class RGBICPPoseEstimator(torch.nn.Module):
 
     def multi_cost_fun(self, xfloat, ref_pcl, target_pcl, ref_frame, target_frame):
 
-        icp_residuals = self.icp_estimator.residual_fun(xfloat.float(), ref_pcl, target_pcl, ref_frame.mask)
-        rgb_residuals = self.rgb_estimator.residual_fun(xfloat.float(), ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
+        icp_residuals = self.icp_estimator.residual_fun(xfloat[0, :].float(), ref_pcl, target_pcl, ref_frame.mask)
+        rgb_residuals = self.rgb_estimator.residual_fun(xfloat[0, :].float(), ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
 
         residuals = [icp_residuals, rgb_residuals]
 
@@ -54,12 +54,12 @@ class RGBICPPoseEstimator(torch.nn.Module):
         tidx = torch.argmin(dims)
         residuals[tidx] = torch.cat((residuals[tidx], torch.zeros(size-residuals[tidx].shape[0])))
     
-        return torch.stack(residuals, dim=0)[None, ...]
+        return torch.stack(residuals, dim=0)[None, ...].double()
 
     def multi_jaco_fun(self, xfloat, ref_pcl, target_pcl, ref_frame, target_frame):
 
-        icp_jacobian = self.icp_estimator.jacobian(xfloat.float(), ref_pcl, target_pcl, ref_frame.mask)
-        rgb_jacobian = self.rgb_estimator.jacobian(xfloat.float(), ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
+        icp_jacobian = self.icp_estimator.jacobian(xfloat[0, :].float(), ref_pcl, target_pcl, ref_frame.mask)
+        rgb_jacobian = self.rgb_estimator.jacobian(xfloat[0, :].float(), ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
 
         jacobians = [icp_jacobian, rgb_jacobian]
 
@@ -68,21 +68,20 @@ class RGBICPPoseEstimator(torch.nn.Module):
         tidx = torch.argmin(dims[:, 0])
         jacobians[tidx] = torch.cat((jacobians[tidx], torch.zeros(size-jacobians[tidx].shape[0], jacobians[tidx].shape[-1])))
 
-        return torch.stack(jacobians, dim=0)[None, ...]
+        return torch.stack(jacobians, dim=0)[None, ...].double()
 
     def estimate_gn(self, ref_frame: FrameClass, target_frame: FrameClass, target_pcl:SurfelMap, init_x: torch.Tensor=None):
 
         ref_pcl = SurfelMap(frame=ref_frame, kmat=self.icp_estimator.intrinsics, ignore_mask=True)
 
-        coeffs_list = lsq_gna_parallel(
-                            p = init_x.double(),
-                            function = self.multi_cost_fun,
-                            jac_function = self.multi_jaco_fun,
-                            args = (ref_pcl, target_pcl, ref_frame, target_frame,),
+        multi_cost_fun_args = lambda p: self.multi_cost_fun(p, ref_pcl, target_pcl, ref_frame, target_frame)
+        multi_jaco_fun_args = lambda p: self.multi_jaco_fun(p, ref_pcl, target_pcl, ref_frame, target_frame)
+
+        coeffs_list = lsq_gna_parallel_plain(
+                            p = init_x[None, ...].double(),
+                            function = multi_cost_fun_args,
+                            jac_function = multi_jaco_fun_args,
                             wvec = torch.ones(2, device=init_x.device, dtype=init_x.dtype),
-                            ftol = 1e-8,
-                            ptol = 1e-8,
-                            gtol = 1e-8,
                             l = .1,
                             max_iter = self.n_iter,
                         )
