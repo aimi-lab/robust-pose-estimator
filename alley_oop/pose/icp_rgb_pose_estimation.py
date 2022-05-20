@@ -1,7 +1,7 @@
 import torch
 from alley_oop.fusion.surfel_map import SurfelMap
 from alley_oop.pose.frame_class import FrameClass
-from typing import Tuple
+from typing import Dict, Tuple
 import warnings
 from alley_oop.pose.rgb_pose_estimation import RGBPoseEstimator
 from alley_oop.pose.icp_estimation import ICPEstimator
@@ -86,7 +86,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
                             max_iter = self.n_iter,
                         )
 
-        return coeffs, coeffs, None
+        return coeffs, coeffs, dict()
 
     def _estimate_gn(self, ref_frame: FrameClass, target_frame: FrameClass, target_pcl:SurfelMap, init_x: torch.Tensor=None):
         """ Minimize combined energy using Gauss-Newton and solving the normal equations."""
