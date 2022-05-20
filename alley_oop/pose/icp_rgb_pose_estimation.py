@@ -70,7 +70,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
 
         return torch.stack(jacobians, dim=0)[None, ...].double()
 
-    def _estimate_gn(self, ref_frame: FrameClass, target_frame: FrameClass, target_pcl:SurfelMap, init_x: torch.Tensor=None):
+    def estimate_gn(self, ref_frame: FrameClass, target_frame: FrameClass, target_pcl:SurfelMap, init_x: torch.Tensor=None):
 
         ref_pcl = SurfelMap(frame=ref_frame, kmat=self.icp_estimator.intrinsics, ignore_mask=True)
 
@@ -88,7 +88,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
 
         return coeffs_list[-1], None, None
 
-    def estimate_gn(self, ref_frame: FrameClass, target_frame: FrameClass, target_pcl:SurfelMap, init_x: torch.Tensor=None):
+    def _estimate_gn(self, ref_frame: FrameClass, target_frame: FrameClass, target_pcl:SurfelMap, init_x: torch.Tensor=None):
         """ Minimize combined energy using Gauss-Newton and solving the normal equations."""
         ref_pcl = SurfelMap(frame=ref_frame, kmat=self.icp_estimator.intrinsics, ignore_mask=True)
         x = torch.zeros(6, dtype=torch.float64, device=ref_frame.depth.device)
