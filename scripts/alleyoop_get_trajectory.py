@@ -82,7 +82,6 @@ def main(input_path, output_path, config, device_sel, nsamples):
 if __name__ == '__main__':
     import argparse
     import yaml
-    from pathlib import Path
     parser = argparse.ArgumentParser(description='script to run EMDQ SLAM re-implementation')
 
     parser.add_argument(
@@ -98,7 +97,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--config',
         type=str,
-        default=Path().cwd() / 'configuration' / 'alleyoop_slam.yaml',
+        default='../configuration/alleyoop_slam.yaml',
         help='Configuration file.'
     )
     parser.add_argument(
