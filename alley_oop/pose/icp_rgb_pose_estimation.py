@@ -77,7 +77,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
         multi_cost_fun_args = lambda p: self.multi_cost_fun(p, ref_pcl, target_pcl, ref_frame, target_frame)
         multi_jaco_fun_args = lambda p: self.multi_jaco_fun(p, ref_pcl, target_pcl, ref_frame, target_frame)
 
-        coeffs_list = lsq_gna_parallel_plain(
+        coeffs = lsq_gna_parallel_plain(
                             p = init_x[None, ...].double(),
                             function = multi_cost_fun_args,
                             jac_function = multi_jaco_fun_args,
@@ -86,7 +86,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
                             max_iter = self.n_iter,
                         )
 
-        return coeffs_list[-1], None, None
+        return coeffs, coeffs, None
 
     def _estimate_gn(self, ref_frame: FrameClass, target_frame: FrameClass, target_pcl:SurfelMap, init_x: torch.Tensor=None):
         """ Minimize combined energy using Gauss-Newton and solving the normal equations."""
