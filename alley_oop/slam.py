@@ -137,7 +137,7 @@ class PreProcess(object):
     def __call__(self, img:ndarray, depth:ndarray, mask:ndarray=None, dummy_label=None):
         img = (torch.tensor(img).permute(2, 0, 1) / 255.0).to(self.dtype)
         depth = depth * self.depth_scale  # normalize depth for numerical stability
-        depth = cv2.bilateralFilter(depth, None, sigmaColor=0.01, sigmaSpace=10)
+        depth = cv2.bilateralFilter(depth, d=-1, sigmaColor=0.01, sigmaSpace=10)
         mask = np.ones_like(depth).astype(bool) if mask is None else mask
         # depth clipping
         mask &= (depth > self.depth_min) & (depth < 1.0)
@@ -147,4 +147,3 @@ class PreProcess(object):
         mask = (torch.tensor(mask).unsqueeze(0)).to(torch.bool)
 
         return img, depth, mask
-
