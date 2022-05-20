@@ -8,7 +8,6 @@ from alley_oop.fusion.surfel_map import SurfelMap
 from alley_oop.utils.pytorch import batched_dot_product
 from typing import Tuple
 import matplotlib.pyplot as plt
-from torchimize.functions import lsq_lma
 
 
 class ICPEstimator(torch.nn.Module):
@@ -52,17 +51,16 @@ class ICPEstimator(torch.nn.Module):
         return (residuals**2).mean()
 
     def residual_fun(self, x, ref_pcl, target_pcl, ref_mask=None):
-        T_est = lie_se3_to_SE3(x)
+        T_est = lie_se3_to_SE3(-x)
         self.src_ids, self.trg_ids = self.associate(ref_pcl, target_pcl, T_est, ref_mask)
         # compute residuals
         ref_pcl_world_c = ref_pcl.transform_cpy(T_est)
         residuals = batched_dot_product(target_pcl.normals.T[self.trg_ids],
-                                   (ref_pcl_world_c.opts.T[self.src_ids] - target_pcl.opts.T[
-                                       self.trg_ids]))
+                                   (target_pcl.opts.T[self.trg_ids] - ref_pcl_world_c.opts.T[self.src_ids]))
         return residuals
 
     def jacobian(self, x, ref_pcl, target_pcl, ref_mask=None):
-        T_est = lie_se3_to_SE3(x)
+        T_est = lie_se3_to_SE3(-x)
         ref_pcl_world_c = ref_pcl.transform_cpy(T_est)
         return (target_pcl.normals.T[self.trg_ids].unsqueeze(1) @ self.j_3d(
             ref_pcl_world_c.opts.T[self.src_ids])).squeeze()
@@ -112,13 +110,11 @@ class ICPEstimator(torch.nn.Module):
 
     def projective_association(self, ref_pcl:SurfelMap, target_pcl:SurfelMap, T_est:torch.tensor, ref_mask:torch.tensor=None):
         # update image shape
-        ref_pcl = ref_pcl.transform_cpy(T_est)
-
-        pmat_inv = inv_transform(T_est)
+        ref_pcl = ref_pcl.transform_cpy(inv_transform(T_est))
 
         # project all surfels to current image frame
-        global_ipts, bidx = forward_project2image(target_pcl.opts, kmat=self.intrinsics, rmat=pmat_inv[:3, :3],
-                                            tvec=pmat_inv[:3, -1][:, None], img_shape=self.img_shape)
+        global_ipts, bidx = forward_project2image(target_pcl.opts, kmat=self.intrinsics, rmat=T_est[:3, :3],
+                                            tvec=T_est[:3, -1][:, None], img_shape=self.img_shape)
 
         # find correspondence by projecting surfels to current frame
         midx = ref_pcl.get_match_indices(global_ipts[:, bidx], upscale=1)

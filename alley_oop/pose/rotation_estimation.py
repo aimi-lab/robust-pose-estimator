@@ -34,19 +34,20 @@ class RotationEstimator(torch.nn.Module):
         """ estimate rotation using efficient second-order optimization"""
         ref_img = ref_frame.img_gray
         target_img = target_frame.img_gray
-        x = torch.zeros(3, device=self.d.device, dtype=ref_img.dtype)
+        x = torch.zeros(3, device=self.d.device, dtype=torch.float64)
         converged = False
         best_sol = [x.clone(), torch.inf*torch.ones(1, device=self.d.device).squeeze()]
         for i in range(self.n_iter):
             # compute residuals f(x)
-            warped_img = self._warp_img(ref_img, x)
+            xfloat = x.float()
+            warped_img = self._warp_img(ref_img, xfloat)
             J = self._ems_jacobian(warped_img, target_img)
             residuals = ((warped_img - target_img)).reshape(-1, 1)
             if mask is not None:
                 residuals = mask.view(-1,1)*residuals
             cost = self.cost_fun(residuals)
             # compute update parameter x0
-            x0 = torch.linalg.lstsq(J, residuals).solution
+            x0 = torch.linalg.lstsq(J.double(), residuals.double()).solution
 
             costs = torch.stack([cost, best_sol[1]]) # if cost < best_sol[1]: best_sol = (x.clone(), cost)
             xs = torch.stack([x, best_sol[0]])
@@ -63,7 +64,7 @@ class RotationEstimator(torch.nn.Module):
             x += x0.squeeze()
         if not converged:
             warnings.warn(f"EMS not converged after {self.n_iter}", RuntimeWarning)
-        return lie_so3_to_SO3(best_sol[0]), best_sol[1]
+        return best_sol[0], best_sol[1]
 
     @staticmethod
     def cost_fun(residuals):

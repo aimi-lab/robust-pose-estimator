@@ -21,9 +21,12 @@ class StereoRectifier(object):
         if img_size_new is not None:
             # scale intrinsics
             self.scale = img_size_new[0]/cal['img_size'][0]
-            assert self.scale == img_size_new[1]/cal['img_size'][1]
+            h_crop = int((cal['img_size'][1]*self.scale - img_size_new[1])/2)
+            assert h_crop >= 0, 'only vertical crop implemented'
             cal['lkmat'][:2] *= self.scale
             cal['rkmat'][:2] *= self.scale
+            cal['lkmat'][1, 2] -= h_crop
+            cal['rkmat'][1, 2] -= h_crop
             cal['img_size'] = img_size_new
         self.img_size = cal['img_size']
 

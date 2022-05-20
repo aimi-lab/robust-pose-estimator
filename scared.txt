@@ -1,0 +1,1 @@
+/storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/01_stereo/01_intuitive_scared/dataset_1/keyframe_1
