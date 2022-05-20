@@ -72,7 +72,6 @@ class PyramidPoseEstimator(torch.nn.Module):
             pose = self.last_pose_lie - pose_cur2last_lie
             self.last_pose_lie.data = pose
         self.last_frame_pyr = frame_pyr
-        print(self.last_pose)
         return self.last_pose, model_frame
 
     @property
