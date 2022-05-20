@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from torch.nn.functional import conv2d, pad
 from alley_oop.interpol.synth_view import synth_view
 from alley_oop.pose.frame_class import FrameClass
+from torchimize.functions import lsq_lma
 
 
 class RGBPoseEstimator(torch.nn.Module):
