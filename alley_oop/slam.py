@@ -114,6 +114,7 @@ class OptimizationRecordings():
             ax[i].plot(self.costs_combined[i])
             ax[i].plot(self.costs_icp[i])
             ax[i].plot(self.costs_rgb[i])
+            ax[i].set_xlim([0, 1.1*max(self.costs_combined[i])])
             ax[i].grid()
             ax[0].legend(['combined', 'icp', 'rgb'])
         ax[self.pyramid_levels].plot(self.surfels_stable)
@@ -135,16 +136,28 @@ class PreProcess(object):
         self.dtype = dtype
 
     def __call__(self, img:ndarray, depth:ndarray, mask:ndarray=None, dummy_label=None):
-        img = (torch.tensor(img).permute(2, 0, 1) / 255.0).to(self.dtype)
-        depth = depth * self.depth_scale  # normalize depth for numerical stability
+        # normalize img
+        img = img.astype(np.float32) / 255.0
+        # normalize depth for numerical stability
+        depth = depth * self.depth_scale
+
+        # filter depth to smooth out noisy points
         depth = cv2.bilateralFilter(depth, None, sigmaColor=0.01, sigmaSpace=10)
         mask = np.ones_like(depth).astype(bool) if mask is None else mask
+        mask &= self.specularity_mask(img)
         # depth clipping
         mask &= (depth > self.depth_min) & (depth < 1.0)
-        # border points are usually unstable
+        # border points are usually unstable, mask them out
         mask = cv2.erode(mask.astype(np.uint8), kernel=np.ones((7, 7)))
         depth = (torch.tensor(depth).unsqueeze(0)).to(self.dtype)
         mask = (torch.tensor(mask).unsqueeze(0)).to(torch.bool)
 
+        img = (torch.tensor(img).permute(2, 0, 1)).to(self.dtype)
+
         return img, depth, mask
 
+    def specularity_mask(self, img, spec_thr=0.96):
+        """ specularities can cause issues in the photometric pose estimation.
+            We can easily mask them by looking for maximum intensity values in all color channels """
+        mask = img.sum(axis=-1) < (3*spec_thr)
+        return mask
