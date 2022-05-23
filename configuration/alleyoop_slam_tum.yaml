@@ -18,7 +18,7 @@ slam:
     - 'projective'
     - 'projective'
   depth_clipping:
-    - 0
+    - 1
     - 5000.0 # max depth in mm
   debug: False
 
