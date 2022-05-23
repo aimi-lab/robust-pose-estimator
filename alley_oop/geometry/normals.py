@@ -2,7 +2,7 @@ from scipy.spatial import KDTree
 from sklearn.decomposition import PCA
 import numpy as np
 import torch
-from typing import Union
+from typing import Union, Tuple
 from alley_oop.utils.lib_handling import get_lib
 
 
@@ -91,3 +91,18 @@ def get_ray_surfnorm_angle(opts: np.ndarray, naxs: np.ndarray, tvec: np.ndarray 
     angs = np.arccos(anit)
 
     return angs
+
+
+def resize_normalmap(normals: torch.tensor, img_shape: Tuple) -> torch.tensor:
+    """
+    Consistent resizing of normal map. The map can be sparse where undefined normals have value (0,0,0).
+    """
+
+    assert normals.ndim == 4
+    assert normals.shape[1] == 3
+
+    normals_lowscale = torch.nn.functional.adaptive_avg_pool2d(normals, output_size=img_shape)
+    norm = torch.linalg.norm(normals_lowscale, dim=1, keepdim=True)
+    norm[norm == 0.0] = 1.0
+    normals_lowscale /= norm
+    return normals_lowscale

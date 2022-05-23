@@ -37,7 +37,7 @@ def main(input_path, output_path, config, device_sel, nsamples, start, step):
         seg_model = SemanticSegmentationModel('stereo_slam/segmentation_network/trained/PvtB2_combined_TAM_fold1.pth',
                                               device)
     with torch.inference_mode():
-        viewer = Viewer3D((3 * config['img_size'][0], 3 * config['img_size'][1]),
+        viewer = Viewer3D((2 * config['img_size'][0], 2 * config['img_size'][1]),
                           blocking=config['viewer']['blocking']) if config['viewer']['enable'] else None
 
         trajectory = []
@@ -50,11 +50,15 @@ def main(input_path, output_path, config, device_sel, nsamples, start, step):
                 mask &= depth_valid  # mask tools and non-valid depth
             else:
                 limg, depth, mask, img_number = data
-            pose, scene = slam.processFrame(limg.to(device), depth.to(device), mask.to(device))
+            pose, scene, pose_relscale = slam.processFrame(limg.to(device), depth.to(device), mask.to(device))
 
             if viewer is not None:
-                curr_pcl = SurfelMap(frame=slam.get_frame(), kmat=torch.tensor(calib['intrinsics']['left']).float(), pmat=pose).pcl2open3d(stable=False)
-                curr_pcl.paint_uniform_color([0.5,0.5,0.5])
+                curr_pcl = SurfelMap(frame=slam.get_frame(), kmat=torch.tensor(calib['intrinsics']['left']).float(),
+                                     pmat=pose_relscale, depth_scale=scene.depth_scale).pcl2open3d(stable=False)
+                if scene.patch_colors is not None:
+                    curr_pcl.colors = open3d.utility.Vector3dVector(scene.patch_colors[slam.get_frame().mask.view(-1)])
+                else:
+                    curr_pcl.paint_uniform_color([0.5,0.5,0.5])
                 viewer(pose.cpu(), scene.pcl2open3d(stable=config['viewer']['stable']), add_pcd=curr_pcl,
                        frame=slam.get_frame(), synth_frame=slam.get_rendered_frame(), optim_results=slam.get_optimization_res())
             trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
