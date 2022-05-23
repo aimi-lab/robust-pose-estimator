@@ -81,4 +81,4 @@ class PyramidPoseEstimator(torch.nn.Module):
 
     @property
     def last_pose(self):
-        return lie_se3_to_SE3(self.last_pose_lie).float()
+        return lie_se3_to_SE3(self.last_pose_lie.reshape(-1)).float()

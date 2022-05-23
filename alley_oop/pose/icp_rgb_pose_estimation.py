@@ -44,11 +44,12 @@ class RGBICPPoseEstimator(torch.nn.Module):
 
     def multi_cost_fun(self, xfloat, ref_pcl, target_pcl, ref_frame, target_frame):
 
-        icp_residuals = self.icp_estimator.residual_fun(xfloat[0, :].float(), ref_pcl, target_pcl, ref_frame.mask)
-        rgb_residuals = self.rgb_estimator.residual_fun(xfloat[0, :].float(), ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
+        icp_residuals = self.icp_estimator.residual_fun(xfloat.reshape(-1).float(), ref_pcl, target_pcl, ref_frame.mask)
+        rgb_residuals = self.rgb_estimator.residual_fun(xfloat.reshape(-1).float(), ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
 
         residuals = [icp_residuals, rgb_residuals]
 
+        # enable tensor cost stacking by padding tensor with less values
         dims = torch.tensor([icp_residuals.size(), rgb_residuals.size()])
         size = torch.max(dims)
         tidx = torch.argmin(dims)
@@ -58,11 +59,12 @@ class RGBICPPoseEstimator(torch.nn.Module):
 
     def multi_jaco_fun(self, xfloat, ref_pcl, target_pcl, ref_frame, target_frame):
 
-        icp_jacobian = self.icp_estimator.jacobian(xfloat[0, :].float(), ref_pcl, target_pcl, ref_frame.mask)
-        rgb_jacobian = self.rgb_estimator.jacobian(xfloat[0, :].float(), ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
+        icp_jacobian = self.icp_estimator.jacobian(xfloat.reshape(-1).float(), ref_pcl, target_pcl, ref_frame.mask)
+        rgb_jacobian = self.rgb_estimator.jacobian(xfloat.reshape(-1).float(), ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
 
         jacobians = [icp_jacobian, rgb_jacobian]
 
+        # enable tensor cost stacking by padding tensor with less values
         dims = torch.tensor([icp_jacobian.size(), rgb_jacobian.size()])
         size = torch.max(dims[:, 0])
         tidx = torch.argmin(dims[:, 0])
