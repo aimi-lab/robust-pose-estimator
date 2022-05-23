@@ -79,12 +79,14 @@ class RGBICPPoseEstimator(torch.nn.Module):
         multi_cost_fun_args = lambda p: self.multi_cost_fun(p, ref_pcl, target_pcl, ref_frame, target_frame)
         multi_jaco_fun_args = lambda p: self.multi_jaco_fun(p, ref_pcl, target_pcl, ref_frame, target_frame)
 
+        wvec = torch.ones(2, device=init_x.device, dtype=init_x.dtype)
+        wvec[0] = self.icp_weight
+
         coeffs = lsq_gna_parallel_plain(
                             p = init_x[None, ...].double(),
                             function = multi_cost_fun_args,
                             jac_function = multi_jaco_fun_args,
-                            wvec = torch.ones(2, device=init_x.device, dtype=init_x.dtype),
-                            l = .1,
+                            wvec = wvec,
                             max_iter = self.n_iter,
                         )
 
