@@ -4,7 +4,7 @@ from typing import Union, Tuple
 
 from alley_oop.geometry.pinhole_transforms import forward_project2image, reverse_project, create_img_coords_t, forward_project
 from alley_oop.interpol.sparse_img_interpolation import SparseImgInterpolator
-from alley_oop.geometry.normals import normals_from_regular_grid
+from alley_oop.geometry.normals import normals_from_regular_grid, resize_normalmap
 from alley_oop.utils.pytorch import batched_dot_product
 from alley_oop.pose.frame_class import FrameClass
 
@@ -27,7 +27,7 @@ class SurfelMap(object):
         # initiliaze focal length
         self.flen = (self.kmat[0, 0] + self.kmat[1, 1]) / 2
         self.depth_scale = kwargs['depth_scale'] if 'depth_scale' in kwargs else 1.0  # only used for open3d pcl
-
+        self.patch_colors = None
         # either provide opts, normals and color or a frame class
         if 'opts' in kwargs:
             assert 'normals' in kwargs
@@ -116,8 +116,10 @@ class SurfelMap(object):
         # get correspondence by assigning projected points to image coordinates
         midx = self.get_match_indices(global_ipts[:, bidx])
 
-        # compute mask that rejects depth and normal outliers
-        vidx, midx = self.filter_surfels_by_correspondence(opts=opts, vidx=bidx, midx=midx, normals=normals, d_thresh=self.d_thresh)
+        # compute mask that rejects depth and normal outliers and detects duplicated surface patches
+        vidx, midx, dmask = self.filter_surfels_by_correspondence(opts=opts, vidx=bidx, midx=midx, normals=normals,
+                                                                  d_thresh=self.d_thresh, check_duplicate_surfaces=True)
+
         # apply frame mask to reject invalid pixels
         bidx[vidx.clone()] &= (frame.mask.view(-1)[(midx/self.upscale**2).long()]).type(torch.bool)
         midx = midx[frame.mask.view(-1)[(midx/self.upscale**2).long()]]
@@ -146,7 +148,7 @@ class SurfelMap(object):
         # bring mask back to original shape
         mask = ~max_pool2d(mask.view(1,1,self.img_shape[0]*self.upscale, self.img_shape[1]*self.upscale), self.upscale, stride=self.upscale).view(-1).to(torch.bool)
         # avoid fusion with invalid pixels
-        mask &= frame.mask.view(-1)
+        mask &= frame.mask.view(-1) & dmask
         if self.dbug_opt:
             # print ratio of added points vs frame resolution
             ratio = mask.float().mean()
@@ -203,10 +205,11 @@ class SurfelMap(object):
         midx: torch.Tensor,
         vidx: torch.Tensor = None,
         normals: torch.Tensor = None,
-        d_thresh: float = 3,
+        d_thresh: float = 0.05,
         n_thresh: float = 20,
-        remove_duplicates: bool = False
-        ) -> Tuple[torch.Tensor, torch.Tensor]:
+        remove_duplicates: bool = False,
+        check_duplicate_surfaces: bool = False
+        ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         filter correspondences by depth and normal angle
         """
@@ -217,14 +220,26 @@ class SurfelMap(object):
         angle_threshold = torch.cos(torch.tensor(n_thresh)/180*torch.pi)
 
         # 1. depth distance constraint
-        valid = torch.abs(opts[2, midx] - self.opts[2, vidx]) < d_thresh
+        depth_diff = opts[2, midx] - self.opts[2, vidx]
+        valid_depth = torch.abs(depth_diff) < d_thresh
 
         # 2. normals constraint (degrees threshold)
-        valid &= torch.abs(batched_dot_product(normals[:, midx].T, self.nrml[:, vidx].T)) > angle_threshold
+        valid_normals = torch.abs(batched_dot_product(normals[:, midx].T, self.nrml[:, vidx].T)) > angle_threshold
+
+        # 3. check for duplicated surfaces
+        if check_duplicate_surfaces:
+            invidx = vidx.clone()
+            invidx[vidx] &= ~valid_depth
+            duplicate_mask = self.detect_duplicated_surfaces(normals, invidx, depth_diff, midx)
+            print(duplicate_mask.float().mean())
+            if duplicate_mask.float().mean() < 0.3:
+                print(duplicate_mask.float().mean(), "  something went wrong here!!!")
+        else:
+            duplicate_mask = torch.ones(self.img_shape[0]*self.img_shape[1], device=self.device, dtype=torch.bool)
 
         # combine constraints and update indices
-        vidx[vidx.clone()] &= valid
-        midx = midx[valid]
+        vidx[vidx.clone()] &= valid_depth & valid_normals
+        midx = midx[valid_depth & valid_normals]
 
         if remove_duplicates:
             # identify duplicates
@@ -232,7 +247,7 @@ class SurfelMap(object):
             duplicates = oidx[bins>1]
             candidate_mask = torch.ones_like(midx).to(torch.bool)
             kidx = vidx.clone()
-            # TODO vectorize for-loop , this is too slow, I had to comment it out for the moment
+            # TODO vectorize for-loop , this is too slow
             for d in duplicates:
                 candidates = midx == d
                 candidates &= ~(self.conf[:,vidx] == torch.max(self.conf[:,vidx][:,candidates])).squeeze()
@@ -241,7 +256,7 @@ class SurfelMap(object):
             midx = midx[candidate_mask]
         else:
             kidx = vidx
-        return kidx, midx
+        return kidx, midx, duplicate_mask
 
     @property
     def normals(self):
@@ -251,7 +266,44 @@ class SurfelMap(object):
     def normals(self, normals):
         self.nrml = normals
 
-    ########################
+    def detect_duplicated_surfaces(
+            self,
+            normals: torch.tensor,
+            invidx: torch.tensor,
+            depth_diff: torch.tensor,
+            midx: torch.tensor,
+            angle_threshold:float=45.0):
+        """
+            Detect duplicated surfaces and exclude them from surfel creation.
+        """
+        angle_threshold = torch.cos(torch.tensor(angle_threshold) / 180 * torch.pi)
+
+        # 2. check if invalid surfels correspond to true occlusion by checking the normal directions
+
+        # generate low-resolution normal maps from input frame and rendered scene
+        patch_size = (self.img_shape[0]//32, self.img_shape[1]//32)
+        normals_lowscale = resize_normalmap(normals.reshape(1,3,self.img_shape[0], self.img_shape[1]), patch_size)
+
+        # rotate, translate and forward-project points
+        pts_h = torch.vstack([self.opts[:, invidx], torch.ones(self.opts[:, invidx].shape[1], dtype=self.opts.dtype, device=self.device)])
+        npts, idx = forward_project2image(pts_h, img_shape=self.img_shape, kmat=self.kmat)
+
+        # generate sparse img maps and interpolate missing values
+        img_coords = npts[1, idx].long() * self.img_shape[1] + npts[0, idx].long()
+        scene_normals_low_scale = torch.zeros((3,*self.img_shape), device=self.device).view(3,-1)
+        scene_normals_low_scale[:, img_coords] = self.normals[:, invidx][:, idx]
+
+        scene_normals_low_scale = resize_normalmap(scene_normals_low_scale.view(1,3,*self.img_shape), patch_size)
+
+        # check if normals are pointing in same direction
+        duplicate_mask = torch.abs(batched_dot_product(normals_lowscale.view(3,-1).T, scene_normals_low_scale.view(3,-1).T)) < angle_threshold
+
+        duplicate_mask = torch.nn.functional.interpolate(duplicate_mask.float().view(1,1,*patch_size), self.img_shape, mode='nearest')
+
+        # 1. check if invalid surfels lie behind object such that they cannot be visible
+        duplicate_mask = duplicate_mask.to(torch.bool).view(-1)
+        duplicate_mask[midx] &= depth_diff < 0
+        return duplicate_mask
 
     def transform(self, transform:torch.tensor):
         """

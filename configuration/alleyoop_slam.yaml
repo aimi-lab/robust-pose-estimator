@@ -3,8 +3,8 @@ slam:
   rot:
     n_iter: 10
     Ftol: 1.0e-4
-  icp_weight:  50.0
-  dist_thr: 0.02 # relative distance threshold for data association
+  icp_weight:  10.0
+  dist_thr: 0.05 # relative distance threshold for data association
   n_iter:
     - 10
     - 4
@@ -20,7 +20,7 @@ slam:
   depth_clipping:
     - 1
     - 300 # in mm
-  debug: False
+  debug: True
 
 img_size:
   - 640
@@ -30,6 +30,6 @@ img_size:
 
 
 viewer:
-  enable: False
-  blocking: False
+  enable: True
+  blocking: True
   stable: False
