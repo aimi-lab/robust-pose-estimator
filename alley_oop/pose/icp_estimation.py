@@ -123,7 +123,7 @@ class ICPEstimator(torch.nn.Module):
             midx = midx[ref_mask.view(-1)[midx]]
 
         # compute that rejects correspondences for a single unique one
-        vidx, midx = target_pcl.filter_surfels_by_correspondence(opts=ref_pcl.opts, vidx=bidx, midx=midx,
+        vidx, midx, _ = target_pcl.filter_surfels_by_correspondence(opts=ref_pcl.opts, vidx=bidx, midx=midx,
                                                                normals=ref_pcl.normals, d_thresh=self.dist_thr,
                                                                n_thresh=self.normal_thr)
 

@@ -190,7 +190,7 @@ class SurfelMapTest(unittest.TestCase):
         # find matching index without duplicate removal as an alternative
         aidx = torch.fliplr(midx.unique(sorted=False)[None, :])[0]
 
-        kidx, midx = surf_map.filter_surfels_by_correspondence(gpts, midx=midx)
+        kidx, midx, _ = surf_map.filter_surfels_by_correspondence(gpts, midx=midx)
 
         # assertion
         self.assertEqual(len(aidx), len(shuffle_idx), 'Number of unique correspondences deviates from ground truth')

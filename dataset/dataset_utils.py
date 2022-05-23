@@ -6,6 +6,7 @@ from dataset.video_dataset import StereoVideoDataset
 from dataset.semantic_dataset import RGBDDataset
 from dataset.rectification import StereoRectifier
 from typing import Tuple
+from torch.utils.data import Sampler
 
 
 def get_data(input_path: str, img_size: Tuple, sample_video: int=1):
@@ -41,3 +42,26 @@ def get_data(input_path: str, img_size: Tuple, sample_video: int=1):
                 dataset = StereoVideoDataset(video_file, calib_file, pose_file, img_size=calib['img_size'], sample=sample_video)
 
     return dataset, calib
+
+
+class SequentialSubSampler(Sampler):
+    """
+    Samples elements sequentially, always in the same order with a defined subsampling step.
+
+        :param data_source: dataset to sample from
+        :param step: subsample step
+    """
+
+    def __init__(self, data_source, start: int= 0, stop: int=-1, step: int=1):
+        self.data_source = data_source
+        self.start = start
+        self.stop = stop
+        self.step = step
+
+    def __iter__(self):
+        if self.stop > 0:
+            l = min(self.stop, len(self.data_source))
+        return iter(range(self.start, l, self.step))
+
+    def __len__(self):
+        return int(len(self.data_source)/self.step)
