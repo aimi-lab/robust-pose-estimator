@@ -290,7 +290,7 @@ class SurfelMap(object):
 
         # generate sparse img maps and interpolate missing values
         img_coords = npts[1, idx].long() * self.img_shape[1] + npts[0, idx].long()
-        scene_normals_low_scale = torch.zeros((3,*self.img_shape)).view(3,-1)
+        scene_normals_low_scale = torch.zeros((3,*self.img_shape), device=self.device).view(3,-1)
         scene_normals_low_scale[:, img_coords] = self.normals[:, invidx][:, idx]
 
         scene_normals_low_scale = resize_normalmap(scene_normals_low_scale.view(1,3,*self.img_shape), patch_size)
@@ -303,10 +303,6 @@ class SurfelMap(object):
         # 1. check if invalid surfels lie behind object such that they cannot be visible
         duplicate_mask = duplicate_mask.to(torch.bool).view(-1)
         duplicate_mask[midx] &= depth_diff < 0
-
-        import matplotlib.pyplot as plt
-        cm = plt.get_cmap('jet')
-        self.patch_colors = cm(duplicate_mask.float().squeeze().cpu().numpy())[..., :3]
         return duplicate_mask
 
     def transform(self, transform:torch.tensor):
