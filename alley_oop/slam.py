@@ -3,10 +3,8 @@ from alley_oop.fusion.surfel_map import SurfelMap
 from alley_oop.pose.pyramid_pose_estimator import PyramidPoseEstimator
 from alley_oop.pose.frame_class import FrameClass
 from typing import Union, Tuple
-from numpy import ndarray
 from torch import tensor
-import numpy as np
-import cv2
+from alley_oop.preprocessing.preprocess import PreProcess
 
 
 class SLAM(object):
@@ -129,35 +127,4 @@ class OptimizationRecordings():
         return fig, ax
 
 
-class PreProcess(object):
-    def __init__(self, scale, depth_min, dtype=torch.float32):
-        self.depth_scale = scale
-        self.depth_min = depth_min
-        self.dtype = dtype
 
-    def __call__(self, img:ndarray, depth:ndarray, mask:ndarray=None, dummy_label=None):
-        # normalize img
-        img = img.astype(np.float32) / 255.0
-        # normalize depth for numerical stability
-        depth = depth * self.depth_scale
-
-        # filter depth to smooth out noisy points
-        depth = cv2.bilateralFilter(depth, d=-1, sigmaColor=0.01, sigmaSpace=10)
-        mask = np.ones_like(depth).astype(bool) if mask is None else mask
-        mask &= self.specularity_mask(img)
-        # depth clipping
-        mask &= (depth > self.depth_min) & (depth < 1.0)
-        # border points are usually unstable, mask them out
-        mask = cv2.erode(mask.astype(np.uint8), kernel=np.ones((7, 7)))
-        depth = (torch.tensor(depth).unsqueeze(0)).to(self.dtype)
-        mask = (torch.tensor(mask).unsqueeze(0)).to(torch.bool)
-
-        img = (torch.tensor(img).permute(2, 0, 1)).to(self.dtype)
-
-        return img, depth, mask
-
-    def specularity_mask(self, img, spec_thr=0.96):
-        """ specularities can cause issues in the photometric pose estimation.
-            We can easily mask them by looking for maximum intensity values in all color channels """
-        mask = img.sum(axis=-1) < (3*spec_thr)
-        return mask
