@@ -59,7 +59,7 @@ class SLAM(object):
             self.cnt += 1
             pose_scaled = pose.clone()
             pose_scaled[:3,3] /= self.depth_scale  # de-normalize depth scaling
-            return pose_scaled, self.scene
+            return pose_scaled, self.scene, pose
 
     def to(self, device: torch.device):
         self.device = device
