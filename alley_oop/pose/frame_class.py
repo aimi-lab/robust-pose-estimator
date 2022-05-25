@@ -48,7 +48,7 @@ class FrameClass:
             pad = torch.nn.ReplicationPad2d((0, 1, 0, 1))
             self.normals = pad(normals.permute(2, 0, 1)).contiguous().unsqueeze(0)
 
-        self.confidence = confidence if confidence is not None else torch.ones_like(self.img_gray)
+        self.confidence = confidence.contiguous() if confidence is not None else torch.ones_like(self.img_gray)
 
         assert self.img.shape[-2:] == self.img_gray.shape[-2:]
         assert self.img_gray.shape == self.depth.shape

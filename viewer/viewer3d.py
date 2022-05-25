@@ -47,7 +47,7 @@ class Viewer3D(object):
                 ax[0].imshow(img_view)
                 ax[0].axis('off')
                 img_view = np.concatenate((conf, conf_synth), axis=1)
-                ax[1].imshow(img_view, vmin=0, vmax=7)
+                ax[1].imshow(img_view, vmin=0, vmax=1)
                 ax[1].axis('off')
             # plot optimization results
             if optim_results is not None:

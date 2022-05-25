@@ -21,7 +21,7 @@ slam:
     - 1
     - 5000.0 # max depth in mm
   debug: False
-  mask_specularities: False
+  mask_specularities: True
 
 img_size:
   - 640
@@ -32,5 +32,5 @@ img_size:
 
 viewer:
   enable: False
-  blocking: True
+  blocking: False
   stable: False

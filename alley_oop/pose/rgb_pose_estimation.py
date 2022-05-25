@@ -50,7 +50,7 @@ class RGBPoseEstimator(torch.nn.Module):
         residuals = ref_frame.img_gray.view(-1)[self.src_ids] - trg_frame.img_gray.view(-1)[self.trg_ids]
         mask = ref_frame.mask.view(-1)[self.src_ids] & trg_frame.mask.view(-1)[self.trg_ids]
         # weight residuals by confidences
-        #residuals = self.warped_conf * trg_frame.confidence.reshape(-1)[self.trg_ids ] * residuals
+        #residuals = ref_frame.confidence.view(-1)[self.src_ids]* trg_frame.confidence.reshape(-1)[self.trg_ids] * residuals
         residuals = residuals[mask]
         return residuals
 
@@ -60,7 +60,7 @@ class RGBPoseEstimator(torch.nn.Module):
         J = J[self.src_ids].squeeze()
         mask = ref_frame.mask.view(-1)[self.src_ids] & trg_frame.mask.view(-1)[self.trg_ids]
         # weight residuals by confidences
-        #J = (self.warped_conf * trg_frame.confidence.reshape(-1)[self.trg_ids ])[:, None] * J
+        #J = (ref_frame.confidence.view(-1)[self.src_ids] * trg_frame.confidence.reshape(-1)[self.trg_ids])[:, None] * J
         J = J[mask]
         return J
 

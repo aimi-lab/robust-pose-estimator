@@ -95,7 +95,7 @@ class OptimizationRecordings():
 
     def __call__(self, scene, estimator):
         self.surfels_total.append(scene.opts.shape[1])
-        self.surfels_stable.append((scene.conf > scene.conf_thr).sum().item())
+        self.surfels_stable.append((scene.conf >= 1.0).sum().item())
         for i in range(self.pyramid_levels):
             self.costs_combined[i].append(estimator.cost[i][0])
             self.costs_icp[i].append(estimator.cost[i][1])
