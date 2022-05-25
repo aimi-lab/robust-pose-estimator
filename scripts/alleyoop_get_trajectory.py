@@ -5,10 +5,8 @@ import os
 import torch
 import numpy as np
 from tqdm import tqdm
-from viewer.viewer3d import Viewer3D
 from other_slam_methods.stereo_slam.disparity.disparity_model import DisparityModel
 from other_slam_methods.stereo_slam.segmentation_network.seg_model import SemanticSegmentationModel
-import open3d
 import matplotlib.pyplot as plt
 from alley_oop.fusion.surfel_map import SurfelMap
 from alley_oop.utils.trajectory import save_trajectory
@@ -37,8 +35,12 @@ def main(input_path, output_path, config, device_sel, nsamples, start, step):
         seg_model = SemanticSegmentationModel('stereo_slam/segmentation_network/trained/PvtB2_combined_TAM_fold1.pth',
                                               device)
     with torch.inference_mode():
-        viewer = Viewer3D((2 * config['img_size'][0], 2 * config['img_size'][1]),
-                          blocking=config['viewer']['blocking']) if config['viewer']['enable'] else None
+        viewer = None
+        if config['viewer']['enable']:
+            import open3d
+            from viewer.viewer3d import Viewer3D
+            viewer = Viewer3D((2 * config['img_size'][0], 2 * config['img_size'][1]),
+                              blocking=config['viewer']['blocking'])
 
         trajectory = []
         os.makedirs(output_path, exist_ok=True)
@@ -65,8 +67,7 @@ def main(input_path, output_path, config, device_sel, nsamples, start, step):
                        frame=slam.get_frame(), synth_frame=slam.get_rendered_frame(), optim_results=slam.get_optimization_res())
             trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
             if (i%50) == 0:
-                pcl = scene.pcl2open3d(stable=True)
-                open3d.io.write_point_cloud(os.path.join(output_path, f'map_{i:04d}.ply'), pcl)
+                scene.save_ply(os.path.join(output_path, f'map_{i:04d}.ply'), stable=True)
 
         save_trajectory(trajectory, output_path)
 
@@ -74,8 +75,7 @@ def main(input_path, output_path, config, device_sel, nsamples, start, step):
         fig, ax = slam.plot_recordings()
         plt.savefig(os.path.join(output_path, 'optimization_plot.pdf'))
 
-        pcl = scene.pcl2open3d(stable=True)
-        open3d.io.write_point_cloud(os.path.join(output_path, f'map.ply'), pcl)
+        scene.save_ply(os.path.join(output_path, f'map.ply'), stable=True)
 
         if viewer is not None:
             viewer.blocking = True

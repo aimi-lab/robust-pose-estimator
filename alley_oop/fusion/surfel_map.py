@@ -1,12 +1,14 @@
 import torch
 from torch.nn.functional import max_pool2d
 from typing import Union, Tuple
+import numpy as np
 
 from alley_oop.geometry.pinhole_transforms import forward_project2image, reverse_project, create_img_coords_t, forward_project
 from alley_oop.interpol.sparse_img_interpolation import SparseImgInterpolator
 from alley_oop.geometry.normals import normals_from_regular_grid, resize_normalmap
 from alley_oop.utils.pytorch import batched_dot_product
 from alley_oop.pose.frame_class import FrameClass
+from alley_oop.utils.save_ply import save_ply
 
 
 class SurfelMap(object):
@@ -389,6 +391,18 @@ class SurfelMap(object):
             rgb = self.gray.repeat((3,1)).T[filter][stable_pts]
             pcd.colors = open3d.utility.Vector3dVector(rgb.cpu().numpy())
         return pcd
+
+    def save_ply(self, path:str, stable:bool=True):
+        if stable:
+            stable_pts = (self.conf > 1.0).squeeze()
+        else:
+            stable_pts = torch.ones_like(self.conf, dtype=torch.bool).squeeze()
+        opts = self.opts.T[stable_pts].cpu().numpy()/self.depth_scale
+        if self.gray.numel() > 0:
+            rgb = self.gray.repeat((3, 1)).T[stable_pts]
+        else:
+            rgb = np.zeros_like(opts)
+        save_ply(opts, rgb, path)
 
     def to(self, d: Union[torch.device, torch.dtype]):
         self.radi = self.radi.to(d)
