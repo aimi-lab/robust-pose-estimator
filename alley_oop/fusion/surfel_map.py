@@ -233,7 +233,6 @@ class SurfelMap(object):
             invidx = vidx.clone()
             invidx[vidx] &= ~valid_depth
             duplicate_mask = self.detect_duplicated_surfaces(normals, invidx, depth_diff, midx)
-            print(duplicate_mask.float().mean())
             if duplicate_mask.float().mean() < 0.3:
                 #ToDo how do we handle failed slam registration?
                 print(duplicate_mask.float().mean(), "  something went wrong here!!!")
