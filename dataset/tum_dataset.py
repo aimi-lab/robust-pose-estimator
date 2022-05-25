@@ -17,7 +17,7 @@ class TUMDataset(Dataset):
         assert len(self.imgs) == len(self.depth)
         assert len(self.imgs) > 0
 
-        self.transform = ResizeRGBD(img_size, disparity=False)
+        self.transform = ResizeRGBD(img_size)
         img = cv2.cvtColor(cv2.imread(self.imgs[0]), cv2.COLOR_BGR2RGB)
         h, w = img.shape[:2]
         self.scale = max(img_size[0] / w, img_size[1] / h)
@@ -29,10 +29,9 @@ class TUMDataset(Dataset):
         depth = cv2.imread(self.depth[item], cv2.IMREAD_ANYDEPTH)
         depth = depth.astype(np.float32) / 5.0
 
-        if self.transform is not None:
-            img, depth, mask = self.transform(img, depth)
+        data = self.transform(img, depth)
 
-        return img, depth, mask, img_number
+        return (*data, img_number)
 
     def __len__(self):
         return len(self.imgs)

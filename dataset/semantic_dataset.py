@@ -291,22 +291,22 @@ class RGBDDataset(Dataset):
         assert len(self.imgs) == len(self.semantics)
         assert len(self.imgs) > 0
 
-        self.transform = ResizeRGBD(img_size, disparity=False)
+        self.transform = ResizeRGBD(img_size)
         self.baseline = baseline
         self.rgb_decoder = RGBDecoder()
 
     def __getitem__(self, item):
         img = cv2.cvtColor(cv2.imread(self.imgs[item]), cv2.COLOR_BGR2RGB)
+        img_r = cv2.cvtColor(cv2.imread(self.imgs[item].replace('l.png', 'r.png')), cv2.COLOR_BGR2RGB)
         img_number = os.path.basename(self.imgs[item]).split('l.png')[0]
         # find depth map according to file-look up
         disparity = cv2.imread(self.disparity[item], cv2.IMREAD_UNCHANGED)
         semantic = cv2.cvtColor(cv2.imread(self.semantics[item]), cv2.COLOR_BGR2RGB)
-        semantic_or_mask = self.rgb_decoder.getToolMask(semantic)
+        mask = self.rgb_decoder.getToolMask(semantic)
         # get depth from disparity (fc * baseline) / disparity
         depth = self.baseline / disparity
-        if self.transform is not None:
-            img, depth, semantic_or_mask = self.transform(img, depth, semantic_or_mask)
-        return img, depth, semantic_or_mask, img_number
+        data = self.transform(img, depth, mask, img_r, disparity)
+        return (*data, img_number)
 
     def __len__(self):
         return len(self.imgs)
