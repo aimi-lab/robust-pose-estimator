@@ -44,13 +44,15 @@ def main(input_path, output_path, config, device_sel, nsamples, start, step):
         os.makedirs(output_path, exist_ok=True)
         for i, data in enumerate(tqdm(loader, total=len(dataset))):
             if isinstance(dataset, StereoVideoDataset):
+                raise NotImplementedError
                 limg, rimg, pose_kinematics, img_number = data
                 depth, depth_valid = disp_model(limg, rimg)
                 mask = seg_model.get_mask(limg)[0]
                 mask &= depth_valid  # mask tools and non-valid depth
             else:
-                limg, depth, mask, img_number = data
-            pose, scene, pose_relscale = slam.processFrame(limg.to(device), depth.to(device), mask.to(device))
+                limg, depth, mask, confidence, img_number = data
+            pose, scene, pose_relscale = slam.processFrame(limg.to(device), depth.to(device), mask.to(device),
+                                                           confidence.to(device))
 
             if viewer is not None:
                 curr_pcl = SurfelMap(frame=slam.get_frame(), kmat=torch.tensor(calib['intrinsics']['left']).float(),

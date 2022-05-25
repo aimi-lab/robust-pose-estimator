@@ -31,15 +31,16 @@ class SLAM(object):
         self.config = config
         self.pre_process = PreProcess(self.depth_scale, depth_min, self.dtype)
 
-    def processFrame(self, img: tensor, depth:tensor, mask:tensor=None):
+    def processFrame(self, img: tensor, depth:tensor, mask:tensor=None, confidence:torch.tensor=None):
         """
         track frame and fuse points to SurfelMap
         :param img: RGB input image
         :param depth: input depth map
         :param mask: input mask (to mask out tools)
+        :param confidence: depth confidence value between 0 and 1
         """
         with torch.inference_mode():
-            self.frame = FrameClass(img, depth, intrinsics=self.intrinsics, mask=mask)
+            self.frame = FrameClass(img, depth, intrinsics=self.intrinsics, mask=mask, confidence=confidence)
             if self.scene is None:
                 # initialize scene with first frame
                 self.scene = SurfelMap(frame=self.frame, kmat=self.intrinsics, upscale=1,

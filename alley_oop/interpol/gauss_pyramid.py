@@ -97,9 +97,10 @@ class FrameGaussPyramid(GaussPyramid):
         self.level_frame = [self._top_level_frame]
         img_pyr, _ = super().forward(self._top_level_frame.img)
         depth_pyr, _ = super().forward(self._top_level_frame.depth)
+        conf_pyr, _ = super().forward(self._top_level_frame.confidence)
         mask_pyr = self.discrete_pyramid(self._top_level_frame.mask)
-        for img, depth, intrinsics, mask in zip(img_pyr[1:], depth_pyr[1:], self.intrinsics_levels[1:], mask_pyr[1:]):
-            self.level_frame.append(FrameClass(img, depth, intrinsics=intrinsics, mask=mask))
+        for img, depth, intrinsics, mask, conf in zip(img_pyr[1:], depth_pyr[1:], self.intrinsics_levels[1:], mask_pyr[1:], conf_pyr[1:]):
+            self.level_frame.append(FrameClass(img, depth, intrinsics=intrinsics, mask=mask, confidence=conf))
         return self.level_frame, self.intrinsics_levels
 
     def discrete_pyramid(self, mask: torch.Tensor) -> List[torch.Tensor]:
