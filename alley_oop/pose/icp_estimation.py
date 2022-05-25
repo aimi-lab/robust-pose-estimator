@@ -57,13 +57,18 @@ class ICPEstimator(torch.nn.Module):
         ref_pcl_world_c = ref_pcl.transform_cpy(T_est)
         residuals = batched_dot_product(target_pcl.normals.T[self.trg_ids],
                                    (target_pcl.opts.T[self.trg_ids] - ref_pcl_world_c.opts.T[self.src_ids]))
+        # weight residuals by confidences
+        #residuals = ref_pcl_world_c.confidence[self.src_ids]*target_pcl.confidence[self.trg_ids]*residuals
         return residuals
 
     def jacobian(self, x, ref_pcl, target_pcl, ref_mask=None):
         T_est = lie_se3_to_SE3(-x)
         ref_pcl_world_c = ref_pcl.transform_cpy(T_est)
-        return (target_pcl.normals.T[self.trg_ids].unsqueeze(1) @ self.j_3d(
+        jacobian =  (target_pcl.normals.T[self.trg_ids].unsqueeze(1) @ self.j_3d(
             ref_pcl_world_c.opts.T[self.src_ids])).squeeze()
+        # weight jacobian by confidences
+        #jacobian = (ref_pcl_world_c.confidence[self.src_ids] * target_pcl.confidence[self.trg_ids])[:, None] * jacobian
+        return jacobian
 
     def estimate_lm(self, ref_frame: FrameClass, target_pcl:SurfelMap, ref_mask: torch.tensor=None):
         """ Levenberg-Marquard estimation."""
