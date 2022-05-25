@@ -37,7 +37,8 @@ class PreProcess(object):
             disp = torch.tensor(disp)
             confidence = disparity_photo_loss(img, img_r, disp, alpha=5.437)
         else:
-            confidence = torch.ones_like(depth)
+            # use generic depth based uncertainty model
+            confidence = torch.exp(-.5 * depth ** 2 / .6 ** 2)
 
         return img, depth, mask, confidence
 
