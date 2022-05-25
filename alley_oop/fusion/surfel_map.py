@@ -32,6 +32,7 @@ class SurfelMap(object):
         if 'opts' in kwargs:
             assert 'normals' in kwargs
             assert 'gray' in kwargs
+
             self.opts = kwargs['opts']
             self.device = self.opts.device
             dtype = self.opts.dtype
@@ -39,7 +40,12 @@ class SurfelMap(object):
             self.nrml = kwargs['normals']
             self.radi = kwargs['radi'] if 'radi' in kwargs else torch.ones((1, self.opts.shape[1])).to(self.device)
             self.img_shape = kwargs['img_shape'] if 'img_shape' in kwargs else None
-
+            # initialize confidence
+            if 'conf' in kwargs:
+                self.conf = kwargs['conf']
+            else:
+                gamma = self.opts[2].flatten() / torch.max(self.opts[2])
+                self.conf = torch.exp(-.5 * gamma ** 2 / .6 ** 2)[None, :]
         else:
             assert 'frame' in kwargs
             frame = kwargs['frame']
@@ -57,15 +63,12 @@ class SurfelMap(object):
 
             self.gray = frame.img_gray[mask].view(1, -1)
             self.nrml = frame.normals.view(3, -1)[:, mask.view(-1)]
+            self.conf = frame.confidence[mask].view(1, -1) / self.conf_thr  # normalize confidence
             # initialize radii
             self.radi = ((frame.depth[mask].view(-1)) / (self.flen* 2**.5 * abs(self.nrml[2,:]))).unsqueeze(0)
 
         self.kmat = self.kmat.to(self.device).to(dtype)
         self.pmat = self.pmat.to(self.device).to(dtype)
-
-        # initialize confidence
-        gamma = self.opts[2].flatten()/torch.max(self.opts[2])
-        self.conf = torch.exp(-.5 * gamma**2 / .6**2)[None ,:]
 
         # intialize tick as timestamp
         self.tick = 0
@@ -127,11 +130,8 @@ class SurfelMap(object):
         # compute radii
         radi = (opts[2, :] * 2**.5) / (self.flen * abs(normals[2, :]))[None, :]
 
-        # compute confidence
-        gamma = opts[2, :]/torch.max(opts[2, :])
-        conf = torch.exp(-.5 * gamma**2 / .6**2)[None, :]
-
         # pre-select confidence elements
+        conf = frame.confidence.view(1, -1) / self.conf_thr
         ccor = conf[:, midx]
         conf_idx = self.conf[:, vidx]
 
@@ -140,7 +140,7 @@ class SurfelMap(object):
         self.gray[:, vidx] = (conf_idx*self.gray[:, vidx] + ccor*gray[:, midx]) / (conf_idx + ccor)
         self.radi[:, vidx] = (conf_idx*self.radi[:, vidx] + ccor*radi[:, midx]) / (conf_idx + ccor)
         self.nrml[:, vidx] = (conf_idx*self.nrml[:, vidx] + ccor*normals[:, midx]) / (conf_idx + ccor)
-        self.conf[:, vidx] = conf_idx + ccor
+        self.conf[:, vidx] = torch.clamp(conf_idx + ccor, 0.0, 1.0)  # saturate confidence to 1
 
         # create mask identifying unmatched indices
         mask = torch.zeros(opts.shape[1]).to(opts.device)
@@ -170,7 +170,7 @@ class SurfelMap(object):
     def remove_surfels_by_confidence_and_time(self):
         """ remove unstable points that have been created long time ago """
 
-        ok_pts = ((self.conf > self.conf_thr) | ((self.tick - self.t_created) < self.t_max)).squeeze()
+        ok_pts = ((self.conf >= 1.0) | ((self.tick - self.t_created) < self.t_max)).squeeze()
         self.opts = self.opts[:, ok_pts]
         self.gray = self.gray[:, ok_pts]
         self.radi = self.radi[:, ok_pts]
@@ -233,6 +233,7 @@ class SurfelMap(object):
             duplicate_mask = self.detect_duplicated_surfaces(normals, invidx, depth_diff, midx)
             print(duplicate_mask.float().mean())
             if duplicate_mask.float().mean() < 0.3:
+                #ToDo how do we handle failed slam registration?
                 print(duplicate_mask.float().mean(), "  something went wrong here!!!")
         else:
             duplicate_mask = torch.ones(self.img_shape[0]*self.img_shape[1], device=self.device, dtype=torch.bool)
@@ -323,7 +324,7 @@ class SurfelMap(object):
         opts = transform[:3,:3]@self.opts + transform[:3,3,None]
         normals = transform[:3,:3] @ self.nrml
         return SurfelMap(opts=opts, normals=normals, kmat=self.kmat, gray=self.gray, img_shape=self.img_shape,
-                         radi=self.radi, depth_scale=self.depth_scale).to(self.device)
+                         radi=self.radi, depth_scale=self.depth_scale, conf=self.conf).to(self.device)
 
     @property
     def grid_pts(self):
@@ -334,6 +335,9 @@ class SurfelMap(object):
     def grid_normals(self):
         assert self.img_shape is not None
         return self.nrml.T.view((*self.img_shape, 3))
+    @property
+    def confidence(self):
+        return self.conf.view(-1)
 
     def render(self, intrinsics: torch.tensor=None, extrinsics: torch.tensor=None):
         """
@@ -361,7 +365,10 @@ class SurfelMap(object):
         colors = torch.nan*torch.ones(self.img_shape, dtype=self.opts.dtype, device=self.device)
         colors[img_coords] = self.gray[0, valid]
         colors = self.interpolate(colors[None,None,...])
-        return FrameClass(colors, depth, intrinsics=intrinsics, mask=mask).to(intrinsics.device)
+
+        confidence = torch.zeros(self.img_shape, dtype=self.opts.dtype, device=self.device)
+        confidence[img_coords] = self.conf[0, valid]
+        return FrameClass(colors, depth, intrinsics=intrinsics, mask=mask, confidence=confidence[None,None,...]).to(intrinsics.device)
 
     def pcl2open3d(self, stable: bool=True, filter: torch.Tensor=None):
         """
@@ -373,7 +380,7 @@ class SurfelMap(object):
         if filter is None:
             filter = torch.ones_like(self.conf, dtype=torch.bool).squeeze()
         if stable:
-            stable_pts = (self.conf[:,filter] > self.conf_thr).squeeze()
+            stable_pts = (self.conf[:,filter] > 1.0).squeeze()
         else:
             stable_pts = torch.ones_like(self.conf[:,filter], dtype=torch.bool).squeeze()
 

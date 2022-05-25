@@ -37,31 +37,35 @@ class Viewer3D(object):
         # plot input frame and synthesized frame
         if (optim_results is not None) | (frame is not None):
             if optim_results is not None:
-                fig, ax = plt.subplots(len(optim_results) + 1, 1, num=1, clear=True, figsize=(8,16))
+                fig, ax = plt.subplots(len(optim_results) + 2, 1, num=1, clear=True, figsize=(8,16))
             else:
                 fig, ax = plt.subplots(2, 1, num=1, clear=True, figsize=(8,16))
             if (frame is not None) & (synth_frame is not None):
-                img = frame.to_numpy()[1]
-                img_synth = synth_frame.to_numpy()[1]
+                _, img, *_, conf = frame.to_numpy()
+                _, img_synth, *_, conf_synth = synth_frame.to_numpy()
                 img_view = np.concatenate((img, img_synth), axis=1)
                 ax[0].imshow(img_view)
                 ax[0].axis('off')
+                img_view = np.concatenate((conf, conf_synth), axis=1)
+                ax[1].imshow(img_view, vmin=0, vmax=7)
+                ax[1].axis('off')
             # plot optimization results
             if optim_results is not None:
-                for lv, i in enumerate(range(len(optim_results), 0, -1)):
-                    ax[i].set_title(f'Optimization Cost at Pyramid Lv {lv}')
-                    ax[i].plot(optim_results[lv]['combined'], marker='.')
-                    ax[i].plot(optim_results[lv]['icp'], marker='.')
-                    ax[i].plot(optim_results[lv]['rgb'], marker='.')
-                    ax[i].plot(optim_results[lv]['dx'], marker='.')
-                    ax2 = ax[i].twinx()
-                    ax2.plot(optim_results[lv]['cond'], 'r--', marker='*')
-                    ax2.legend(['# cond'])
-                    ax[i].grid()
-                    ax[i].axvline(optim_results[lv]['best_iter'])
-                ax[1].legend(['combined', 'icp', 'rgb', '|dx|'])
-                ax[-1].set_xlabel('iterations')
-                plt.tight_layout()
+                if len(optim_results[0]) > 0:
+                    for lv, i in enumerate(range(len(optim_results), 0, -1)):
+                        ax[i+1].set_title(f'Optimization Cost at Pyramid Lv {lv}')
+                        ax[i+1].plot(optim_results[lv]['combined'], marker='.')
+                        ax[i+1].plot(optim_results[lv]['icp'], marker='.')
+                        ax[i+1].plot(optim_results[lv]['rgb'], marker='.')
+                        ax[i+1].plot(optim_results[lv]['dx'], marker='.')
+                        ax2 = ax[i+1].twinx()
+                        ax2.plot(optim_results[lv]['cond'], 'r--', marker='*')
+                        ax2.legend(['# cond'])
+                        ax[i+1].grid()
+                        ax[i+1].axvline(optim_results[lv]['best_iter'])
+                    ax[2].legend(['combined', 'icp', 'rgb', '|dx|'])
+                    ax[-1].set_xlabel('iterations')
+                    plt.tight_layout()
             plt.draw()
             plt.pause(0.0001)
 
