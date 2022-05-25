@@ -53,7 +53,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
         dims = torch.tensor([icp_residuals.size(), rgb_residuals.size()])
         size = torch.max(dims)
         tidx = torch.argmin(dims)
-        residuals[tidx] = torch.cat((residuals[tidx], torch.zeros(size-residuals[tidx].shape[0])))
+        residuals[tidx] = torch.cat((residuals[tidx], torch.zeros(size-residuals[tidx].shape[0], device=xfloat.device)))
     
         return torch.stack(residuals, dim=0)[None, ...].double()
 
@@ -68,7 +68,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
         dims = torch.tensor([icp_jacobian.size(), rgb_jacobian.size()])
         size = torch.max(dims[:, 0])
         tidx = torch.argmin(dims[:, 0])
-        jacobians[tidx] = torch.cat((jacobians[tidx], torch.zeros(size-jacobians[tidx].shape[0], jacobians[tidx].shape[-1])))
+        jacobians[tidx] = torch.cat((jacobians[tidx], torch.zeros((size-jacobians[tidx].shape[0], jacobians[tidx].shape[-1]), device=xfloat.device)))
 
         return torch.stack(jacobians, dim=0)[None, ...].double()
 
