@@ -1,5 +1,6 @@
-from alley_oop.interpol.synth_view import synth_view
+from alley_oop.interpol.synth_view import synth_view, disp_shift_view_synth
 from alley_oop.utils.lib_handling import get_lib
+import torch
 
 def dual_projected_photo_loss(img0, img1, dep0, dep1, rmat, tvec, kmat0, kmat1=None):
 
@@ -32,3 +33,8 @@ def projected_photo_loss(rimg, qimg, dept, rmat, tvec, kmat0, kmat1=None, dbg_op
         imageio.imwrite('./photometric_loss_ref.png', rimg/rimg.max())
 
     return rmse
+
+
+def disparity_photo_loss(rimg, qimg, disp, alpha=1.0):
+    rimg_synth = disp_shift_view_synth(qimg, disp, mode='lr')
+    return 2-2*torch.nn.functional.sigmoid(alpha*(rimg - rimg_synth)**2)

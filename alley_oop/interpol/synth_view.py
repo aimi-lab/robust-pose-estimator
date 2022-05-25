@@ -44,3 +44,36 @@ def synth_view(
         nimg = img_map_torch(img=img, npts=npts, mode=mode)
 
     return nimg
+
+
+def disp_shift_view_synth(im, disp, mode):
+    """ synthesize 2nd view from one RGB viewpoint image and corresponding disparities """
+
+    # add color channel at dim 1 if necessary
+    if im.dim() == 3:
+        im = im.reshape(im.shape[0], 1, im.shape[1], im.shape[2])
+    N, C, H, W = im.shape
+
+    i_base = torch.linspace(0, H - 1, H).repeat(N, W, 1).transpose(1, 2).type_as(im) + .5
+    j_base = torch.linspace(0, W - 1, W).repeat(N, H, 1).type_as(im) + .5
+    i_base = i_base.to(disp.device)
+    j_base = j_base.to(disp.device)
+
+    # apply shift in j direction
+    if mode == 'lr':
+        j_new = j_base + disp
+    elif mode == 'rl':
+        j_new = j_base - disp
+
+    # normalize with image height and width
+    i_base = 2 * i_base / H - 1
+    j_new = 2 * j_new / W - 1
+    j_new = j_new.clamp(-1, 1)
+
+    # create grid
+    grid = torch.stack((j_new, i_base), dim=3)  # reversed, because (x, y) -> (j, i)
+
+    # sample new image
+    im_out = torch.nn.functional.grid_sample(im, grid, mode='bilinear', padding_mode='zeros', align_corners=True)
+
+    return im_out

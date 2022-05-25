@@ -2,6 +2,7 @@ import torch
 from numpy import ndarray
 import numpy as np
 import cv2
+from alley_oop.metrics.projected_photo_metrics import disparity_photo_loss
 
 
 class PreProcess(object):
@@ -10,7 +11,7 @@ class PreProcess(object):
         self.depth_min = depth_min
         self.dtype = dtype
 
-    def __call__(self, img:ndarray, depth:ndarray, mask:ndarray=None, dummy_label=None):
+    def __call__(self, img:ndarray, depth:ndarray, mask:ndarray=None, img_r:ndarray=None, disp:ndarray=None):
         # normalize img
         img = img.astype(np.float32) / 255.0
         # normalize depth for numerical stability
@@ -29,10 +30,22 @@ class PreProcess(object):
 
         img = (torch.tensor(img).permute(2, 0, 1)).to(self.dtype)
 
-        return img, depth, mask
+        if img_r is not None:
+            assert disp is not None
+            img_r = img_r.astype(np.float32) / 255.0
+            img_r = (torch.tensor(img_r).permute(2, 0, 1)).to(self.dtype)
+            disp = torch.tensor(disp)
+            confidence = disparity_photo_loss(img, img_r, disp, alpha=5.437)
+        else:
+            confidence = torch.ones_like(depth)
+
+        return img, depth, mask, confidence
 
     def specularity_mask(self, img, spec_thr=0.96):
         """ specularities can cause issues in the photometric pose estimation.
             We can easily mask them by looking for maximum intensity values in all color channels """
         mask = img.sum(axis=-1) < (3*spec_thr)
         return mask
+
+    def get_confidence(self, img, disparity):
+        return disparity_photo_loss()
