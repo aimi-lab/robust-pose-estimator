@@ -20,11 +20,11 @@ def get_rect_maps(
     # compute pixel mappings
     r1, r2, p1, p2, q, valid_pix_roi1, valid_pix_roi2 = cv2.stereoRectify(cameraMatrix1=lcam_mat.astype('float64'), distCoeffs1=ldist_coeffs.astype('float64'), 
                                                                         cameraMatrix2=rcam_mat.astype('float64'), distCoeffs2=rdist_coeffs.astype('float64'), 
-                                                                        imageSize=img_size, R=rmat.astype('float64'), T=tvec.T.astype('float64'), 
+                                                                        imageSize=tuple(img_size), R=rmat.astype('float64'), T=tvec.T.astype('float64'),
                                                                         alpha=0)
 
-    lmap1, lmap2 = cv2.initUndistortRectifyMap(cameraMatrix=lcam_mat, distCoeffs=ldist_coeffs, R=r1, newCameraMatrix=p1, size=img_size, m1type=cv2.CV_32FC1)
-    rmap1, rmap2 = cv2.initUndistortRectifyMap(cameraMatrix=rcam_mat, distCoeffs=ldist_coeffs, R=r2, newCameraMatrix=p2, size=img_size, m1type=cv2.CV_32FC1)
+    lmap1, lmap2 = cv2.initUndistortRectifyMap(cameraMatrix=lcam_mat, distCoeffs=ldist_coeffs, R=r1, newCameraMatrix=p1, size=tuple(img_size), m1type=cv2.CV_32FC1)
+    rmap1, rmap2 = cv2.initUndistortRectifyMap(cameraMatrix=rcam_mat, distCoeffs=ldist_coeffs, R=r2, newCameraMatrix=p2, size=tuple(img_size), m1type=cv2.CV_32FC1)
 
     maps = {'lmap1': lmap1,
             'lmap2': lmap2,
