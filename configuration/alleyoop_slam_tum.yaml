@@ -31,6 +31,6 @@ img_size:
 
 
 viewer:
-  enable: True
+  enable: False
   blocking: True
   stable: False

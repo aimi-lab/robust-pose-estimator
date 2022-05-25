@@ -48,17 +48,17 @@ class RGBPoseEstimator(torch.nn.Module):
         T_est = lie_se3_to_SE3(x)
         self.src_ids, self.trg_ids = self._warp_frame(ref_frame, ref_pcl, T_est)
         residuals = ref_frame.img_gray.view(-1)[self.src_ids] - trg_frame.img_gray.view(-1)[self.trg_ids]
-        mask = ref_frame.mask.view(-1)[self.trg_ids] & trg_frame.mask.view(-1)[self.trg_ids]
+        mask = ref_frame.mask.view(-1)[self.src_ids] & trg_frame.mask.view(-1)[self.trg_ids]
         # weight residuals by confidences
         #residuals = self.warped_conf * trg_frame.confidence.reshape(-1)[self.trg_ids ] * residuals
         residuals = residuals[mask]
         return residuals
 
     def jacobian(self, x, ref_frame:FrameClass, ref_pcl:SurfelMap, trg_frame:FrameClass):
-        J_img = self._image_jacobian(trg_frame.img_gray).squeeze()
+        J_img = self._image_jacobian(ref_frame.img_gray).squeeze()
         J = J_img.unsqueeze(1) @ self.j_wt(ref_pcl.opts.T)
-        J = J[self.trg_ids].squeeze()
-        mask = ref_frame.mask.view(-1)[self.trg_ids] & trg_frame.mask.view(-1)[self.trg_ids]
+        J = J[self.src_ids].squeeze()
+        mask = ref_frame.mask.view(-1)[self.src_ids] & trg_frame.mask.view(-1)[self.trg_ids]
         # weight residuals by confidences
         #J = (self.warped_conf * trg_frame.confidence.reshape(-1)[self.trg_ids ])[:, None] * J
         J = J[mask]
