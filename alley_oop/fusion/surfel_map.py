@@ -399,7 +399,7 @@ class SurfelMap(object):
             stable_pts = torch.ones_like(self.conf, dtype=torch.bool).squeeze()
         opts = self.opts.T[stable_pts].cpu().numpy()/self.depth_scale
         if self.gray.numel() > 0:
-            rgb = self.gray.repeat((3, 1)).T[stable_pts]
+            rgb = self.gray.repeat((3, 1)).T[stable_pts].cpu().numpy()
         else:
             rgb = np.zeros_like(opts)
         save_ply(opts, rgb, path)
