@@ -39,8 +39,7 @@ class Compose(object):
     def __init__(self, transforms: list):
         self.transforms = transforms
 
-    def __call__(self, img, disp_or_depth=None, mask=None):
-        args = (img, disp_or_depth, mask)
+    def __call__(self, *args):
         for tr in self.transforms:
             args = tr(*args)
         return args
