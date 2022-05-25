@@ -10,13 +10,15 @@ class FrameClass:
         Class containing image, depth and normals
     """
     def __init__(self, img: torch.Tensor, depth: torch.Tensor, normals: torch.Tensor=None,
-                 intrinsics: torch.Tensor=None, mask: torch.Tensor=None):
+                 intrinsics: torch.Tensor=None, mask: torch.Tensor=None, confidence: torch.Tensor=None):
         """
 
         :param img: RGB image in range (0, 1) with shape Nx3xHxW or gray-scale Nx1xHxW
         :param depth: depth map in mm with shape Nx1xHxW
         :param normals: surface normals with shape Nx3xHxW (optional)
         :param intrinsics: camera intrinsics for normal computation (optional if normals provided)
+        :param mask: binary mask to include or exclude points with shape Nx1xHxW (optional)
+        :param confidence: depth confidence map (0 to 1) with shape Nx1xHxW (optional)
         """
         assert img.ndim == 4
         assert depth.ndim == 4
@@ -46,10 +48,13 @@ class FrameClass:
             pad = torch.nn.ReplicationPad2d((0, 1, 0, 1))
             self.normals = pad(normals.permute(2, 0, 1)).contiguous().unsqueeze(0)
 
+        self.confidence = confidence if confidence is not None else torch.ones_like(self.img_gray)
+
         assert self.img.shape[-2:] == self.img_gray.shape[-2:]
-        assert self.img.shape[-2:] == self.depth.shape[-2:]
-        assert self.img.shape[-2:] == self.mask.shape[-2:]
+        assert self.img_gray.shape == self.depth.shape
+        assert self.img_gray.shape == self.mask.shape
         assert self.img.shape[-2:] == self.normals.shape[-2:]
+        assert self.img_gray.shape == self.confidence.shape
 
     def to(self, dev_or_type: Union[torch.device, torch.dtype]):
         self.img = self.img.to(dev_or_type)
@@ -57,6 +62,7 @@ class FrameClass:
         self.depth = self.depth.to(dev_or_type)
         self.normals = self.normals.to(dev_or_type)
         self.mask = self.mask.to(dev_or_type)
+        self.confidence = self.confidence.to(dev_or_type)
         return self
 
     @property
@@ -65,12 +71,13 @@ class FrameClass:
 
     def plot(self):
         import matplotlib.pyplot as plt
-        fig, ax = plt.subplots(1,4)
-        img, img_gray, depth, mask = self.to_numpy()
+        fig, ax = plt.subplots(1,5)
+        img, img_gray, depth, mask, confidence = self.to_numpy()
         ax[0].imshow(img)
         ax[1].imshow(img_gray)
         ax[2].imshow(depth)
         ax[3].imshow(mask, vmin=0, vmax=1)
+        ax[4].imshow(confidence, vmin=0, vmax=1)
         for a in ax:
             a.axis('off')
         plt.show()
@@ -80,4 +87,5 @@ class FrameClass:
         img_gray = self.img_gray.detach().cpu().squeeze().numpy()
         depth = self.depth.detach().cpu().squeeze().numpy()
         mask = self.mask.detach().cpu().squeeze().numpy()
-        return img, img_gray, depth, mask
+        confidence = self.confidence.detach().cpu().squeeze().numpy()
+        return img, img_gray, depth, mask, confidence
