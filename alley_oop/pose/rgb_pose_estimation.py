@@ -46,19 +46,23 @@ class RGBPoseEstimator(torch.nn.Module):
 
     def residual_fun(self, x, ref_frame:FrameClass, ref_pcl:SurfelMap, trg_frame:FrameClass):
         T_est = lie_se3_to_SE3(x)
-        self.warped_img, self.valid = self._warp_img(ref_frame.img_gray, ref_pcl, T_est)
-        residuals = self.warped_img - trg_frame.img_gray.view(-1)[self.valid]
-        mask = ref_frame.mask & trg_frame.mask #ToDo warp ref mask as well
-        residuals = residuals[mask.view(-1)[self.valid]]
+        self.src_ids, self.trg_ids = self._warp_frame(ref_frame, ref_pcl, T_est)
+        residuals = ref_frame.img_gray.view(-1)[self.src_ids] - trg_frame.img_gray.view(-1)[self.trg_ids]
+        mask = ref_frame.mask.view(-1)[self.trg_ids] & trg_frame.mask.view(-1)[self.trg_ids]
+        # weight residuals by confidences
+        #residuals = self.warped_conf * trg_frame.confidence.reshape(-1)[self.trg_ids ] * residuals
+        residuals = residuals[mask]
         return residuals
 
     def jacobian(self, x, ref_frame:FrameClass, ref_pcl:SurfelMap, trg_frame:FrameClass):
         J_img = self._image_jacobian(trg_frame.img_gray).squeeze()
         J = J_img.unsqueeze(1) @ self.j_wt(ref_pcl.opts.T)
-        J = J[self.valid]
-        mask = ref_frame.mask & trg_frame.mask #ToDo warp ref mask as well
-        J = J[mask.view(-1)[self.valid]]
-        return J.squeeze()
+        J = J[self.trg_ids].squeeze()
+        mask = ref_frame.mask.view(-1)[self.trg_ids] & trg_frame.mask.view(-1)[self.trg_ids]
+        # weight residuals by confidences
+        #J = (self.warped_conf * trg_frame.confidence.reshape(-1)[self.trg_ids ])[:, None] * J
+        J = J[mask]
+        return J
 
     def estimate_lm(self, ref_frame: FrameClass, target_frame: FrameClass):
         """ Levenberg-Marquard estimation."""
@@ -122,7 +126,7 @@ class RGBPoseEstimator(torch.nn.Module):
 
         return J
 
-    def _warp_img(self, img:torch.Tensor, pcl:SurfelMap, T:torch.Tensor):
+    def _warp_frame(self, frame:FrameClass, pcl:SurfelMap, T:torch.Tensor):
         assert T.shape == (4,4)
         # transform and project
         # Note that, we implicitly perform nearest neighbour interpolation which is not a continuous function. This
@@ -130,7 +134,7 @@ class RGBPoseEstimator(torch.nn.Module):
         pts = torch.vstack([pcl.opts, torch.ones(pcl.opts.shape[1], device=pcl.opts.device, dtype=pcl.opts.dtype)])
         img_pts = forward_project(pts, self.intrinsics, T[:3,:3], T[:3,3,None]).long().T
         # filter points that are not in the image
-        valid = (img_pts[:, 1] < img.shape[-2]) & (img_pts[:, 0] < img.shape[-1]) & (
+        valid = (img_pts[:, 1] < frame.img_gray.shape[-2]) & (img_pts[:, 0] < frame.img_gray.shape[-1]) & (
                     img_pts[:, 1] > 0) & (img_pts[:, 0] > 0)
-        ids = (0, 0, img_pts.long()[valid][:, 1], img_pts.long()[valid][:, 0])
-        return img[ids], valid
+        ids = img_pts.long()[valid][:, 1]*frame.shape[1]+ img_pts.long()[valid][:, 0]
+        return ids, valid
