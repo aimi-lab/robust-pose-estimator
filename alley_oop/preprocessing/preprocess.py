@@ -6,10 +6,11 @@ from alley_oop.metrics.projected_photo_metrics import disparity_photo_loss
 
 
 class PreProcess(object):
-    def __init__(self, scale, depth_min, dtype=torch.float32):
+    def __init__(self, scale, depth_min, dtype=torch.float32, mask_specularities:bool=True):
         self.depth_scale = scale
         self.depth_min = depth_min
         self.dtype = dtype
+        self.mask_specularities = mask_specularities
 
     def __call__(self, img:ndarray, depth:ndarray, mask:ndarray=None, img_r:ndarray=None, disp:ndarray=None):
         # normalize img
@@ -20,14 +21,15 @@ class PreProcess(object):
         # filter depth to smooth out noisy points
         depth = cv2.bilateralFilter(depth, d=-1, sigmaColor=0.01, sigmaSpace=10)
         mask = np.ones_like(depth).astype(bool) if mask is None else mask
-        mask &= self.specularity_mask(img)
+        if self.mask_specularities:
+            mask &= self.specularity_mask(img)
         # depth clipping
         mask &= (depth > self.depth_min) & (depth < 1.0)
         # border points are usually unstable, mask them out
         mask = cv2.erode(mask.astype(np.uint8), kernel=np.ones((7, 7)))
+
         depth = (torch.tensor(depth).unsqueeze(0)).to(self.dtype)
         mask = (torch.tensor(mask).unsqueeze(0)).to(torch.bool)
-
         img = (torch.tensor(img).permute(2, 0, 1)).to(self.dtype)
 
         if img_r is not None:

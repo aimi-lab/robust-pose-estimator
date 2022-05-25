@@ -29,7 +29,7 @@ class SLAM(object):
         self.recorder = OptimizationRecordings(config['pyramid_levels'])
         self.optim_res = None
         self.config = config
-        self.pre_process = PreProcess(self.depth_scale, depth_min, self.dtype)
+        self.pre_process = PreProcess(self.depth_scale, depth_min, self.dtype, mask_specularities=config['mask_specularities'])
 
     def processFrame(self, img: tensor, depth:tensor, mask:tensor=None, confidence:torch.tensor=None):
         """
