@@ -105,8 +105,8 @@ class RGBICPPoseEstimator(torch.nn.Module):
             icp_residuals = self.icp_estimator.residual_fun(xfloat, ref_pcl, target_pcl, ref_frame.mask)
             icp_jacobian = self.icp_estimator.jacobian(xfloat, ref_pcl, target_pcl, ref_frame.mask)
             # photometric
-            rgb_residuals = self.rgb_estimator.residual_fun(xfloat, ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
-            rgb_jacobian = self.rgb_estimator.jacobian(xfloat, ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
+            rgb_residuals = self.rgb_estimator.residual_fun(xfloat, ref_frame, ref_pcl, target_frame)
+            rgb_jacobian = self.rgb_estimator.jacobian(xfloat, ref_frame, ref_pcl, target_frame)
 
             # normal equations to be solved
             if (icp_residuals.ndim == 0) | (rgb_residuals.ndim == 0) | (icp_jacobian.ndim == 0)| (rgb_jacobian.ndim == 0):
