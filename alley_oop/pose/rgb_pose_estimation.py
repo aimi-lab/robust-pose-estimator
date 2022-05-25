@@ -44,24 +44,20 @@ class RGBPoseEstimator(torch.nn.Module):
     def cost_fun(residuals):
         return (residuals**2).mean()
 
-    def residual_fun(self, x, ref_img, ref_pcl, trg_img, trg_mask=None, ref_mask=None):
+    def residual_fun(self, x, ref_frame:FrameClass, ref_pcl:SurfelMap, trg_frame:FrameClass):
         T_est = lie_se3_to_SE3(x)
-        self.warped_img, self.valid = self._warp_img(ref_img, ref_pcl, T_est)
-        residuals = self.warped_img - trg_img.view(-1)[self.valid]
-        mask = trg_mask if trg_mask is not None else ref_mask
-        if mask is not None:
-            mask = mask & ref_mask if ref_mask is not None else mask
-            residuals = residuals[mask.view(-1)[self.valid]]
+        self.warped_img, self.valid = self._warp_img(ref_frame.img_gray, ref_pcl, T_est)
+        residuals = self.warped_img - trg_frame.img_gray.view(-1)[self.valid]
+        mask = ref_frame.mask & trg_frame.mask #ToDo warp ref mask as well
+        residuals = residuals[mask.view(-1)[self.valid]]
         return residuals
 
-    def jacobian(self, x, ref_img, ref_pcl, trg_img, trg_mask=None, ref_mask=None):
-        J_img = self._image_jacobian(trg_img).squeeze()
+    def jacobian(self, x, ref_frame:FrameClass, ref_pcl:SurfelMap, trg_frame:FrameClass):
+        J_img = self._image_jacobian(trg_frame.img_gray).squeeze()
         J = J_img.unsqueeze(1) @ self.j_wt(ref_pcl.opts.T)
         J = J[self.valid]
-        mask = trg_mask if trg_mask is not None else ref_mask
-        if mask is not None:
-            mask = mask & ref_mask if ref_mask is not None else mask
-            J = J[mask.view(-1)[self.valid]]
+        mask = ref_frame.mask & trg_frame.mask #ToDo warp ref mask as well
+        J = J[mask.view(-1)[self.valid]]
         return J.squeeze()
 
     def estimate_lm(self, ref_frame: FrameClass, target_frame: FrameClass):

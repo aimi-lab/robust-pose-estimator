@@ -60,7 +60,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
     def multi_jaco_fun(self, xfloat, ref_pcl, target_pcl, ref_frame, target_frame):
 
         icp_jacobian = self.icp_estimator.jacobian(xfloat.reshape(-1).float(), ref_pcl, target_pcl, ref_frame.mask)
-        rgb_jacobian = self.rgb_estimator.jacobian(xfloat.reshape(-1).float(), ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask)
+        rgb_jacobian = self.rgb_estimator.jacobian(xfloat.reshape(-1).float(), ref_frame, ref_pcl, target_frame)
 
         jacobians = [icp_jacobian, rgb_jacobian]
 
