@@ -21,7 +21,7 @@ slam:
     - 1
     - 300 # in mm
   debug: True
-  mask_specularities: False
+  mask_specularities: True
 
 img_size:
   - 640
