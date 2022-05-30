@@ -151,6 +151,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--log',
         action='store_true',
+        default=None,
         help='use wandb logging.'
     )
     args = parser.parse_args()
