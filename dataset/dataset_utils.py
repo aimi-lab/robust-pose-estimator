@@ -12,6 +12,7 @@ from torch.utils.data import Sampler
 def get_data(input_path: str, img_size: Tuple, sample_video: int=1):
 
     # check the format of the calibration file
+    img_size = tuple(img_size)
     calib_file = None
     if os.path.isfile(os.path.join(input_path, 'camcal.json')):
         calib_file = os.path.join(input_path, 'camcal.json')
