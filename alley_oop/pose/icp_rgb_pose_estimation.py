@@ -18,7 +18,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
 """
 
     def __init__(self, img_shape: Tuple, intrinsics: torch.Tensor, icp_weight: float=10.0, n_iter: int=20, Ftol: float=0.001, xtol: float=1e-8,
-                 dist_thr: float=200.0/15, normal_thr: float=20, association_mode='projective', dbg_opt=False):
+                 dist_thr: float=200.0/15, normal_thr: float=20, association_mode='projective', dbg_opt=False, conf_weighing: bool=False):
         """
 
         :param img_shape: height and width of images to process
@@ -30,11 +30,12 @@ class RGBICPPoseEstimator(torch.nn.Module):
         :param dist_thr: euclidean distance threshold to accept/reject point correspondences
         :param normal_thr: angular difference threshold of normals to accept/reject point correspondences
         :param association_mode: projective or euclidean correspondence in ICP
+        :param conf_weighing: weight residuals (and jacobian) by src and target confidence
         """
         super(RGBICPPoseEstimator, self).__init__()
-        self.rgb_estimator = RGBPoseEstimator(img_shape, intrinsics)
+        self.rgb_estimator = RGBPoseEstimator(img_shape, intrinsics, conf_weighing=conf_weighing)
         self.icp_estimator = ICPEstimator(img_shape, intrinsics, dist_thr=dist_thr, normal_thr=normal_thr,
-                                          association_mode=association_mode)
+                                          association_mode=association_mode, conf_weighing=conf_weighing)
         assert icp_weight >= 0.0
         self.icp_weight = icp_weight
         self.n_iter = n_iter
