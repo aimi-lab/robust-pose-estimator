@@ -1,7 +1,7 @@
 import torch
 from alley_oop.geometry.normals import normals_from_regular_grid
 from typing import Union
-from alley_oop.utils.rgb2gray import rgb2gray_t
+from alley_oop.utils.rgb2gray import rgb2gray_t, rgb2r_t
 from alley_oop.geometry.pinhole_transforms import create_img_coords_t, reverse_project
 
 
@@ -25,7 +25,7 @@ class FrameClass:
         self.img = img.contiguous()
 
         if img.shape[1] == 3:
-            self.img_gray = rgb2gray_t(self.img, ax0=1).contiguous()
+            self.img_gray = rgb2gray_t(self.img).contiguous()
         else:
             self.img_gray = self.img
 
