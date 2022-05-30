@@ -72,8 +72,6 @@ def main(input_path, output_path, config, device_sel, nsamples, start, step, log
                 viewer(pose.cpu(), scene.pcl2open3d(stable=config['viewer']['stable']), add_pcd=curr_pcl,
                        frame=slam.get_frame(), synth_frame=slam.get_rendered_frame(), optim_results=slam.get_optimization_res())
             trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
-            if (i%50) == 0:
-                scene.save_ply(os.path.join(output_path, f'map_{i:04d}.ply'), stable=True)
             if log & (i > 0):
                 slam.recorder.log(step=i)
 
