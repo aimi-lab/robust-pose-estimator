@@ -6,6 +6,7 @@
 #SBATCH --job-name="deepLabv3"
 #SBATCH --partition=gpu-invest
 #SBATCH --account=ws_00000
+#SBATCH --gres=gpu:1
 ##SBATCH --array=1-1
 
 
