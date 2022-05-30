@@ -53,7 +53,7 @@ class SLAM(object):
             if self.cnt > 0:
                 self.scene.fuse(self.frame, pose)
                 if self.dbg_opt:
-                    print(f"number of surfels: {self.scene.opts.shape[1]}, stable: {(self.scene.conf > self.scene.conf_thr).sum().item()}")
+                    print(f"number of surfels: {self.scene.opts.shape[1]}, stable: {(self.scene.conf >= 1.0).sum().item()}")
                 self.recorder(self.scene, self.pose_estimator)
                 self.optim_res = self.pose_estimator.optim_res
             self.cnt += 1
