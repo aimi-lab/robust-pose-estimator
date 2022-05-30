@@ -5,6 +5,7 @@ from alley_oop.pose.frame_class import FrameClass
 from typing import Union, Tuple
 from torch import tensor
 from alley_oop.preprocessing.preprocess import PreProcess
+from alley_oop.utils.logging import OptimizationRecordings
 
 
 class SLAM(object):
@@ -82,50 +83,3 @@ class SLAM(object):
 
     def plot_recordings(self, show=False):
         return self.recorder.plot(show)
-
-
-class OptimizationRecordings():
-    def __init__(self, pyramid_levels):
-        self.costs_combined = [[] for i in range(pyramid_levels)]
-        self.costs_rgb = [[] for i in range(pyramid_levels)]
-        self.costs_icp = [[] for i in range(pyramid_levels)]
-        self.surfels_total = []
-        self.surfels_stable = []
-        self.pyramid_levels = pyramid_levels
-
-    def __call__(self, scene, estimator):
-        self.surfels_total.append(scene.opts.shape[1])
-        self.surfels_stable.append((scene.conf >= 1.0).sum().item())
-        for i in range(self.pyramid_levels):
-            self.costs_combined[i].append(estimator.cost[i][0])
-            self.costs_icp[i].append(estimator.cost[i][1])
-            self.costs_rgb[i].append(estimator.cost[i][2])
-
-    def plot(self, show=False):
-        if not show:
-            import matplotlib as mpl
-            mpl.use('Agg')
-        import matplotlib.pyplot as plt
-        fig, ax = plt.subplots(self.pyramid_levels+1,1)
-
-        for i in range(self.pyramid_levels):
-            ax[i].set_title(f'Optimization Cost at Pyramid Lv {i}')
-            ax[i].plot(self.costs_combined[i])
-            ax[i].plot(self.costs_icp[i])
-            ax[i].plot(self.costs_rgb[i])
-            ax[i].set_xlim([0, 1.1*max(self.costs_combined[i])])
-            ax[i].grid()
-            ax[0].legend(['combined', 'icp', 'rgb'])
-        ax[self.pyramid_levels].plot(self.surfels_stable)
-        ax[self.pyramid_levels].plot(self.surfels_total)
-        ax[self.pyramid_levels].legend(['stable', 'unstable'])
-        ax[self.pyramid_levels].set_title(f'Number of Surfels')
-        ax[self.pyramid_levels].grid()
-        ax[self.pyramid_levels].set_xlabel('time [frames]')
-        plt.tight_layout()
-        if show:
-            plt.show()
-        return fig, ax
-
-
-

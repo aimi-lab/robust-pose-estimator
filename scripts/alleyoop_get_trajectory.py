@@ -14,15 +14,21 @@ from dataset.dataset_utils import get_data, StereoVideoDataset, SequentialSubSam
 from dataset.transforms import Compose
 import warnings
 from torch.utils.data import DataLoader
+import wandb
+from scripts.evaluate_ate_freiburg import main as evaluate
 
 
-def main(input_path, output_path, config, device_sel, nsamples, start, step):
+def main(input_path, output_path, config, device_sel, nsamples, start, step, log):
     device = torch.device('cpu')
     if device_sel == 'gpu':
         if torch.cuda.is_available():
             device = torch.device('cuda')
         else:
             warnings.warn('No GPU available, fallback to CPU')
+
+    if log:
+        config.update({'data': os.path.split(input_path)[-1]})
+        wandb.init(project='Alley-OOP', config=config)
 
     dataset, calib = get_data(input_path, config['img_size'])
     slam = SLAM(torch.tensor(calib['intrinsics']['left']), config['slam'], img_shape=config['img_size']).to(device)
@@ -68,14 +74,29 @@ def main(input_path, output_path, config, device_sel, nsamples, start, step):
             trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
             if (i%50) == 0:
                 scene.save_ply(os.path.join(output_path, f'map_{i:04d}.ply'), stable=True)
+            if log & (i > 0):
+                slam.recorder.log(step=i)
 
         save_trajectory(trajectory, output_path)
+
 
         plt.close()
         fig, ax = slam.plot_recordings()
         plt.savefig(os.path.join(output_path, 'optimization_plot.pdf'))
 
-        scene.save_ply(os.path.join(output_path, f'map.ply'), stable=True)
+        scene.save_ply(os.path.join(output_path, 'map.ply'), stable=True)
+        if log:
+            wandb.save(os.path.join(output_path, 'trajectory.freiburg'))
+            wandb.save(os.path.join(output_path, 'trajectory.json'))
+            wandb.save(os.path.join(output_path, 'map.ply'))
+            if os.path.isfile(os.path.join(input_path, 'groundtruth.txt')):
+                error = evaluate(os.path.join(input_path, 'groundtruth.txt'),
+                                 os.path.join(output_path, 'trajectory.freiburg'))
+                wandb.define_metric('trans_error', step_metric='frame')
+                for i, e in enumerate(error):
+                    wandb.log({'trans_error': e, 'frame': i})
+                wandb.summary['ATE/RMSE'] = np.sqrt(np.dot(error,error) / len(error))
+                wandb.summary['ATE/mean'] = np.mean(error)
 
         if viewer is not None:
             viewer.blocking = True
@@ -129,10 +150,15 @@ if __name__ == '__main__':
         default=1,
         help='sub sampling interval.'
     )
+    parser.add_argument(
+        '--log',
+        action='store_true',
+        help='use wandb logging.'
+    )
     args = parser.parse_args()
     with open(args.config, 'r') as ymlfile:
         config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
     if args.outpath is None:
         args.outpath = os.path.join(args.input, 'data','alleyoop')
 
-    main(args.input, args.outpath, config, args.device, args.nsamples, args.start, args.step)
+    main(args.input, args.outpath, config, args.device, args.nsamples, args.start, args.step, args.log is not None)
