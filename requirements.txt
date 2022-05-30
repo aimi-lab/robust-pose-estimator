@@ -13,3 +13,4 @@ opencv-python==4.2.0.34
 segmentation-models-pytorch
 plyfile
 torchimize==0.0.8
+wandb

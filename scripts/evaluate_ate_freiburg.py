@@ -66,6 +66,7 @@ def read_file_list(filename):
     list = [(float(l[0]),l[1:]) for l in list if len(l)>1]
     return dict(list)
 
+
 def associate(first_list, second_list,offset,max_difference):
     """
     Associate two dictionaries of (stamp,data). As the time stamps never match exactly, we aim 
@@ -97,6 +98,7 @@ def associate(first_list, second_list,offset,max_difference):
     
     matches.sort()
     return matches
+
 
 def align(model,data):
     """Align two trajectories using the method of Horn (closed-form).
@@ -132,6 +134,7 @@ def align(model,data):
         
     return rot,trans,trans_error
 
+
 def plot_traj(ax,stamps,traj,style,color,label):
     """
     Plot a trajectory using matplotlib. 
@@ -162,7 +165,34 @@ def plot_traj(ax,stamps,traj,style,color,label):
         last= stamps[i]
     if len(x)>0:
         ax.plot(x,y,style,color=color,label=label)
-            
+
+
+def main(first_list, second_list, offset=0, max_difference=10e8, scale=1.0):
+    if not isinstance(first_list, list):
+        first_list = read_file_list(first_list)
+    if not isinstance(second_list, list):
+        second_list = read_file_list(second_list)
+    matches = associate(first_list, second_list, float(offset), float(max_difference))
+    assert len(matches) > 2, "Couldn't find matching timestamp pairs between groundtruth and estimated trajectory! Did you choose the correct sequence?"
+
+    first_xyz = numpy.matrix([[float(value) for value in first_list[a][0:3]] for a, b in matches]).transpose()
+    second_xyz = numpy.matrix(
+        [[float(value) * float(scale) for value in second_list[b][0:3]] for a, b in matches]).transpose()
+    rot, trans, trans_error = align(second_xyz, first_xyz)
+
+    second_xyz_aligned = rot * second_xyz + trans
+
+    first_stamps = list(first_list.keys())
+    first_stamps.sort()
+    first_xyz_full = numpy.matrix([[float(value) for value in first_list[b][0:3]] for b in first_stamps]).transpose()
+
+    second_stamps = list(second_list.keys())
+    second_stamps.sort()
+    second_xyz_full = numpy.matrix(
+        [[float(value) * float(scale) for value in second_list[b][0:3]] for b in second_stamps]).transpose()
+    second_xyz_full_aligned = rot * second_xyz_full + trans
+    return trans_error
+
 
 if __name__=="__main__":
     # parse command line
@@ -183,26 +213,8 @@ if __name__=="__main__":
     first_list = read_file_list(args.first_file)
     second_list = read_file_list(args.second_file)
 
-    matches = associate(first_list, second_list,float(args.offset),float(args.max_difference))    
-    if len(matches)<2:
-        sys.exit("Couldn't find matching timestamp pairs between groundtruth and estimated trajectory! Did you choose the correct sequence?")
+    trans_error = main(first_list, second_list, args.offset, args.max_difference, args.scale)
 
-
-    first_xyz = numpy.matrix([[float(value) for value in first_list[a][0:3]] for a,b in matches]).transpose()
-    second_xyz = numpy.matrix([[float(value)*float(args.scale) for value in second_list[b][0:3]] for a,b in matches]).transpose()
-    rot,trans,trans_error = align(second_xyz,first_xyz)
-    
-    second_xyz_aligned = rot * second_xyz + trans
-    
-    first_stamps = list(first_list.keys())
-    first_stamps.sort()
-    first_xyz_full = numpy.matrix([[float(value) for value in first_list[b][0:3]] for b in first_stamps]).transpose()
-    
-    second_stamps = list(second_list.keys())
-    second_stamps.sort()
-    second_xyz_full = numpy.matrix([[float(value)*float(args.scale) for value in second_list[b][0:3]] for b in second_stamps]).transpose()
-    second_xyz_full_aligned = rot * second_xyz_full + trans
-    
     if args.verbose:
         print("compared_pose_pairs %d pairs"%(len(trans_error)))
 
@@ -214,36 +226,4 @@ if __name__=="__main__":
         print("absolute_translational_error.max %f m"%numpy.max(trans_error))
     else:
         print("%f"%numpy.sqrt(numpy.dot(trans_error,trans_error) / len(trans_error)))
-        
-    if args.save_associations:
-        file = open(args.save_associations,"w")
-        file.write("\n".join(["%f %f %f %f %f %f %f %f"%(a,x1,y1,z1,b,x2,y2,z2) for (a,b),(x1,y1,z1),(x2,y2,z2) in zip(matches,first_xyz.transpose().A,second_xyz_aligned.transpose().A)]))
-        file.close()
-        
-    if args.save:
-        file = open(args.save,"w")
-        file.write("\n".join(["%f "%stamp+" ".join(["%f"%d for d in line]) for stamp,line in zip(second_stamps,second_xyz_full_aligned.transpose().A)]))
-        file.close()
-
-    if args.plot:
-        import matplotlib
-        matplotlib.use('Agg')
-        import matplotlib.pyplot as plt
-        import matplotlib.pylab as pylab
-        from matplotlib.patches import Ellipse
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        plot_traj(ax,first_stamps,first_xyz_full.transpose().A,'-',"black","ground truth")
-        plot_traj(ax,second_stamps,second_xyz_full_aligned.transpose().A,'-',"blue","estimated")
-
-        label="difference"
-        for (a,b),(x1,y1,z1),(x2,y2,z2) in zip(matches,first_xyz.transpose().A,second_xyz_aligned.transpose().A):
-            ax.plot([x1,x2],[y1,y2],'-',color="red",label=label)
-            label=""
-            
-        ax.legend()
-            
-        ax.set_xlabel('x [m]')
-        ax.set_ylabel('y [m]')
-        plt.savefig(args.plot,dpi=90)
         

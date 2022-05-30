@@ -23,7 +23,7 @@ conda activate alleyoop
 
 cd scripts
 
-python -u alleyoop_get_trajectory.py /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/tum_rgbd/rgbd_dataset_freiburg1_xyz --device gpu --config ../configuration/alleyoop_slam_tum.yaml --outpath ../output/tum
+python -u alleyoop_get_trajectory.py /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/tum_rgbd/rgbd_dataset_freiburg1_xyz --device gpu --config ../configuration/alleyoop_slam_tum.yaml --outpath ../output/tum --log
 python -u evaluate_ate_freiburg.py /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/tum_rgbd/rgbd_dataset_freiburg1_xyz/groundtruth.txt ../output/tum/trajectory.freiburg --verbose >> ../output/tum/eval.log
 
 
