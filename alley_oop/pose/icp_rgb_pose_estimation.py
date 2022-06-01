@@ -37,7 +37,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
                                           association_mode=association_mode)
         assert icp_weight >= 0.0
         self.icp_weight = icp_weight
-        self.wvec = torch.tensor([self.icp_weight, 1], device=intrinsics.device, dtype=intrinsics.dtype)
+        self.wvec = torch.nn.Parameter(torch.tensor([self.icp_weight, 1]))
         self.n_iter = n_iter
         self.Ftol = Ftol
         self.xtol = xtol
