@@ -121,7 +121,9 @@ class RGBICPPoseEstimator(torch.nn.Module):
 
         best_idx = torch.argmin(torch.tensor(self.optim_results['combined']))
         best_sol = coeffs[best_idx], self.optim_results['combined'][best_idx]
-
+        self.best_cost = (self.optim_results['combined'][best_idx],
+                          self.optim_results['icp'][best_idx],
+                          self.optim_results['rgb'][best_idx])
         assert len(coeffs) == len(self.optim_results['combined'])
 
         return best_sol[0], best_sol[1], self.optim_results
