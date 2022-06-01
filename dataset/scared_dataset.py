@@ -6,7 +6,9 @@ import torch
 import warnings
 from torch.utils.data import Dataset
 from dataset.transforms import ResizeRGBD
-from typing import Tuple
+from typing import Tuple, List
+import json
+from alley_oop.utils.trajectory import save_freiburg
 
 
 class ScaredDataset(Dataset):
@@ -34,4 +36,21 @@ class ScaredDataset(Dataset):
         return len(self.imgs)
 
 
+def load_scared_kinematics(fnames:List) -> np.ndarray:
 
+    # if kinematics data collect all files
+    pose_list = []
+    for i, fname in enumerate(fnames):
+        with open(str(fname), 'r') as f: pose_elem = json.load(f)
+        pose = np.array(pose_elem['camera-pose'])
+        pose_list.append({'camera-pose': pose, 'timestamp': f'{i:06d}'})
+    return pose_list
+
+
+def scared2freiburg(folder:str):
+    fnames = sorted(glob.glob(os.path.join(folder, '*.json')))
+    pose_list = load_scared_kinematics(fnames)
+
+    save_freiburg(pose_list, folder)
+    import shutil
+    shutil.move(os.path.join(folder, 'trajectory.freiburg'), os.path.join(folder, '..', '..', 'groundtruth.txt'))

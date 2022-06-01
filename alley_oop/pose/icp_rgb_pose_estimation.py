@@ -38,6 +38,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
                                           association_mode=association_mode, conf_weighing=conf_weighing)
         assert icp_weight >= 0.0
         self.icp_weight = icp_weight
+        self.wvec = torch.tensor([self.icp_weight, 1], device=intrinsics.device, dtype=intrinsics.dtype)
         self.n_iter = n_iter
         self.Ftol = Ftol
         self.xtol = xtol
@@ -104,16 +105,13 @@ class RGBICPPoseEstimator(torch.nn.Module):
         multi_cost_fun_args = lambda p: self.multi_cost_fun(p, ref_pcl, target_pcl, ref_frame, target_frame)
         multi_jaco_fun_args = lambda p: self.multi_jaco_fun(p, ref_pcl, target_pcl, ref_frame, target_frame)
 
-        wvec = torch.ones(2, device=init_x.device, dtype=init_x.dtype)
-        wvec[0] = self.icp_weight
-
         init_x = init_x[None, ...] if len(init_x.shape) == 1 else init_x
 
         coeffs = lsq_gna_parallel(#lsq_gna_parallel_plain(#
                             p = init_x.double(),
                             function = multi_cost_fun_args,
                             jac_function = multi_jaco_fun_args,
-                            wvec = wvec,
+                            wvec = self.wvec,
                             ftol = 1e-9,
                             ptol = 1e-9,
                             gtol = 1e-9,

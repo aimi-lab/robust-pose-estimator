@@ -26,9 +26,9 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log):
         else:
             warnings.warn('No GPU available, fallback to CPU')
 
-    if log:
+    if log is not None:
         config.update({'data': os.path.split(input_path)[-1]})
-        wandb.init(project='Alley-OOP', config=config)
+        wandb.init(project='Alley-OOP', config=config, group=log)
 
     dataset, calib = get_data(input_path, config['img_size'])
     slam = SLAM(torch.tensor(calib['intrinsics']['left']), config['slam'], img_shape=config['img_size']).to(device)
@@ -72,9 +72,7 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log):
                 viewer(pose.cpu(), scene.pcl2open3d(stable=config['viewer']['stable']), add_pcd=curr_pcl,
                        frame=slam.get_frame(), synth_frame=slam.get_rendered_frame(), optim_results=slam.get_optimization_res())
             trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
-            if ((i % 200) == 0) & (i > 0):
-                scene.save_ply(os.path.join(output_path, f'map_{i}.ply'), stable=True)
-            if log & (i > 0):
+            if (log is not None) & (i > 0):
                 slam.recorder.log(step=i)
 
         save_trajectory(trajectory, output_path)
@@ -85,7 +83,7 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log):
         plt.savefig(os.path.join(output_path, 'optimization_plot.pdf'))
 
         scene.save_ply(os.path.join(output_path, 'map.ply'), stable=True)
-        if log:
+        if log is not None:
             wandb.save(os.path.join(output_path, 'trajectory.freiburg'))
             wandb.save(os.path.join(output_path, 'trajectory.json'))
             wandb.save(os.path.join(output_path, 'map.ply'))
@@ -152,9 +150,8 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--log',
-        action='store_true',
         default=None,
-        help='use wandb logging.'
+        help='wandb group logging name. No logging if none set'
     )
     args = parser.parse_args()
     with open(args.config, 'r') as ymlfile:
@@ -162,4 +159,4 @@ if __name__ == '__main__':
     if args.outpath is None:
         args.outpath = os.path.join(args.input, 'data','alleyoop')
 
-    main(args.input, args.outpath, config, args.device, args.stop, args.start, args.step, args.log is not None)
+    main(args.input, args.outpath, config, args.device, args.stop, args.start, args.step, args.log)
