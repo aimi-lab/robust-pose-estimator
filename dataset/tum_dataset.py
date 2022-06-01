@@ -14,7 +14,10 @@ class TUMDataset(Dataset):
         super().__init__()
         self.imgs = sorted(glob.glob(os.path.join(input_folder, 'rgb', '*.png')))
         self.depth = sorted(glob.glob(os.path.join(input_folder, 'depth', '*.png')))
-        assert len(self.imgs) == len(self.depth)
+        # generate look-up table for synchronization
+        self.depth_lookup = [os.path.basename(l).split('.png')[0] for l in self.depth]
+        self.depth_lookup = np.asarray([int(l.split('.')[0] + l.split('.')[1]) for l in self.depth_lookup])
+        #assert len(self.imgs) == len(self.depth)
         assert len(self.imgs) > 0
 
         self.transform = ResizeRGBD(img_size)
@@ -22,11 +25,17 @@ class TUMDataset(Dataset):
         h, w = img.shape[:2]
         self.scale = max(img_size[0] / w, img_size[1] / h)
 
+    def _find_closest_timestamp(self, item):
+        query = os.path.basename(self.imgs[item]).split('.png')[0]
+        query = int(query.split('.')[0] + query.split('.')[1])
+        return np.argmin((self.depth_lookup - query)**2)
+
     def __getitem__(self, item):
         img = cv2.cvtColor(cv2.imread(self.imgs[item]), cv2.COLOR_BGR2RGB)
         img_number = os.path.basename(self.imgs[item]).split('.png')[0]
-        # find depth map according to file-look up
-        depth = cv2.imread(self.depth[item], cv2.IMREAD_ANYDEPTH)
+
+        # find depth map that has closed time index as depth and rgb are not synchronized
+        depth = cv2.imread(self.depth[self._find_closest_timestamp(item)], cv2.IMREAD_ANYDEPTH)
         depth = depth.astype(np.float32) / 5.0
 
         data = self.transform(img, depth)
