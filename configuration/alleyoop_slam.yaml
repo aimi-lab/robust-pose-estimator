@@ -22,6 +22,7 @@ slam:
     - 300 # in mm
   debug: True
   mask_specularities: True
+  conf_weighing: True
 
 img_size:
   - 640
@@ -31,6 +32,6 @@ img_size:
 
 
 viewer:
-  enable: True
+  enable: False
   blocking: True
   stable: False

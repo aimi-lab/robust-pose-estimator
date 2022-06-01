@@ -18,7 +18,7 @@ class ICPEstimator(torch.nn.Module):
 """
 
     def __init__(self, img_shape: Tuple, intrinsics: torch.Tensor, n_iter: int=20, Ftol: float=0.001, xtol: float=1e-8,
-                 dist_thr: float=200.0/15, normal_thr: float=30, association_mode='projective'):
+                 dist_thr: float=200.0/15, normal_thr: float=30, association_mode: str='projective', conf_weighing: bool=False):
         """
 
         :param img_shape: height and width of images to process
@@ -29,6 +29,7 @@ class ICPEstimator(torch.nn.Module):
         :param dist_thr: euclidean distance threshold to accept/reject point correspondences
         :param normal_thr: angular difference threshold of normals to accept/reject point correspondences
         :param association_mode: projective or euclidean correspondence in ICP
+        :param conf_weighing: weight residuals (and jacobian) by src and target confidence
         """
         super(ICPEstimator, self).__init__()
         assert len(img_shape) == 2
@@ -43,6 +44,7 @@ class ICPEstimator(torch.nn.Module):
         self.normal_thr = normal_thr
         self.intrinsics = torch.nn.Parameter(intrinsics)
         self.d = torch.nn.Parameter(torch.empty(0))  # dummy device store
+        self.conf_weighing = conf_weighing
         self.trg_ids = None
         self.src_ids = None
 
@@ -58,7 +60,8 @@ class ICPEstimator(torch.nn.Module):
         residuals = batched_dot_product(target_pcl.normals.T[self.trg_ids],
                                    (target_pcl.opts.T[self.trg_ids] - ref_pcl_world_c.opts.T[self.src_ids]))
         # weight residuals by confidences
-        #residuals = ref_pcl_world_c.confidence[self.src_ids]*target_pcl.confidence[self.trg_ids]*residuals
+        if self.conf_weighing:
+            residuals = torch.sqrt(ref_pcl_world_c.confidence[self.src_ids]*target_pcl.confidence[self.trg_ids])*residuals
         return residuals
 
     def jacobian(self, x, ref_pcl, target_pcl, ref_mask=None):
@@ -67,7 +70,8 @@ class ICPEstimator(torch.nn.Module):
         jacobian =  (target_pcl.normals.T[self.trg_ids].unsqueeze(1) @ self.j_3d(
             ref_pcl_world_c.opts.T[self.src_ids])).squeeze()
         # weight jacobian by confidences
-        #jacobian = (ref_pcl_world_c.confidence[self.src_ids] * target_pcl.confidence[self.trg_ids])[:, None] * jacobian
+        if self.conf_weighing:
+            jacobian = torch.sqrt(ref_pcl_world_c.confidence[self.src_ids] * target_pcl.confidence[self.trg_ids])[:, None] * jacobian
         return jacobian
 
     def estimate_lm(self, ref_frame: FrameClass, target_pcl:SurfelMap, ref_mask: torch.tensor=None):

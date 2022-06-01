@@ -168,9 +168,9 @@ def plot_traj(ax,stamps,traj,style,color,label):
 
 
 def main(first_list, second_list, offset=0, max_difference=10e8, scale=1.0):
-    if not isinstance(first_list, list):
+    if not isinstance(first_list, dict):
         first_list = read_file_list(first_list)
-    if not isinstance(second_list, list):
+    if not isinstance(second_list, dict):
         second_list = read_file_list(second_list)
     matches = associate(first_list, second_list, float(offset), float(max_difference))
     assert len(matches) > 2, "Couldn't find matching timestamp pairs between groundtruth and estimated trajectory! Did you choose the correct sequence?"

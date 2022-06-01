@@ -18,7 +18,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
 """
 
     def __init__(self, img_shape: Tuple, intrinsics: torch.Tensor, icp_weight: float=10.0, n_iter: int=20, Ftol: float=0.001, xtol: float=1e-8,
-                 dist_thr: float=200.0/15, normal_thr: float=20, association_mode='projective', dbg_opt=False):
+                 dist_thr: float=200.0/15, normal_thr: float=20, association_mode='projective', dbg_opt=False, conf_weighing: bool=False):
         """
 
         :param img_shape: height and width of images to process
@@ -30,11 +30,12 @@ class RGBICPPoseEstimator(torch.nn.Module):
         :param dist_thr: euclidean distance threshold to accept/reject point correspondences
         :param normal_thr: angular difference threshold of normals to accept/reject point correspondences
         :param association_mode: projective or euclidean correspondence in ICP
+        :param conf_weighing: weight residuals (and jacobian) by src and target confidence
         """
         super(RGBICPPoseEstimator, self).__init__()
-        self.rgb_estimator = RGBPoseEstimator(img_shape, intrinsics)
+        self.rgb_estimator = RGBPoseEstimator(img_shape, intrinsics, conf_weighing=conf_weighing)
         self.icp_estimator = ICPEstimator(img_shape, intrinsics, dist_thr=dist_thr, normal_thr=normal_thr,
-                                          association_mode=association_mode)
+                                          association_mode=association_mode, conf_weighing=conf_weighing)
         assert icp_weight >= 0.0
         self.icp_weight = icp_weight
         self.wvec = torch.nn.Parameter(torch.tensor([self.icp_weight, 1]))
@@ -74,7 +75,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
         tidx = torch.argmin(dims)
         residuals[tidx] = torch.cat((residuals[tidx], torch.zeros(size-residuals[tidx].shape[0], device=xfloat.device)))
     
-        return torch.stack(residuals, dim=0)[None, ...].double()
+        return torch.stack(residuals, dim=0)[None, ...]
 
     def multi_jaco_fun(self, xfloat, ref_pcl, target_pcl, ref_frame, target_frame):
 
@@ -92,7 +93,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
         tidx = torch.argmin(dims[:, 0])
         jacobians[tidx] = torch.cat((jacobians[tidx], torch.zeros((size-jacobians[tidx].shape[0], jacobians[tidx].shape[-1]), device=xfloat.device)))
 
-        return torch.stack(jacobians, dim=0)[None, ...].double()
+        return torch.stack(jacobians, dim=0)[None, ...]
 
     def estimate_gn(self, ref_frame: FrameClass, target_frame: FrameClass, target_pcl:SurfelMap, init_x: torch.Tensor=None):
 

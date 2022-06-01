@@ -1,11 +1,12 @@
 #!/bin/bash
 #SBATCH --mail-user=michel.hayoz@artorg.unibe.ch
-#SBATCH --time=01:00:00
+#SBATCH --time=03:00:00
 #SBATCH --mem-per-cpu=20G
 #SBATCH --cpus-per-task=1
 #SBATCH --job-name="deepLabv3"
 #SBATCH --partition=gpu-invest
 #SBATCH --account=ws_00000
+#SBATCH --gres=gpu:1
 ##SBATCH --array=1-1
 
 
@@ -22,7 +23,7 @@ conda activate alleyoop
 
 cd scripts
 
-python -u alleyoop_get_trajectory.py /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/tum_rgbd/rgbd_dataset_freiburg1_xyz --device gpu --config ../configuration/alleyoop_slam_tum.yaml --outpath ../output/tum --log
+python -u alleyoop_get_trajectory.py /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/tum_rgbd/rgbd_dataset_freiburg1_xyz --device gpu --config ../configuration/alleyoop_slam_tum.yaml --outpath ../output/tum --log tum
 python -u evaluate_ate_freiburg.py /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/tum_rgbd/rgbd_dataset_freiburg1_xyz/groundtruth.txt ../output/tum/trajectory.freiburg --verbose >> ../output/tum/eval.log
 
 

@@ -36,5 +36,8 @@ def projected_photo_loss(rimg, qimg, dept, rmat, tvec, kmat0, kmat1=None, dbg_op
 
 
 def disparity_photo_loss(rimg, qimg, disp, alpha=1.0):
+    assert rimg.ndim == 4
+    assert qimg.ndim == 4
     rimg_synth = disp_shift_view_synth(qimg, disp, mode='lr')
-    return 2-2*torch.nn.functional.sigmoid(alpha*(rimg - rimg_synth)**2)
+    photo_diff = ((rimg - rimg_synth)**2).sum(dim=1, keepdims=True)
+    return 2-2*torch.sigmoid(alpha*photo_diff)

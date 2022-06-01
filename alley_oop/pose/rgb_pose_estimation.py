@@ -19,7 +19,8 @@ class RGBPoseEstimator(torch.nn.Module):
     It estimates the camera rotation and translation between a scene and a current depth map
 """
 
-    def __init__(self, img_shape: Tuple, intrinsics: torch.Tensor, n_iter: int=10000, Ftol: float=0.00001, xtol: float=1e-8):
+    def __init__(self, img_shape: Tuple, intrinsics: torch.Tensor, n_iter: int=10000, Ftol: float=0.00001,
+                 xtol: float=1e-8, conf_weighing: bool=False):
         """
 
         :param img_shape: height and width of images to process
@@ -27,6 +28,7 @@ class RGBPoseEstimator(torch.nn.Module):
         :param n_iter: max number of iterations of the optimizer
         :param Ftol: cost function threshold
         :param xtol: variable change threshold
+        :param conf_weighing: weight residuals (and jacobian) by src and target confidence
         """
         super(RGBPoseEstimator, self).__init__()
         assert len(img_shape) == 2
@@ -39,6 +41,7 @@ class RGBPoseEstimator(torch.nn.Module):
         self.d = torch.nn.Parameter(torch.empty(0))  # dummy device store
         self.trg_ids = None
         self.src_grid_ids = None
+        self.conf_weighing = conf_weighing
 
     @staticmethod
     def cost_fun(residuals):
@@ -50,7 +53,8 @@ class RGBPoseEstimator(torch.nn.Module):
         residuals = ref_frame.img_gray.view(-1)[self.src_ids] - trg_frame.img_gray.view(-1)[self.trg_ids]
         mask = ref_frame.mask.view(-1)[self.src_ids] & trg_frame.mask.view(-1)[self.trg_ids]
         # weight residuals by confidences
-        #residuals = ref_frame.confidence.view(-1)[self.src_ids]* trg_frame.confidence.reshape(-1)[self.trg_ids] * residuals
+        if self.conf_weighing:
+            residuals = torch.sqrt(ref_frame.confidence.view(-1)[self.src_ids]* trg_frame.confidence.view(-1)[self.trg_ids]) * residuals
         residuals = residuals[mask]
         return residuals
 
@@ -60,7 +64,8 @@ class RGBPoseEstimator(torch.nn.Module):
         J = J[self.src_ids].squeeze()
         mask = ref_frame.mask.view(-1)[self.src_ids] & trg_frame.mask.view(-1)[self.trg_ids]
         # weight residuals by confidences
-        #J = (ref_frame.confidence.view(-1)[self.src_ids] * trg_frame.confidence.reshape(-1)[self.trg_ids])[:, None] * J
+        if self.conf_weighing:
+            J = torch.sqrt(ref_frame.confidence.view(-1)[self.src_ids] * trg_frame.confidence.view(-1)[self.trg_ids])[:, None] * J
         J = J[mask]
         return J
 

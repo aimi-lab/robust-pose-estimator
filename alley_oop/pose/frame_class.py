@@ -1,7 +1,7 @@
 import torch
 from alley_oop.geometry.normals import normals_from_regular_grid
 from typing import Union
-from alley_oop.utils.rgb2gray import rgb2gray_t
+from alley_oop.utils.rgb2gray import rgb2gray_t, rgb2r_t
 from alley_oop.geometry.pinhole_transforms import create_img_coords_t, reverse_project
 
 

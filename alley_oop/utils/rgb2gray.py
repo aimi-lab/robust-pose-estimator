@@ -26,3 +26,20 @@ def rgb2gray_t(
         raise AttributeError("undefined argument 'ax0'")
 
     return gry
+
+
+def rgb2r_t(
+        rgb: torch.Tensor,
+) -> torch.Tensor:
+    """
+    Convert RGB image to relative color components.
+    r = R/(R+G+B)
+
+    :param rgb: rgb image
+
+    """
+    assert rgb.ndim == 4
+    assert rgb.shape[1] == 3
+    rimg = rgb[:,0].unsqueeze(1) / rgb.sum(dim=1, keepdim=True)
+
+    return rimg

@@ -6,9 +6,10 @@ from alley_oop.metrics.projected_photo_metrics import disparity_photo_loss
 
 
 class PreProcess(object):
-    def __init__(self, scale, depth_min, dtype=torch.float32, mask_specularities:bool=True):
+    def __init__(self, scale, depth_min, intrinsics, dtype=torch.float32, mask_specularities:bool=True):
         self.depth_scale = scale
         self.depth_min = depth_min
+        self.intrinsics = intrinsics
         self.dtype = dtype
         self.mask_specularities = mask_specularities
 
@@ -37,7 +38,7 @@ class PreProcess(object):
             img_r = img_r.astype(np.float32) / 255.0
             img_r = (torch.tensor(img_r).permute(2, 0, 1)).to(self.dtype)
             disp = torch.tensor(disp)
-            confidence = disparity_photo_loss(img, img_r, disp, alpha=5.437)
+            confidence = disparity_photo_loss(img.unsqueeze(0), img_r.unsqueeze(0), disp.unsqueeze(0), alpha=5.437).squeeze(0)
         else:
             # use generic depth based uncertainty model
             confidence = torch.exp(-.5 * depth ** 2 / .6 ** 2)
@@ -49,6 +50,3 @@ class PreProcess(object):
             We can easily mask them by looking for maximum intensity values in all color channels """
         mask = img.sum(axis=-1) < (3*spec_thr)
         return mask
-
-    def get_confidence(self, img, disparity):
-        return disparity_photo_loss()

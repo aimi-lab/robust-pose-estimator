@@ -30,7 +30,8 @@ class SLAM(object):
         self.recorder = OptimizationRecordings(config['pyramid_levels'])
         self.optim_res = None
         self.config = config
-        self.pre_process = PreProcess(self.depth_scale, depth_min, self.dtype, mask_specularities=config['mask_specularities'])
+        self.pre_process = PreProcess(self.depth_scale, depth_min, self.intrinsics,
+                                      self.dtype, mask_specularities=config['mask_specularities'])
 
     def processFrame(self, img: tensor, depth:tensor, mask:tensor=None, confidence:torch.tensor=None):
         """
@@ -53,7 +54,7 @@ class SLAM(object):
             if self.cnt > 0:
                 self.scene.fuse(self.frame, pose)
                 if self.dbg_opt:
-                    print(f"number of surfels: {self.scene.opts.shape[1]}, stable: {(self.scene.conf > self.scene.conf_thr).sum().item()}")
+                    print(f"number of surfels: {self.scene.opts.shape[1]}, stable: {(self.scene.conf >= 1.0).sum().item()}")
                 self.recorder(self.scene, self.pose_estimator)
                 self.optim_res = self.pose_estimator.optim_res
             self.cnt += 1

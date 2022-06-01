@@ -10,6 +10,8 @@ def save_ply(pts: np.ndarray, rgb: np.ndarray, file_path: str = './depth.ply') -
     :param file_path: file path string for file creation
     :return: True once saving succeeded
     """
+    if np.max(rgb) <= 1:
+        rgb *= 255
     ptsrgb = np.column_stack((pts, rgb))
     # remove invalid points
     valid_pts = ptsrgb[np.sum(np.isinf(ptsrgb) + np.isnan(ptsrgb), axis=1) == 0]

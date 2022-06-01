@@ -393,7 +393,7 @@ class SurfelMap(object):
 
     def save_ply(self, path:str, stable:bool=True):
         if stable:
-            stable_pts = (self.conf > 1.0).squeeze()
+            stable_pts = (self.conf >= 1.0).squeeze()
         else:
             stable_pts = torch.ones_like(self.conf, dtype=torch.bool).squeeze()
         opts = self.opts.T[stable_pts].cpu().numpy()/self.depth_scale

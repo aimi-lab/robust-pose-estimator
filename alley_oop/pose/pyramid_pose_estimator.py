@@ -39,7 +39,8 @@ class PyramidPoseEstimator(torch.nn.Module):
                                              self.config['n_iter'][i],
                                              self.config['Ftol'][i],
                                              dist_thr=self.config['dist_thr'],
-                                             association_mode=self.config['mode'][i], dbg_opt=config['debug']))
+                                             association_mode=self.config['mode'][i], dbg_opt=config['debug'],
+                                             conf_weighing=self.config['conf_weighing']))
         self.pose_estimator = torch.nn.ModuleList(self.pose_estimator)
 
     def estimate(self, frame: FrameClass, scene: SurfelMap, div_thr=0.1):
