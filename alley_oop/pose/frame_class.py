@@ -25,7 +25,7 @@ class FrameClass:
         self.img = img.contiguous()
 
         if img.shape[1] == 3:
-            self.img_gray = rgb2gray_t(self.img).contiguous()
+            self.img_gray = rgb2gray_t(self.img, ax0=1).contiguous()
         else:
             self.img_gray = self.img
 

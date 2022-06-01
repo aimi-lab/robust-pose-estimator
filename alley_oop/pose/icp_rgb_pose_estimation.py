@@ -75,7 +75,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
         tidx = torch.argmin(dims)
         residuals[tidx] = torch.cat((residuals[tidx], torch.zeros(size-residuals[tidx].shape[0], device=xfloat.device)))
     
-        return torch.stack(residuals, dim=0)[None, ...].double()
+        return torch.stack(residuals, dim=0)[None, ...]
 
     def multi_jaco_fun(self, xfloat, ref_pcl, target_pcl, ref_frame, target_frame):
 
@@ -93,7 +93,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
         tidx = torch.argmin(dims[:, 0])
         jacobians[tidx] = torch.cat((jacobians[tidx], torch.zeros((size-jacobians[tidx].shape[0], jacobians[tidx].shape[-1]), device=xfloat.device)))
 
-        return torch.stack(jacobians, dim=0)[None, ...].double()
+        return torch.stack(jacobians, dim=0)[None, ...]
 
     def estimate_gn(self, ref_frame: FrameClass, target_frame: FrameClass, target_pcl:SurfelMap, init_x: torch.Tensor=None):
 
