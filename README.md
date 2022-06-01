@@ -7,6 +7,12 @@
 
 ## Installation
 
+you will need Python 3.8, which can be checked with
+
+``` $ python3 --version ```
+
+Installation can be accomplished using the following bash script
+
 ``` $ bash install_env.sh```
 
 **Note**
