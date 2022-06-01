@@ -60,12 +60,12 @@ class RGBICPPoseEstimator(torch.nn.Module):
         cost = (cost_icp + cost_rgb) / len(icp_residuals)
         self.optim_results['combined'].append(cost) #if self.i % 2 == 1 else None   # only append every other cost as cost fun gets called twice per LM iteration
         self.i += 1
-
-        self.optim_results['icp'].append(cost_icp)
-        self.optim_results['rgb'].append(cost_rgb)
-        self.optim_results['icp_pts'].append(len(icp_residuals))
-        self.optim_results['rgb_pts'].append(len(rgb_residuals))
-        self.optim_results['dx'].append(torch.linalg.norm(xfloat,ord=2))
+        if self.dbg_opt:
+            self.optim_results['icp'].append(cost_icp)
+            self.optim_results['rgb'].append(cost_rgb)
+            self.optim_results['icp_pts'].append(len(icp_residuals))
+            self.optim_results['rgb_pts'].append(len(rgb_residuals))
+            self.optim_results['dx'].append(torch.linalg.norm(xfloat,ord=2))
 
         residuals = [icp_residuals, rgb_residuals]
 
