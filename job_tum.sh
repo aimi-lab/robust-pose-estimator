@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --mail-user=michel.hayoz@artorg.unibe.ch
-#SBATCH --time=01:00:00
+#SBATCH --time=03:00:00
 #SBATCH --mem-per-cpu=20G
 #SBATCH --cpus-per-task=1
 #SBATCH --job-name="deepLabv3"
