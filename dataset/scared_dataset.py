@@ -43,7 +43,7 @@ def load_scared_kinematics(fnames:List) -> np.ndarray:
     for i, fname in enumerate(fnames):
         with open(str(fname), 'r') as f: pose_elem = json.load(f)
         pose = np.array(pose_elem['camera-pose'])
-        pose_list.append({'camera-pose': pose, 'timestamp': i})
+        pose_list.append({'camera-pose': pose, 'timestamp': f'{i:06d}'})
     return pose_list
 
 
@@ -52,4 +52,5 @@ def scared2freiburg(folder:str):
     pose_list = load_scared_kinematics(fnames)
 
     save_freiburg(pose_list, folder)
-
+    import shutil
+    shutil.move(os.path.join(folder, 'trajectory.freiburg'), os.path.join(folder, '..', '..', 'groundtruth.txt'))
