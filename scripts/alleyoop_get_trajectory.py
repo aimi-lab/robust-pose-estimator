@@ -18,7 +18,7 @@ import wandb
 from scripts.evaluate_ate_freiburg import main as evaluate
 
 
-def main(input_path, output_path, config, device_sel, nsamples, start, step, log):
+def main(input_path, output_path, config, device_sel, stop, start, step, log):
     device = torch.device('cpu')
     if device_sel == 'gpu':
         if torch.cuda.is_available():
@@ -33,7 +33,7 @@ def main(input_path, output_path, config, device_sel, nsamples, start, step, log
     dataset, calib = get_data(input_path, config['img_size'])
     slam = SLAM(torch.tensor(calib['intrinsics']['left']), config['slam'], img_shape=config['img_size']).to(device)
     dataset.transform = Compose([dataset.transform, slam.pre_process])  # add pre-processing to data loading (CPU)
-    sampler = SequentialSubSampler(dataset, start, nsamples, step)
+    sampler = SequentialSubSampler(dataset, start, stop, step)
     loader = DataLoader(dataset, num_workers=1, pin_memory=True, sampler=sampler)
 
     if isinstance(dataset, StereoVideoDataset):
@@ -50,7 +50,7 @@ def main(input_path, output_path, config, device_sel, nsamples, start, step, log
 
         trajectory = []
         os.makedirs(output_path, exist_ok=True)
-        for i, data in enumerate(tqdm(loader, total=len(dataset))):
+        for i, data in enumerate(tqdm(loader, total=min(len(dataset), (stop-start)//step))):
             if isinstance(dataset, StereoVideoDataset):
                 raise NotImplementedError
                 limg, rimg, pose_kinematics, img_number = data
@@ -72,6 +72,8 @@ def main(input_path, output_path, config, device_sel, nsamples, start, step, log
                 viewer(pose.cpu(), scene.pcl2open3d(stable=config['viewer']['stable']), add_pcd=curr_pcl,
                        frame=slam.get_frame(), synth_frame=slam.get_rendered_frame(), optim_results=slam.get_optimization_res())
             trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
+            if ((i % 200) == 0) & (i > 0):
+                scene.save_ply(os.path.join(output_path, f'map_{i}.ply'), stable=True)
             if log & (i > 0):
                 slam.recorder.log(step=i)
 
@@ -131,7 +133,7 @@ if __name__ == '__main__':
         help='select cpu or gpu to run slam.'
     )
     parser.add_argument(
-        '--nsamples',
+        '--stop',
         type=int,
         default=10000000000,
         help='number of samples to run for.'
@@ -160,4 +162,4 @@ if __name__ == '__main__':
     if args.outpath is None:
         args.outpath = os.path.join(args.input, 'data','alleyoop')
 
-    main(args.input, args.outpath, config, args.device, args.nsamples, args.start, args.step, args.log is not None)
+    main(args.input, args.outpath, config, args.device, args.stop, args.start, args.step, args.log is not None)
