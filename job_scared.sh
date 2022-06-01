@@ -7,7 +7,7 @@
 #SBATCH --partition=gpu-invest
 #SBATCH --account=ws_00000
 #SBATCH --gres=gpu:1
-#SBATCH --array=1-6
+#SBATCH --array=1-3
 
 
 #### Your shell commands below this line ####
