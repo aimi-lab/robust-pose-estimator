@@ -60,12 +60,12 @@ class RGBICPPoseEstimator(torch.nn.Module):
         cost = (cost_icp + cost_rgb) / len(icp_residuals)
         self.optim_results['combined'].append(cost) #if self.i % 2 == 1 else None   # only append every other cost as cost fun gets called twice per LM iteration
         self.i += 1
-
-        self.optim_results['icp'].append(cost_icp)
-        self.optim_results['rgb'].append(cost_rgb)
-        self.optim_results['icp_pts'].append(len(icp_residuals))
-        self.optim_results['rgb_pts'].append(len(rgb_residuals))
-        self.optim_results['dx'].append(torch.linalg.norm(xfloat,ord=2))
+        if self.dbg_opt:
+            self.optim_results['icp'].append(cost_icp)
+            self.optim_results['rgb'].append(cost_rgb)
+            self.optim_results['icp_pts'].append(len(icp_residuals))
+            self.optim_results['rgb_pts'].append(len(rgb_residuals))
+            self.optim_results['dx'].append(torch.linalg.norm(xfloat,ord=2))
 
         residuals = [icp_residuals, rgb_residuals]
 
@@ -107,7 +107,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
 
         init_x = init_x[None, ...] if len(init_x.shape) == 1 else init_x
 
-        coeffs = lsq_gna_parallel(#lsq_gna_parallel_plain(#
+        coeffs = lsq_gna_parallel(
                             p = init_x.double(),
                             function = multi_cost_fun_args,
                             jac_function = multi_jaco_fun_args,
@@ -126,53 +126,4 @@ class RGBICPPoseEstimator(torch.nn.Module):
                           self.optim_results['rgb'][best_idx])
         assert len(coeffs) == len(self.optim_results['combined'])
 
-        return best_sol[0], best_sol[1], self.optim_results
-
-    def _estimate_gn(self, ref_frame: FrameClass, target_frame: FrameClass, target_pcl:SurfelMap, init_x: torch.Tensor=None):
-        """ Minimize combined energy using Gauss-Newton and solving the normal equations."""
-        ref_pcl = SurfelMap(frame=ref_frame, kmat=self.icp_estimator.intrinsics, ignore_mask=True)
-        x = torch.zeros(6, dtype=torch.float64, device=ref_frame.depth.device)
-        if init_x is not None:
-            x = init_x.double()
-        self.optim_results = {'combined': [],'icp':[], 'rgb':[], 'icp_pts': [], 'rgb_pts': [], 'best_iter': 0, 'dx': [], 'cond': []}
-        converged = False
-        best_sol = [x.clone(), torch.inf*torch.ones(1, device=x.device).squeeze()]
-        for i in range(self.n_iter):
-            # geometric
-            xfloat = x.float()
-            icp_residuals = self.icp_estimator.residual_fun(xfloat, ref_pcl, target_pcl, ref_frame.mask)
-            icp_jacobian = self.icp_estimator.jacobian(xfloat, ref_pcl, target_pcl, ref_frame.mask)
-            # photometric
-            rgb_residuals = self.rgb_estimator.residual_fun(xfloat, ref_frame, ref_pcl, target_frame)
-            rgb_jacobian = self.rgb_estimator.jacobian(xfloat, ref_frame, ref_pcl, target_frame)
-
-            # normal equations to be solved
-            if (icp_residuals.ndim == 0) | (rgb_residuals.ndim == 0) | (icp_jacobian.ndim == 0)| (rgb_jacobian.ndim == 0):
-                break
-            A = self.icp_weight*icp_jacobian.T @ icp_jacobian + rgb_jacobian.T @ rgb_jacobian #
-            b = self.icp_weight*icp_jacobian.T @ icp_residuals + rgb_jacobian.T @ rgb_residuals #
-
-            x0 = torch.linalg.lstsq(A.double(),b.double(), driver='gels').solution
-            cost_icp, cost_rgb = self.icp_weight * self.icp_estimator.cost_fun(icp_residuals), self.rgb_estimator.cost_fun(rgb_residuals)
-            cost = (cost_icp + cost_rgb) / len(icp_residuals)
-            if self.dbg_opt:
-                self.optim_results['icp'].append(cost_icp)
-                self.optim_results['rgb'].append(cost_rgb)
-                self.optim_results['icp_pts'].append(len(icp_residuals))
-                self.optim_results['rgb_pts'].append(len(rgb_residuals))
-                self.optim_results['combined'].append(cost)
-                self.optim_results['dx'].append(torch.linalg.norm(x0,ord=2))
-                self.optim_results['cond'].append(torch.linalg.cond(A))
-
-            costs = torch.stack([cost, best_sol[1]])  # if cost < best_sol[1]: best_sol = (x.clone(), cost)
-            xs = torch.stack([x, best_sol[0]])
-            best_ids = torch.argmin(costs)
-            best_sol = [xs[best_ids], costs[best_ids]]
-            # if cost < self.Ftol:
-            #     converged = True
-            #     break
-            # if torch.linalg.norm(x0,ord=2) < self.xtol*(self.xtol + torch.linalg.norm(x,ord=2)):
-            #     converged = True
-            #     break
-            x -= x0
         return best_sol[0], best_sol[1], self.optim_results
