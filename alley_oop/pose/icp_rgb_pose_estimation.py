@@ -60,12 +60,12 @@ class RGBICPPoseEstimator(torch.nn.Module):
         cost = (cost_icp + cost_rgb) / len(icp_residuals)
         self.optim_results['combined'].append(cost) #if self.i % 2 == 1 else None   # only append every other cost as cost fun gets called twice per LM iteration
         self.i += 1
-        if self.dbg_opt:
-            self.optim_results['icp'].append(cost_icp)
-            self.optim_results['rgb'].append(cost_rgb)
-            self.optim_results['icp_pts'].append(len(icp_residuals))
-            self.optim_results['rgb_pts'].append(len(rgb_residuals))
-            self.optim_results['dx'].append(torch.linalg.norm(xfloat,ord=2))
+
+        self.optim_results['icp'].append(cost_icp)
+        self.optim_results['rgb'].append(cost_rgb)
+        self.optim_results['icp_pts'].append(len(icp_residuals))
+        self.optim_results['rgb_pts'].append(len(rgb_residuals))
+        self.optim_results['dx'].append(torch.linalg.norm(xfloat,ord=2))
 
         residuals = [icp_residuals, rgb_residuals]
 
@@ -105,6 +105,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
         multi_cost_fun_args = lambda p: self.multi_cost_fun(p, ref_pcl, target_pcl, ref_frame, target_frame)
         multi_jaco_fun_args = lambda p: self.multi_jaco_fun(p, ref_pcl, target_pcl, ref_frame, target_frame)
 
+        init_x = torch.zeros(1,6).to(ref_frame.img.device) if init_x is None else init_x
         init_x = init_x[None, ...] if len(init_x.shape) == 1 else init_x
 
         coeffs = lsq_gna_parallel(
