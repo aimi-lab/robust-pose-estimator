@@ -31,7 +31,8 @@ class SLAM(object):
         self.optim_res = None
         self.config = config
         self.pre_process = PreProcess(self.depth_scale, depth_min, self.intrinsics,
-                                      self.dtype, mask_specularities=config['mask_specularities'])
+                                      self.dtype, mask_specularities=config['mask_specularities'],
+                                      compensate_illumination=config['compensate_illumination'])
 
     def processFrame(self, img: tensor, depth:tensor, mask:tensor=None, confidence:torch.tensor=None):
         """

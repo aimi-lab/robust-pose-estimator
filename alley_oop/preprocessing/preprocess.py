@@ -8,13 +8,15 @@ from alley_oop.utils.pytorch import batched_dot_product
 from alley_oop.utils.rgb2gray import rgb2gray_t
 from alley_oop.geometry.pinhole_transforms import create_img_coords_t, reverse_project
 
+
 class PreProcess(object):
-    def __init__(self, scale, depth_min, intrinsics, dtype=torch.float32, mask_specularities:bool=True):
+    def __init__(self, scale, depth_min, intrinsics, dtype=torch.float32, mask_specularities:bool=True, compensate_illumination:bool=False):
         self.depth_scale = scale
         self.depth_min = depth_min
         self.intrinsics = intrinsics
         self.dtype = dtype
         self.mask_specularities = mask_specularities
+        self.cmp_illumination = compensate_illumination
 
     def __call__(self, img:ndarray, depth:ndarray, mask:ndarray=None, img_r:ndarray=None, disp:ndarray=None):
         # normalize img
@@ -47,16 +49,17 @@ class PreProcess(object):
             confidence = torch.exp(-.5 * depth ** 2 / .6 ** 2)
         # compensate illumination and transform to gray-scale image
         img_orig = img.clone()
-        img = self.compensate_illumination(rgb2gray_t(img, ax0=0), depth, self.intrinsics)
+        if self.cmp_illumination:
+            img = self.compensate_illumination(rgb2gray_t(img, ax0=0), depth, self.intrinsics)
 
-        import matplotlib.pyplot as plt
-        plt.subplot(131)
-        plt.imshow(img_orig.permute(1,2,0).numpy())
-        plt.subplot(132)
-        plt.imshow(rgb2gray_t(img_orig).permute(1, 2, 0).numpy())
-        plt.subplot(133)
-        plt.imshow(img.permute(1, 2, 0).numpy())
-        plt.show()
+        # import matplotlib.pyplot as plt
+        # plt.subplot(131)
+        # plt.imshow(img_orig.permute(1,2,0).numpy())
+        # plt.subplot(132)
+        # plt.imshow(rgb2gray_t(img_orig, ax0=0).permute(1, 2, 0).numpy())
+        # plt.subplot(133)
+        # plt.imshow(img.permute(1, 2, 0).numpy())
+        # plt.show()
         return img, depth, mask, confidence
 
     def specularity_mask(self, img, spec_thr=0.96):
@@ -89,5 +92,5 @@ class PreProcess(object):
                                                                                                                       *img.shape[
                                                                                                                        -2:])
         cos_alpha = torch.clamp(cos_alpha, 0.3, 1)
-        albedo = torch.clamp(depth ** 2 * img / cos_alpha, 0.0, 1.0)
+        albedo = torch.clamp(2.5*depth ** 2 * img / cos_alpha, 0.0, 1.0)
         return albedo
