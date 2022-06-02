@@ -71,14 +71,19 @@ class FrameClass:
 
     def plot(self):
         import matplotlib.pyplot as plt
-        fig, ax = plt.subplots(1,5)
+        fig, ax = plt.subplots(2,3)
         img, img_gray, depth, mask, confidence = self.to_numpy()
-        ax[0].imshow(img)
-        ax[1].imshow(img_gray)
-        ax[2].imshow(depth)
-        ax[3].imshow(mask, vmin=0, vmax=1)
-        ax[4].imshow(confidence, vmin=0, vmax=1)
-        for a in ax:
+        ax[0, 0].imshow(img)
+        ax[0, 0].set_title('img rgb')
+        ax[0, 1].imshow(img_gray)
+        ax[0, 1].set_title('img gray')
+        ax[0, 2].imshow(depth)
+        ax[0, 2].set_title('depth')
+        ax[1, 0].imshow(mask, vmin=0, vmax=1, interpolation=None)
+        ax[1, 0].set_title('mask')
+        ax[1, 1].imshow(confidence, vmin=0, vmax=1, interpolation=None)
+        ax[1, 1].set_title('confidence')
+        for a in ax.flatten():
             a.axis('off')
         plt.show()
 
