@@ -3,6 +3,7 @@ import numpy as np
 from pathlib import Path
 
 from alley_oop.pose.rotation_estimation import RotationEstimator, FrameClass
+from alley_oop.geometry.lie_3d import lie_so3_to_SO3
 from scipy.spatial.transform import Rotation
 import cv2
 import torch
@@ -44,8 +45,8 @@ class RotEstimatorTester(unittest.TestCase):
 
         with torch.no_grad():
             estimator = RotationEstimator(frame1.shape, intrinsics).to(device)
-            R, residuals = estimator.estimate(frame1.to(device), frame2.to(device), mask=mask.to(device))
-
+            R_so3, residuals = estimator.estimate(frame1.to(device), frame2.to(device), mask=mask.to(device))
+        R = lie_so3_to_SO3(R_so3)
         # assertion
         self.assertTrue(np.allclose(R.cpu(), R_true, atol=1e-3))
 

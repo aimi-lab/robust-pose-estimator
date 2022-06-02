@@ -69,18 +69,6 @@ class RGBPoseEstimator(torch.nn.Module):
         J = J[mask]
         return J
 
-    def estimate_lm(self, ref_frame: FrameClass, target_frame: FrameClass):
-        """ Levenberg-Marquard estimation."""
-        ref_pcl = SurfelMap(frame=ref_frame, kmat=self.intrinsics, ignore_mask=True)
-        x_list, eps = lsq_lma(torch.zeros(6, device=ref_frame.depth.device, dtype=ref_frame.depth.dtype),
-                              self.residual_fun, self.jacobian,
-                              args=(ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask,),
-                              max_iter=self.n_iter, tol=self.Ftol, xtol=self.xtol)
-
-        x = x_list[-1]
-        cost = self.cost_fun(self.residual_fun(x, ref_frame.img_gray, ref_pcl, target_frame.img_gray, target_frame.mask, ref_frame.mask))
-        return lie_se3_to_SE3(x), cost
-
     def plot(self, x, ref_img, ref_depth, target_img, cost):
         T = lie_se3_to_SE3(x.cpu())
         warped_img = synth_view(ref_img.cpu().float(), ref_depth.float().cpu(), T[:3,:3].float(),

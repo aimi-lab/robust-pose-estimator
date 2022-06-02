@@ -101,7 +101,7 @@ class SurfelMapTest(unittest.TestCase):
             mlab_rgbd(tpts, colors=timg, size=.025, show_opt=True, fig=fig)
 
         # initialize surfel map
-        surf_map = SurfelMap(opts=self.global_opts, gray=self.global_gray, normals=self.global_nrml, pmat=torch.eye(4), kmat=self.kmat, upscale=4)
+        surf_map = SurfelMap(opts=self.global_opts, gray=self.global_gray, normals=self.global_nrml, pmat=torch.eye(4), kmat=self.kmat, upscale=1)
         
         # pass image dimensions and intrinsics
         surf_map.img_shape = self.target_gray.shape[-2:]

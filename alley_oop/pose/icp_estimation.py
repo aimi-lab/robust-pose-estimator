@@ -74,16 +74,6 @@ class ICPEstimator(torch.nn.Module):
             jacobian = torch.sqrt(ref_pcl_world_c.confidence[self.src_ids] * target_pcl.confidence[self.trg_ids])[:, None] * jacobian
         return jacobian
 
-    def estimate_lm(self, ref_frame: FrameClass, target_pcl:SurfelMap, ref_mask: torch.tensor=None):
-        """ Levenberg-Marquard estimation."""
-        ref_pcl = SurfelMap(frame=ref_frame, kmat=self.intrinsics, ignore_mask=True)
-
-        x_list, eps = lsq_lma(torch.zeros(6, device=ref_frame.depth.device, dtype=ref_frame.depth.dtype), self.residual_fun, self.jacobian,
-                              args=(ref_pcl, target_pcl, ref_mask,), max_iter=self.n_iter, tol=self.Ftol, xtol=self.xtol)
-        x = x_list[-1]
-        cost = self.cost_fun(self.residual_fun(x, ref_pcl, target_pcl, ref_mask))
-        return lie_se3_to_SE3(x), cost
-
     def plot(self, x, ref_pcl, target_pcl, downsample=1):
         ref_pcl = ref_pcl.transform_cpy(lie_se3_to_SE3(x))
         ref_pts = ref_pcl.opts.T.cpu().numpy()
