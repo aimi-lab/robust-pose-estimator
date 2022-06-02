@@ -48,18 +48,9 @@ class PreProcess(object):
             # use generic depth based uncertainty model
             confidence = torch.exp(-.5 * depth ** 2 / .6 ** 2)
         # compensate illumination and transform to gray-scale image
-        img_orig = img.clone()
         if self.cmp_illumination:
             img = self.compensate_illumination(rgb2gray_t(img, ax0=0), depth, self.intrinsics)
 
-        # import matplotlib.pyplot as plt
-        # plt.subplot(131)
-        # plt.imshow(img_orig.permute(1,2,0).numpy())
-        # plt.subplot(132)
-        # plt.imshow(rgb2gray_t(img_orig, ax0=0).permute(1, 2, 0).numpy())
-        # plt.subplot(133)
-        # plt.imshow(img.permute(1, 2, 0).numpy())
-        # plt.show()
         return img, depth, mask, confidence
 
     def specularity_mask(self, img, spec_thr=0.96):
@@ -68,7 +59,8 @@ class PreProcess(object):
         mask = img.sum(axis=-1) < (3*spec_thr)
         return mask
 
-    def compensate_illumination(self, img, depth, intrinsics):
+    @staticmethod
+    def compensate_illumination(img, depth, intrinsics):
         """
         use lambertian model and inverse-square law to estimate the albedo
 
@@ -92,5 +84,5 @@ class PreProcess(object):
                                                                                                                       *img.shape[
                                                                                                                        -2:])
         cos_alpha = torch.clamp(cos_alpha, 0.3, 1)
-        albedo = torch.clamp(2.5*depth ** 2 * img / cos_alpha, 0.0, 1.0)
+        albedo = torch.clamp(10.0*depth ** 2 * img / cos_alpha, 0.0, 1.0)  # scale factor should be between 2 and 20.0 so we select 10.0,it doesn't affect the optimization
         return albedo
