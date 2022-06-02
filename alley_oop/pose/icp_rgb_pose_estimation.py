@@ -50,7 +50,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
     def multi_cost_fun(self, xfloat, ref_pcl, target_pcl, ref_frame, target_frame):
 
         icp_residuals = self.icp_estimator.residual_fun(xfloat.reshape(-1).float(), ref_pcl, target_pcl, ref_frame.mask)
-        rgb_residuals = self.rgb_estimator.residual_fun(xfloat.reshape(-1).float(), ref_frame, ref_pcl, target_frame)
+        rgb_residuals = self.rgb_estimator.residual_fun(xfloat.reshape(-1).float(), ref_frame, target_frame)
 
         if (icp_residuals.ndim == 0) | (rgb_residuals.ndim == 0):
             raise AttributeError('At least one residual vector contains zero dimensions.')
@@ -80,7 +80,7 @@ class RGBICPPoseEstimator(torch.nn.Module):
     def multi_jaco_fun(self, xfloat, ref_pcl, target_pcl, ref_frame, target_frame):
 
         icp_jacobian = self.icp_estimator.jacobian(xfloat.reshape(-1).float(), ref_pcl, target_pcl, ref_frame.mask)
-        rgb_jacobian = self.rgb_estimator.jacobian(xfloat.reshape(-1).float(), ref_frame, ref_pcl, target_frame)
+        rgb_jacobian = self.rgb_estimator.jacobian(xfloat.reshape(-1).float(), ref_frame, target_frame)
 
         if (icp_jacobian.ndim == 0) | (rgb_jacobian.ndim == 0):
             raise AttributeError('At least one Jacobian contains zero dimensions.')
