@@ -61,7 +61,7 @@ class ICPEstimator(torch.nn.Module):
                                    (target_pcl.opts.T[self.trg_ids] - ref_pcl_world_c.opts.T[self.src_ids]))
         # weight residuals by confidences
         if self.conf_weighing:
-            residuals = torch.sqrt(ref_pcl_world_c.confidence[self.src_ids]*target_pcl.confidence[self.trg_ids])*residuals
+            residuals = (ref_pcl_world_c.confidence[self.src_ids]*target_pcl.confidence[self.trg_ids])*residuals
         return residuals
 
     def jacobian(self, x, ref_pcl, target_pcl, ref_mask=None):
@@ -71,7 +71,7 @@ class ICPEstimator(torch.nn.Module):
             ref_pcl_world_c.opts.T[self.src_ids])).squeeze()
         # weight jacobian by confidences
         if self.conf_weighing:
-            jacobian = torch.sqrt(ref_pcl_world_c.confidence[self.src_ids] * target_pcl.confidence[self.trg_ids])[:, None] * jacobian
+            jacobian = (ref_pcl_world_c.confidence[self.src_ids] * target_pcl.confidence[self.trg_ids])[:, None] * jacobian
         return jacobian
 
     def plot(self, x, ref_pcl, target_pcl, downsample=1):
