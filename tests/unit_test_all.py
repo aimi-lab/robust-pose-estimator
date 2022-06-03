@@ -1,4 +1,3 @@
-from tests.unit_test_pose import PoseTester
 from tests.unit_test_normals import NormalsTester
 from tests.unit_test_pinhole_transforms import PinholeTransformTester
 from tests.unit_test_photo_loss import PhotoLossTest
@@ -12,7 +11,7 @@ from tests.unit_test_pyr_estimation import PyramidPoseEstimatorTester
 from tests.unit_test_icp_rgb_estimation import RGBICPPoseEstimatorTester
 
 test_classes = [
-    PoseTester, NormalsTester, PinholeTransformTester, PhotoLossTest, Lie3DTester, QuaternionConversionTester,
+    NormalsTester, PinholeTransformTester, PhotoLossTest, Lie3DTester, QuaternionConversionTester,
     RotEstimatorTester, GaussPyramidTester, GrayscaleTester, SurfelMapTest,
     PyramidPoseEstimatorTester, RGBICPPoseEstimatorTester
     ]
