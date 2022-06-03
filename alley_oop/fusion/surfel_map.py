@@ -2,6 +2,7 @@ import torch
 from torch.nn.functional import max_pool2d
 from typing import Union, Tuple
 import numpy as np
+import warnings
 
 from alley_oop.geometry.pinhole_transforms import forward_project2image, reverse_project, create_img_coords_t, forward_project
 from alley_oop.interpol.sparse_img_interpolation import SparseImgInterpolator
@@ -234,8 +235,10 @@ class SurfelMap(object):
             invidx[vidx] &= ~valid_depth
             duplicate_mask = self.detect_duplicated_surfaces(normals, invidx, depth_diff, midx)
             if duplicate_mask.float().mean() < 0.3:
-                #ToDo how do we handle failed slam registration?
-                print(duplicate_mask.float().mean(), "  something went wrong here!!!")
+                warnings.warn('fusion failed', RuntimeWarning)
+                valid_depth[...] = False
+                valid_normals[...] = False
+                duplicate_mask[...] = False
         else:
             duplicate_mask = torch.ones(self.img_shape[0]*self.img_shape[1], device=self.device, dtype=torch.bool)
 
