@@ -47,25 +47,26 @@ class RGBPoseEstimator(torch.nn.Module):
     def cost_fun(residuals):
         return (residuals**2).mean()
 
-    def residual_fun(self, x, ref_frame:FrameClass, ref_pcl:SurfelMap, trg_frame:FrameClass):
+    def residual_fun(self, x, ref_frame:FrameClass, trg_frame:FrameClass):
         T_est = lie_se3_to_SE3(x)
-        self.src_ids, self.trg_ids = self._warp_frame(ref_frame, ref_pcl, T_est)
+        self.src_ids, self.trg_ids = self._warp_frame(trg_frame, T_est, ref_frame.shape)
         residuals = ref_frame.img_gray.view(-1)[self.src_ids] - trg_frame.img_gray.view(-1)[self.trg_ids]
         mask = ref_frame.mask.view(-1)[self.src_ids] & trg_frame.mask.view(-1)[self.trg_ids]
         # weight residuals by confidences
         if self.conf_weighing:
-            residuals = torch.sqrt(ref_frame.confidence.view(-1)[self.src_ids]* trg_frame.confidence.view(-1)[self.trg_ids]) * residuals
+            residuals = trg_frame.confidence.view(-1)[self.trg_ids] * residuals
         residuals = residuals[mask]
         return residuals
 
-    def jacobian(self, x, ref_frame:FrameClass, ref_pcl:SurfelMap, trg_frame:FrameClass):
+    def jacobian(self, x, ref_frame:FrameClass, trg_frame:FrameClass):
         J_img = self._image_jacobian(ref_frame.img_gray).squeeze()
-        J = J_img.unsqueeze(1) @ self.j_wt(ref_pcl.opts.T)
-        J = J[self.src_ids].squeeze()
+        trg_pcl = SurfelMap(frame=trg_frame, kmat=self.intrinsics, ignore_mask=True)
+        J = J_img[self.src_ids].unsqueeze(1) @ self.j_wt(trg_pcl.opts.T[self.trg_ids])
+        J = J.squeeze()
         mask = ref_frame.mask.view(-1)[self.src_ids] & trg_frame.mask.view(-1)[self.trg_ids]
         # weight residuals by confidences
         if self.conf_weighing:
-            J = torch.sqrt(ref_frame.confidence.view(-1)[self.src_ids] * trg_frame.confidence.view(-1)[self.trg_ids])[:, None] * J
+            J = trg_frame.confidence.view(-1)[self.trg_ids][:, None] * J
         J = J[mask]
         return J
 
@@ -119,15 +120,16 @@ class RGBPoseEstimator(torch.nn.Module):
 
         return J
 
-    def _warp_frame(self, frame:FrameClass, pcl:SurfelMap, T:torch.Tensor):
+    def _warp_frame(self, frame: FrameClass, T:torch.Tensor, img_shape: Tuple):
         assert T.shape == (4,4)
         # transform and project
         # Note that, we implicitly perform nearest neighbour interpolation which is not a continuous function. This
         # requires careful choice of optimization parameters and (and step parameter for automatic estimation of the Jacobian)
+        pcl = SurfelMap(frame=frame, kmat=self.intrinsics, ignore_mask=True)
         pts = torch.vstack([pcl.opts, torch.ones(pcl.opts.shape[1], device=pcl.opts.device, dtype=pcl.opts.dtype)])
         img_pts = forward_project(pts, self.intrinsics, T[:3,:3], T[:3,3,None]).long().T
         # filter points that are not in the image
-        valid = (img_pts[:, 1] < frame.img_gray.shape[-2]) & (img_pts[:, 0] < frame.img_gray.shape[-1]) & (
+        valid = (img_pts[:, 1] < img_shape[0]) & (img_pts[:, 0] < img_shape[1]) & (
                     img_pts[:, 1] > 0) & (img_pts[:, 0] > 0)
-        ids = img_pts.long()[valid][:, 1]*frame.shape[1]+ img_pts.long()[valid][:, 0]
+        ids = img_pts.long()[valid][:, 1]*img_shape[1]+ img_pts.long()[valid][:, 0]
         return ids, valid

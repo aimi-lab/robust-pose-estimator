@@ -358,17 +358,21 @@ class SurfelMap(object):
 
         # generate sparse img maps and interpolate missing values
         img_coords = npts[1, valid].long(), npts[0, valid].long()
-        depth = torch.nan*torch.ones(self.img_shape, dtype=self.opts.dtype, device=self.device)
-        depth[img_coords] = self.opts[2, valid]
-        mask = ~torch.isnan(depth[None,None,...]).to(depth.device)
+        confidence = torch.zeros(self.img_shape, dtype=self.opts.dtype, device=self.device)
+        confidence[img_coords] += self.conf[0, valid]
+
+        depth = torch.zeros(self.img_shape, dtype=self.opts.dtype, device=self.device)
+        # confidence aware rendering. If multiple points project into the same pixel, we take a weighted sum of the values
+        depth[img_coords] += self.conf[0,valid]*self.opts[2, valid]
+        depth /= confidence
+        mask = confidence[None,None,...] != 0.0
         depth = self.interpolate(depth[None,None,...])
 
-        colors = torch.nan*torch.ones(self.img_shape, dtype=self.opts.dtype, device=self.device)
-        colors[img_coords] = self.gray[0, valid]
+        colors = torch.zeros(self.img_shape, dtype=self.opts.dtype, device=self.device)
+        colors[img_coords] += self.conf[0,valid]*self.gray[0, valid]
+        colors /= confidence
         colors = self.interpolate(colors[None,None,...])
 
-        confidence = torch.zeros(self.img_shape, dtype=self.opts.dtype, device=self.device)
-        confidence[img_coords] = self.conf[0, valid]
         return FrameClass(colors, depth, intrinsics=intrinsics, mask=mask, confidence=confidence[None,None,...]).to(intrinsics.device)
 
     def pcl2open3d(self, stable: bool=True, filter: torch.Tensor=None):

@@ -23,6 +23,7 @@ slam:
   debug: False
   mask_specularities: True
   conf_weighing: True
+  compensate_illumination: False
 
 img_size:
   - 640

@@ -37,10 +37,10 @@ class OptimizationRecordings():
 
         for i in range(self.pyramid_levels):
             ax[i].set_title(f'Optimization Cost at Pyramid Lv {i}')
-            ax[i].plot(self.costs_combined[i])
-            ax[i].plot(self.costs_icp[i])
-            ax[i].plot(self.costs_rgb[i])
-            ax[i].set_xlim([0, 1.1*max(self.costs_combined[i])])
+            ax[i].plot([j.item() for j in self.costs_combined[i]])
+            ax[i].plot([j.item() for j in self.costs_icp[i]])
+            ax[i].plot([j.item() for j in self.costs_rgb[i]])
+            ax[i].set_xlim([0, 1.1*max([j.item() for j in self.costs_combined[i]])])
             ax[i].grid()
             ax[0].legend(['combined', 'icp', 'rgb'])
         ax[self.pyramid_levels].plot(self.surfels_stable)

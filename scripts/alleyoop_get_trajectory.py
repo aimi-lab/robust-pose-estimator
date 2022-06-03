@@ -34,7 +34,7 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log):
     slam = SLAM(torch.tensor(calib['intrinsics']['left']), config['slam'], img_shape=config['img_size']).to(device)
     dataset.transform = Compose([dataset.transform, slam.pre_process])  # add pre-processing to data loading (CPU)
     sampler = SequentialSubSampler(dataset, start, stop, step)
-    loader = DataLoader(dataset, num_workers=1, pin_memory=True, sampler=sampler)
+    loader = DataLoader(dataset, num_workers=0 if config['slam']['debug'] else 1, pin_memory=True, sampler=sampler)
 
     if isinstance(dataset, StereoVideoDataset):
         disp_model = DisparityModel(calibration=calib, device=device, depth_clipping=config['depth_clipping'])
