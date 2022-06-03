@@ -84,5 +84,5 @@ class PreProcess(object):
                                                                                                                       *img.shape[
                                                                                                                        -2:])
         cos_alpha = torch.clamp(cos_alpha, 0.3, 1)
-        albedo = torch.clamp(10.0*depth ** 2 * img / cos_alpha, 0.0, 1.0)  # scale factor should be between 2 and 20.0 so we select 10.0,it doesn't affect the optimization
+        albedo = torch.clamp(5.0*depth ** 2 * img / cos_alpha, 0.0, 1.0)  # scale factor should be between 2 and 20.0 so we select 10.0,it doesn't affect the optimization
         return albedo
