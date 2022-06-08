@@ -63,21 +63,38 @@ def main(input_path, output_path, config, device_sel, start, stop, step, log):
         if mask is None:
             mask = np.ones_like(depth)
         pose= slam.processFrame(limg, depth.astype(np.uint16),(mask == 0).astype(np.uint8) , i, diff_pose, config['slam']['kinematics'] == 'fuse')
-        trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number, 'residual': 0.0, 'key_frame': True})
-
+        trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
+        if log:
+            log_dict = {'frame': idx}
+            log_dict.update({f'pyr0/cost': slam.get_residual_error()})
+            wandb.log(log_dict, step=idx)
     os.makedirs(output_path, exist_ok=True)
     save_trajectory(trajectory, output_path)
     pcl = slam.getPointCloud()
     if pcl is not None:
         save_ply(pcl, os.path.join(output_path, 'map.ply'))
-        print(pcl.shape)
+
+    if log is not None:
+        wandb.save(os.path.join(outpath, 'trajectory.freiburg'))
+        wandb.save(os.path.join(outpath, 'trajectory.json'))
+        if scene is not None:
+            wandb.save(os.path.join(outpath, 'map.ply'))
+        if os.path.isfile(os.path.join(input_path, 'groundtruth.txt')):
+            error = evaluate(os.path.join(input_path, 'groundtruth.txt'),
+                             os.path.join(outpath, 'trajectory.freiburg'))
+            wandb.define_metric('trans_error', step_metric='frame')
+            for i, e in enumerate(error):
+                wandb.log({'trans_error': e, 'frame': i})
+            wandb.summary['ATE/RMSE'] = np.sqrt(np.dot(error, error) / len(error))
+            wandb.summary['ATE/mean'] = np.mean(error)
+
     print('finished')
 
 
 if __name__ == '__main__':
     import argparse
     import yaml
-    parser = argparse.ArgumentParser(description='script to run EMDQ SLAM re-implementation')
+    parser = argparse.ArgumentParser(description='script to run Elastic Fusion')
 
     parser.add_argument(
         'input',
