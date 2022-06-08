@@ -12,7 +12,13 @@ from torch.utils.data import DataLoader
 import warnings
 import torch
 import wandb
+import numpy as np
 
+
+def tuple2list(listpose):
+    assert len(listpose) == 12
+    array = np.asarray(list(listpose) + [0,0,0,1]).reshape(4,4)
+    return array.tolist()
 
 def main(input_path, outpath, config, device_sel, start, stop, step, log):
     device = torch.device('cpu')
@@ -55,7 +61,7 @@ def main(input_path, outpath, config, device_sel, start, stop, step, log):
         is_key_frame = (slam.map_changed() | (idx == 0))
         if slam.get_tracking_state() == orbslam2.TrackingState.OK:
             trajectory.append(
-                {'camera-pose': slam.get_pose(), 'timestamp': img_number, 'residual': slam.get_residual_error(), 'key_frame': is_key_frame})
+                {'camera-pose': tuple2list(slam.get_pose()), 'timestamp': img_number, 'residual': slam.get_residual_error(), 'key_frame': is_key_frame})
         else:
             trajectory.append(
                 {'camera-pose': trajectory[-1]['camera-pose'], 'timestamp': img_number, 'residual': slam.get_residual_error(),
