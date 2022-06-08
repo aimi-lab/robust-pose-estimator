@@ -7,7 +7,7 @@ import math
 import torch
 from torch import nn
 
-from other_slam_methods.stereo_slam.disparity.sttr_light.utilities.misc import NestedTensor
+from dataset.preprocess.disparity.sttr_light.utilities.misc import NestedTensor
 
 
 class PositionEncodingSine1DRelative(nn.Module):

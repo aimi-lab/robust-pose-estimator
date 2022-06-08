@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import yaml
 import os
-from other_slam_methods.stereo_slam.disparity.sttr_light.sttr import STTR
-from other_slam_methods.stereo_slam.disparity.sttr_light.utilities.misc import NestedTensor
+from dataset.preprocess.disparity.sttr_light.sttr import STTR
+from dataset.preprocess.disparity.sttr_light.utilities.misc import NestedTensor
 from torchvision.transforms import ToTensor
 import warnings
 

@@ -6,8 +6,8 @@ import torch
 import numpy as np
 from tqdm import tqdm
 from viewer.viewer3d import Viewer3D
-from other_slam_methods.stereo_slam.disparity.disparity_model import DisparityModel
-from other_slam_methods.stereo_slam.segmentation_network.seg_model import SemanticSegmentationModel
+from dataset.preprocess.disparity.disparity_model import DisparityModel
+from dataset.preprocess.segmentation_network.seg_model import SemanticSegmentationModel
 import open3d
 import matplotlib.pyplot as plt
 from alley_oop.fusion.surfel_map import SurfelMap
