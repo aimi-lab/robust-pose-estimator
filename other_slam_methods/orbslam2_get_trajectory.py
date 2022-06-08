@@ -14,7 +14,7 @@ import torch
 import wandb
 
 
-def main(input_path, output_path, config, device_sel, start, stop, step, log):
+def main(input_path, outpath, config, device_sel, start, stop, step, log):
     device = torch.device('cpu')
     if device_sel == 'gpu':
         if torch.cuda.is_available():
@@ -62,7 +62,7 @@ def main(input_path, output_path, config, device_sel, start, stop, step, log):
                  'key_frame': is_key_frame})
 
     os.makedirs(outpath, exist_ok=True)
-    save_trajectory(trajectory, output_path)
+    save_trajectory(trajectory, outpath)
     slam.shutdown()
 
     print('finished')
