@@ -9,8 +9,8 @@ import torch
 import numpy as np
 from tqdm import tqdm
 from alley_oop.utils.trajectory import save_trajectory
-from other_slam_methods.stereo_slam.disparity.disparity_model import DisparityModel
-from other_slam_methods.stereo_slam.segmentation_network.seg_model import SemanticSegmentationModel
+from dataset.preprocess.disparity.disparity_model import DisparityModel
+from dataset.preprocess.segmentation_network.seg_model import SemanticSegmentationModel
 import open3d
 import warnings
 
@@ -87,7 +87,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--config',
         type=str,
-        default='stereo_slam/configuration/efusion_tum.yaml',
+        default='configuration/efusion_tum.yaml',
         help='Configuration file.'
     )
     parser.add_argument(
