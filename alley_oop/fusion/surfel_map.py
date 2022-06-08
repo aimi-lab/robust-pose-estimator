@@ -234,7 +234,7 @@ class SurfelMap(object):
             invidx = vidx.clone()
             invidx[vidx] &= ~valid_depth
             duplicate_mask = self.detect_duplicated_surfaces(normals, invidx, depth_diff, midx)
-            if duplicate_mask.float().mean() < 0.3:
+            if duplicate_mask.float().mean() < 0.0:
                 warnings.warn('fusion failed', RuntimeWarning)
                 valid_depth[...] = False
                 valid_normals[...] = False
@@ -362,18 +362,16 @@ class SurfelMap(object):
         # generate sparse img maps and interpolate missing values
         img_coords = npts[1, valid].long(), npts[0, valid].long()
         confidence = torch.zeros(self.img_shape, dtype=self.opts.dtype, device=self.device)
-        confidence[img_coords] += self.conf[0, valid]
+        confidence[img_coords] = self.conf[0, valid]
 
         depth = torch.zeros(self.img_shape, dtype=self.opts.dtype, device=self.device)
         # confidence aware rendering. If multiple points project into the same pixel, we take a weighted sum of the values
-        depth[img_coords] += self.conf[0,valid]*self.opts[2, valid]
-        depth /= confidence
+        depth[img_coords] = self.opts[2, valid]
         mask = confidence[None,None,...] != 0.0
         depth = self.interpolate(depth[None,None,...])
 
         colors = torch.zeros(self.img_shape, dtype=self.opts.dtype, device=self.device)
-        colors[img_coords] += self.conf[0,valid]*self.gray[0, valid]
-        colors /= confidence
+        colors[img_coords] = self.gray[0, valid]
         colors = self.interpolate(colors[None,None,...])
 
         return FrameClass(colors, depth, intrinsics=intrinsics, mask=mask, confidence=confidence[None,None,...]).to(intrinsics.device)
