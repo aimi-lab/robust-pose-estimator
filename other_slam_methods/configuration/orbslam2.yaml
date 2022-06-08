@@ -1,5 +1,5 @@
 slam:
-  kinematics: 'none' # fuse, none, replace
+  debug: False
 
 img_size:
   - 640
@@ -10,7 +10,7 @@ sample: 10
 depth_clipping:
   - 0
   - 8000 # in mm
-depth_scaling: 20.0
+
 viewer:
   enable: True
   show: True

@@ -29,7 +29,7 @@ def main(input_path, output_path, config, device_sel, start, stop, step, log):
     dataset, calib = get_data(input_path, config['img_size'])
     settings_path = os.path.join(input_path, 'slam_config_640x480.yaml')
     assert os.path.isfile(settings_path)
-    slam = orbslam2.System(os.path.join('Vocabulary', 'ORBvoc.txt'), settings_path, orbslam2.Sensor.STEREO)
+    slam = orbslam2.System(os.path.join('Vocabulary', 'ORBvoc.txt'), settings_path, orbslam2.Sensor.RGBD)
     sampler = SequentialSubSampler(dataset, start, stop, step)
     loader = DataLoader(dataset, num_workers=0 if config['slam']['debug'] else 1, pin_memory=True, sampler=sampler)
     if isinstance(dataset, StereoVideoDataset):
@@ -49,8 +49,8 @@ def main(input_path, output_path, config, device_sel, start, stop, step, log):
             mask = seg_model.get_mask(limg)[0]
             mask &= depth_valid  # mask tools and non-valid depth
         else:
-            limg, depth, mask, img_number = data
-        slam.process_image_rgbd(left_img, depth, mask, idx)
+            limg, depth, mask, rimg, disp, img_number = data
+        slam.process_image_rgbd(limg.squeeze().numpy(), depth.squeeze().numpy(), mask.squeeze().numpy(), float(idx))
 
         is_key_frame = (slam.map_changed() | (idx == 0))
         if slam.get_tracking_state() == orbslam2.TrackingState.OK:
@@ -86,7 +86,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--config',
         type=str,
-        default='configuration/orbslam2_rgbd.yaml',
+        default='configuration/orbslam2.yaml',
         help='Path to config file.'
     )
     parser.add_argument(

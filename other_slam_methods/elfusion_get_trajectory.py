@@ -56,7 +56,7 @@ def main(input_path, output_path, config, device_sel, start, stop, step, log):
             diff_pose = np.linalg.pinv(last_pose)@pose_kinematics if config['slam']['kinematics'] != 'none' else np.eye(4)
             last_pose = pose_kinematics
         else:
-            limg, depth, mask, img_number = data
+            limg, depth, mask, rimg, disp, img_number = data
             diff_pose = np.eye(4)
             config['slam']['kinematics'] = 'fuse'
 

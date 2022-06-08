@@ -29,7 +29,7 @@ class ScaredDataset(Dataset):
         # find depth map according to file-look up
         disparity = cv2.imread(self.disparity[item], cv2.IMREAD_UNCHANGED)
         depth = self.baseline / disparity  # get depth from disparity (fc * baseline) / disparity
-        data = self.transform(img_l, depth, None, img_r, disparity)
+        data = self.transform(img_l, depth, np.ones(depth.shape, dtype=np.uint8), img_r, disparity)
         return (*data, img_number)
 
     def __len__(self):
