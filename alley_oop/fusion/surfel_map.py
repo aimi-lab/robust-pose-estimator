@@ -355,23 +355,24 @@ class SurfelMap(object):
             extrinsics = self.pmat
 
         # rotate, translate and forward-project points
-        pts_h = torch.vstack([self.opts, torch.ones(self.opts.shape[1], dtype=self.opts.dtype, device=self.device)])
+        sort_idx = torch.argsort(self.conf, dim=1)[0]
+        pts_h = torch.vstack([self.opts[:, sort_idx], torch.ones(self.opts.shape[1], dtype=self.opts.dtype, device=self.device)])
         npts, valid = forward_project2image(pts_h, img_shape=self.img_shape, kmat=intrinsics, rmat=extrinsics[:3, :3],
                                tvec=extrinsics[:3, -1][..., None])
 
         # generate sparse img maps and interpolate missing values
         img_coords = npts[1, valid].long(), npts[0, valid].long()
         confidence = torch.zeros(self.img_shape, dtype=self.opts.dtype, device=self.device)
-        confidence[img_coords] = self.conf[0, valid]
+        confidence[img_coords] = self.conf[0, sort_idx][valid]
 
         depth = torch.zeros(self.img_shape, dtype=self.opts.dtype, device=self.device)
         # confidence aware rendering. If multiple points project into the same pixel, we take a weighted sum of the values
-        depth[img_coords] = self.opts[2, valid]
+        depth[img_coords] = self.opts[2, sort_idx][valid]
         mask = confidence[None,None,...] != 0.0
         depth = self.interpolate(depth[None,None,...])
 
         colors = torch.zeros(self.img_shape, dtype=self.opts.dtype, device=self.device)
-        colors[img_coords] = self.gray[0, valid]
+        colors[img_coords] = self.gray[0, sort_idx][valid]
         colors = self.interpolate(colors[None,None,...])
 
         return FrameClass(colors, depth, intrinsics=intrinsics, mask=mask, confidence=confidence[None,None,...]).to(intrinsics.device)
