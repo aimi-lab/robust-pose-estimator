@@ -14,11 +14,12 @@ Create a link from
 
 ## ORBSLAM 2
 You need to clone and install orbslam2 as:
-
+    git clone https://github.com/mhayoz/orbslam2_python.git
+    cd orbslam2_python
     ./build_orbslam.sh
     cd Vocabulary
     tar -xzf ORBvoc.txt.tar.gz
     
 Create a soft link in your python environment the shared library.
 
-    ln -s  orbslam_python/lib/orbslam2.so /usr/lib/python3.6/dist-packages/orbslam2.so
+    ln -s  orbslam2_python/orbslam_python/lib/orbslam2.so /usr/lib/python3.6/dist-packages/orbslam2.so
