@@ -9,7 +9,7 @@ from dataset.preprocess.disparity.disparity_model import DisparityModel
 from dataset.preprocess.segmentation_network.seg_model import SemanticSegmentationModel
 import matplotlib.pyplot as plt
 from alley_oop.fusion.surfel_map import SurfelMap
-from alley_oop.utils.trajectory import save_trajectory
+from alley_oop.utils.trajectory import save_trajectory, read_freiburg
 from dataset.dataset_utils import get_data, StereoVideoDataset, SequentialSubSampler
 from dataset.transforms import Compose
 import warnings
@@ -40,6 +40,11 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log):
         disp_model = DisparityModel(calibration=calib, device=device, depth_clipping=config['depth_clipping'])
         seg_model = SemanticSegmentationModel('stereo_slam/segmentation_network/trained/PvtB2_combined_TAM_fold1.pth',
                                               device)
+
+    # check for ground-truth pose data for logging purposes
+    gt_file = os.path.join(input_path, 'groundtruth.txt')
+    gt_trajectory = read_freiburg(gt_file) if os.path.isfile(gt_file) else None
+    slam.recorder.set_gt(gt_trajectory)
     with torch.inference_mode():
         viewer = None
         if config['viewer']['enable']:

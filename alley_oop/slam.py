@@ -52,15 +52,17 @@ class SLAM(object):
             if self.dbg_opt:
                 print(f"optimization costs: {self.pose_estimator.cost}")
 
+            pose_scaled = pose.clone()
+            pose_scaled[:3, 3] /= self.depth_scale  # de-normalize depth scaling
+
             if self.cnt > 0:
                 self.scene.fuse(self.frame, pose)
                 if self.dbg_opt:
                     print(f"number of surfels: {self.scene.opts.shape[1]}, stable: {(self.scene.conf >= 1.0).sum().item()}")
-                self.recorder(self.scene, self.pose_estimator)
+                self.recorder(self.scene, self.pose_estimator, pose_scaled)
                 self.optim_res = self.pose_estimator.optim_res
             self.cnt += 1
-            pose_scaled = pose.clone()
-            pose_scaled[:3,3] /= self.depth_scale  # de-normalize depth scaling
+
             return pose_scaled, self.scene, pose
 
     def to(self, device: torch.device):

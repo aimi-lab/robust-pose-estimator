@@ -1,4 +1,6 @@
 import wandb
+from scipy.spatial.transform import Rotation as R
+import numpy as np
 
 
 class OptimizationRecordings():
@@ -6,13 +8,16 @@ class OptimizationRecordings():
         self.costs_combined = [[] for i in range(pyramid_levels)]
         self.costs_rgb = [[] for i in range(pyramid_levels)]
         self.costs_icp = [[] for i in range(pyramid_levels)]
+        self.trajectory = []
         self.surfels_total = []
         self.surfels_stable = []
         self.pyramid_levels = pyramid_levels
+        self.gt_trajectory = None
 
-    def __call__(self, scene, estimator):
+    def __call__(self, scene, estimator, pose):
         self.surfels_total.append(scene.opts.shape[1])
         self.surfels_stable.append((scene.conf >= 1.0).sum().item())
+        self.trajectory.append(pose.cpu().numpy())
         for i in range(self.pyramid_levels):
             self.costs_combined[i].append(estimator.cost[i][0])
             self.costs_icp[i].append(estimator.cost[i][1])
@@ -26,7 +31,19 @@ class OptimizationRecordings():
             log_dict.update({f'pyr{i}/cost': self.costs_combined[i][-1],
                        f'pyr{i}/cost_rgb': self.costs_icp[i][-1],
                        f'pyr{i}/cost_icp': self.costs_rgb[i][-1]})
+        if self.gt_trajectory is not None:
+            if len(self.gt_trajectory) >= (step+1):
+                tr_err = self.gt_trajectory[step+1][:3,3] - self.trajectory[-1][:3,3]
+                rot_err = (self.gt_trajectory[step + 1][:3, :3].T @ self.trajectory[-1][:3, :3])
+                rot_err_deg = np.linalg.norm(R.from_matrix(rot_err).as_rotvec(degrees=True), ord=2)
+                log_dict.update({'error/x': tr_err[0],
+                                 'error/y': tr_err[1],
+                                 'error/z': tr_err[2],
+                                 'error/rot': rot_err_deg})
         wandb.log(log_dict, step=step)
+
+    def set_gt(self, gt_trajectory):
+        self.gt_trajectory = gt_trajectory
 
     def plot(self, show=False):
         if not show:

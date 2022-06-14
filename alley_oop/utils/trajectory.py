@@ -33,3 +33,20 @@ def json2freiburg(json_path, outpath):
         pose[0:3, 0:3] = pose[0:3, 0:3].T  # invert rotation as Intuitive's coordinate system is inverted wrt. OpenCV
         pose_list.append({'camera-pose': pose, 'timestamp': pose_elem['timestamp']})
     save_freiburg(pose_list, outpath)
+
+def read_freiburg(path: str):
+    with open(path, 'r') as f:
+        data = f.read()
+        lines = data.replace(",", " ").replace("\t", " ").split("\n")
+        list = [[v.strip() for v in line.split(" ") if v.strip() != ""] for line in lines if
+                len(line) > 0 and line[0] != "#"]
+    translation = [l[1:4] for l in list if len(l) > 0]
+    quaternions = [l[4:] for l in list if len(l) > 0]
+    pose_list = []
+    for t, q in zip(translation, quaternions):
+        pose = np.eye(4)
+        pose[:3, 3] = -1000.0*np.asarray(t).astype(float)  #m to mm
+        pose[:3,:3] = Rotation.from_quat(q).as_matrix().T
+        pose_list.append(pose)
+    return pose_list
+
