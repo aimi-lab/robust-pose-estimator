@@ -32,9 +32,9 @@ class OptimizationRecordings():
                        f'pyr{i}/cost_rgb': self.costs_icp[i][-1],
                        f'pyr{i}/cost_icp': self.costs_rgb[i][-1]})
         if self.gt_trajectory is not None:
-            if len(self.gt_trajectory) >= (step+1):
-                tr_err = self.gt_trajectory[step+1][:3,3] - self.trajectory[-1][:3,3]
-                rot_err = (self.gt_trajectory[step + 1][:3, :3].T @ self.trajectory[-1][:3, :3])
+            if len(self.gt_trajectory) > step:
+                tr_err = self.gt_trajectory[step][:3,3] - self.trajectory[-1][:3,3]
+                rot_err = (self.gt_trajectory[step][:3, :3].T @ self.trajectory[-1][:3, :3])
                 rot_err_deg = np.linalg.norm(R.from_matrix(rot_err).as_rotvec(degrees=True), ord=2)
                 log_dict.update({'error/x': tr_err[0],
                                  'error/y': tr_err[1],
