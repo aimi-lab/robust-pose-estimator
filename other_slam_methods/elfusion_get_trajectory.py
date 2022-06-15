@@ -84,9 +84,9 @@ def main(input_path, output_path, config, device_sel, start, stop, step, log):
 
     os.makedirs(output_path, exist_ok=True)
     save_trajectory(trajectory, output_path)
-    pcl = slam.getPointCloud()
-    if pcl is not None:
-        save_ply(pcl, os.path.join(output_path, 'map.ply'))
+    scene = slam.getPointCloud()
+    if scene is not None:
+        save_ply(scene, os.path.join(output_path, 'map.ply'))
 
     if log is not None:
         wandb.save(os.path.join(output_path, 'trajectory.freiburg'))
