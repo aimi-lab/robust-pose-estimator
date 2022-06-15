@@ -1,14 +1,12 @@
 import orbslam2
-from dataset.dataset_utils import get_data, StereoVideoDataset, SequentialSubSampler
-import json
 import os
 from tqdm import tqdm
-from alley_oop.utils.trajectory import save_trajectory
+from alley_oop.utils.trajectory import save_trajectory, read_freiburg
+from dataset.dataset_utils import get_data, StereoVideoDataset, SequentialSubSampler
 from dataset.preprocess.disparity.disparity_model import DisparityModel
 from dataset.preprocess.segmentation_network.seg_model import SemanticSegmentationModel
 from alley_oop.fusion.surfel_map import SurfelMap, FrameClass
-import yaml
-import cv2
+from scipy.spatial.transform import Rotation as R
 from torch.utils.data import DataLoader
 import warnings
 import torch
@@ -49,6 +47,10 @@ def main(input_path, outpath, config, device_sel, start, stop, step, log, genera
     slam.set_use_viewer(config['viewer']['enable'])
     slam.initialize()
 
+    # check for ground-truth pose data for logging purposes
+    gt_file = os.path.join(input_path, 'groundtruth.txt')
+    gt_trajectory = read_freiburg(gt_file) if os.path.isfile(gt_file) else None
+
     trajectory = []
     scene = None
     for idx, data in enumerate(tqdm(loader, total=min(len(dataset), (stop-start)//step))):
@@ -84,6 +86,16 @@ def main(input_path, outpath, config, device_sel, start, stop, step, log, genera
                         'surfels/total': scene.opts.shape[1] if scene is not None else 0,
                         'surfels/stable': (scene.conf >= 1.0).sum().item() if scene is not None else 0}
             log_dict.update({f'pyr0/cost': slam.get_residual_error()})
+            if gt_trajectory is not None:
+                if len(gt_trajectory) > idx:
+                    pose = np.array(trajectory[-1]['camera-pose'])
+                    tr_err = gt_trajectory[idx][:3, 3] - pose[:3, 3]
+                    rot_err = (gt_trajectory[idx][:3, :3].T @ pose[:3, :3])
+                    rot_err_deg = np.linalg.norm(R.from_matrix(rot_err).as_rotvec(degrees=True), ord=2)
+                    log_dict.update({'error/x': tr_err[0],
+                                     'error/y': tr_err[1],
+                                     'error/z': tr_err[2],
+                                     'error/rot': rot_err_deg})
             wandb.log(log_dict, step=idx)
 
     os.makedirs(outpath, exist_ok=True)

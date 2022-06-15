@@ -6,13 +6,14 @@ import os, glob
 import torch
 import numpy as np
 from tqdm import tqdm
-from alley_oop.utils.trajectory import save_trajectory
+from alley_oop.utils.trajectory import save_trajectory, read_freiburg
 from dataset.preprocess.disparity.disparity_model import DisparityModel
 from dataset.preprocess.segmentation_network.seg_model import SemanticSegmentationModel
 import open3d
 import warnings
 import wandb
 from torch.utils.data import DataLoader
+from scipy.spatial.transform import Rotation as R
 
 
 def save_ply(pcl_array, path):
@@ -24,11 +25,11 @@ def save_ply(pcl_array, path):
 
 def main(input_path, output_path, config, device_sel, start, stop, step, log):
     device = torch.device('cpu')
-    if device_sel == 'gpu':
-        if torch.cuda.is_available():
-            device = torch.device('cuda')
-        else:
-            warnings.warn('No GPU available, fallback to CPU')
+    # if device_sel == 'gpu':
+    #     if torch.cuda.is_available():
+    #         device = torch.device('cuda')
+    #     else:
+    #         warnings.warn('No GPU available, fallback to CPU')
 
     if log is not None:
         config.update({'data': os.path.split(input_path)[-1]})
@@ -37,16 +38,18 @@ def main(input_path, output_path, config, device_sel, start, stop, step, log):
     dataset, calib = get_data(input_path, config['img_size'])
     slam = pyElasticFusion(calib['intrinsics']['left'], config['img_size'][0], config['img_size'][1], 7.0, True, config['depth_scaling'])
     sampler = SequentialSubSampler(dataset, start, stop, step)
-    loader = DataLoader(dataset, num_workers=0 if config['slam']['debug'] else 1, pin_memory=True, sampler=sampler)
+    loader = DataLoader(dataset, num_workers=0 if config['slam']['debug'] else 1, sampler=sampler)
     if isinstance(dataset, StereoVideoDataset):
         disp_model = DisparityModel(calibration=calib, device=device, depth_clipping=config['depth_clipping'])
         seg_model = SemanticSegmentationModel('stereo_slam/segmentation_network/trained/PvtB2_combined_TAM_fold1.pth',
                                               device)
 
-
+    # check for ground-truth pose data for logging purposes
+    gt_file = os.path.join(input_path, 'groundtruth.txt')
+    gt_trajectory = read_freiburg(gt_file) if os.path.isfile(gt_file) else None
     trajectory = []
     last_pose = np.eye(4)
-    for i, data in enumerate(tqdm(loader, total=min(len(dataset), (stop-start)//step))):
+    for idx, data in enumerate(tqdm(loader, total=min(len(dataset), (stop-start)//step))):
         if isinstance(dataset, StereoVideoDataset):
             raise NotImplementedError
             limg, rimg, pose_kinematics, img_number = data
@@ -56,18 +59,29 @@ def main(input_path, output_path, config, device_sel, start, stop, step, log):
             diff_pose = np.linalg.pinv(last_pose)@pose_kinematics if config['slam']['kinematics'] != 'none' else np.eye(4)
             last_pose = pose_kinematics
         else:
+            data = [data[i].numpy() for i in range(len(data)-1)] + [data[-1]]
             limg, depth, mask, rimg, disp, img_number = data
             diff_pose = np.eye(4)
             config['slam']['kinematics'] = 'fuse'
 
         if mask is None:
             mask = np.ones_like(depth)
-        pose= slam.processFrame(limg, depth.astype(np.uint16),(mask == 0).astype(np.uint8) , i, diff_pose, config['slam']['kinematics'] == 'fuse')
+        pose= slam.processFrame(limg, depth.astype(np.uint16),(mask == 0).astype(np.uint8) , idx, diff_pose, config['slam']['kinematics'] == 'fuse')
         trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
         if log:
             log_dict = {'frame': idx}
-            log_dict.update({f'pyr0/cost': slam.get_residual_error()})
+            if gt_trajectory is not None:
+                if len(gt_trajectory) > idx:
+                    pose = np.array(trajectory[-1]['camera-pose'])
+                    tr_err = gt_trajectory[idx][:3, 3] - pose[:3, 3]
+                    rot_err = (gt_trajectory[idx][:3, :3].T @ pose[:3, :3])
+                    rot_err_deg = np.linalg.norm(R.from_matrix(rot_err).as_rotvec(degrees=True), ord=2)
+                    log_dict.update({'error/x': tr_err[0],
+                                     'error/y': tr_err[1],
+                                     'error/z': tr_err[2],
+                                     'error/rot': rot_err_deg})
             wandb.log(log_dict, step=idx)
+
     os.makedirs(output_path, exist_ok=True)
     save_trajectory(trajectory, output_path)
     pcl = slam.getPointCloud()
@@ -75,13 +89,13 @@ def main(input_path, output_path, config, device_sel, start, stop, step, log):
         save_ply(pcl, os.path.join(output_path, 'map.ply'))
 
     if log is not None:
-        wandb.save(os.path.join(outpath, 'trajectory.freiburg'))
-        wandb.save(os.path.join(outpath, 'trajectory.json'))
+        wandb.save(os.path.join(output_path, 'trajectory.freiburg'))
+        wandb.save(os.path.join(output_path, 'trajectory.json'))
         if scene is not None:
-            wandb.save(os.path.join(outpath, 'map.ply'))
+            wandb.save(os.path.join(output_path, 'map.ply'))
         if os.path.isfile(os.path.join(input_path, 'groundtruth.txt')):
             error = evaluate(os.path.join(input_path, 'groundtruth.txt'),
-                             os.path.join(outpath, 'trajectory.freiburg'))
+                             os.path.join(output_path, 'trajectory.freiburg'))
             wandb.define_metric('trans_error', step_metric='frame')
             for i, e in enumerate(error):
                 wandb.log({'trans_error': e, 'frame': i})
@@ -109,7 +123,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--config',
         type=str,
-        default='configuration/efusion_tum.yaml',
+        default='configuration/efusion_scared.yaml',
         help='Configuration file.'
     )
     parser.add_argument(
