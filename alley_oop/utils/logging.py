@@ -29,8 +29,8 @@ class OptimizationRecordings():
                    'surfels/stable': self.surfels_stable[-1]}
         for i in range(self.pyramid_levels):
             log_dict.update({f'pyr{i}/cost': self.costs_combined[i][-1],
-                       f'pyr{i}/cost_rgb': self.costs_icp[i][-1],
-                       f'pyr{i}/cost_icp': self.costs_rgb[i][-1]})
+                       f'pyr{i}/cost_icp': self.costs_icp[i][-1],
+                       f'pyr{i}/cost_rgb': self.costs_rgb[i][-1]})
         if self.gt_trajectory is not None:
             if len(self.gt_trajectory) > step:
                 tr_err = self.gt_trajectory[step][:3,3] - self.trajectory[-1][:3,3]
