@@ -14,6 +14,7 @@ import warnings
 import wandb
 from torch.utils.data import DataLoader
 from scipy.spatial.transform import Rotation as R
+from scripts.evaluate_ate_freiburg import main as evaluate
 
 
 def save_ply(pcl_array, path):
