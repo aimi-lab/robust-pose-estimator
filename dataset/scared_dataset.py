@@ -15,7 +15,7 @@ class ScaredDataset(Dataset):
     def __init__(self, input_folder:str, baseline_orig:float, img_size: Tuple):
         super().__init__()
         self.imgs = sorted(glob.glob(os.path.join(input_folder, 'data','video_frames', '*l.png')))
-        self.disparity = sorted(glob.glob(os.path.join(input_folder, 'data','disparity_frames', '*.pfm')))
+        self.disparity = sorted(glob.glob(os.path.join(input_folder, 'data','disparity_frames_psmnet', '*.pfm')))
         assert len(self.imgs) == len(self.disparity)
         assert len(self.imgs) > 0
 

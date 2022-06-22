@@ -7,7 +7,7 @@
 #SBATCH --partition=gpu-invest
 #SBATCH --account=ws_00000
 #SBATCH --gres=gpu:1
-#SBATCH --array=1-3
+#SBATCH --array=1-35%4
 
 
 #### Your shell commands below this line ####
@@ -23,7 +23,7 @@ sequence=$(cat $param_store | awk -v var=$SLURM_ARRAY_TASK_ID 'NR==var {print $1
 
 cd scripts
 
-python -u alleyoop_get_trajectory.py ${sequence} --device gpu --outpath ${sequence}/data/alley_oop/weighted --log scared
+python -u alleyoop_get_trajectory.py ${sequence} --device gpu --outpath ${sequence}/data/alley_oop --log scared_benchmark
 
 
 
