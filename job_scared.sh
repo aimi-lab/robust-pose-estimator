@@ -4,7 +4,7 @@
 #SBATCH --mem-per-cpu=20G
 #SBATCH --cpus-per-task=1
 #SBATCH --job-name="deepLabv3"
-#SBATCH --partition=gpu-invest
+#SBATCH --partition=gpu
 #SBATCH --account=ws_00000
 #SBATCH --gres=gpu:1
 #SBATCH --array=1-35%4
