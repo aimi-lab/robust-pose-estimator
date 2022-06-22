@@ -11,8 +11,6 @@ if __name__ == '__main__':
         sequences = f.readlines()
     mp.set_start_method('spawn')
     for sequence in sequences:
-        if 'dataset_3' not in sequence:
-            continue
         print(sequence)
         try:
             sequence = sequence.replace(PATH_REPLACEMENT[1], PATH_REPLACEMENT[0])
