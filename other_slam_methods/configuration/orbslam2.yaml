@@ -1,5 +1,5 @@
 slam:
-  debug: False
+  debug: True
 
 img_size:
   - 640

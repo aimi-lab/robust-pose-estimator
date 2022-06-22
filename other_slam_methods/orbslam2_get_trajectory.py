@@ -117,7 +117,7 @@ def main(input_path, outpath, config, device_sel, start, stop, step, log, genera
                 wandb.log({'trans_error': e, 'frame': i})
             wandb.summary['ATE/RMSE'] = np.sqrt(np.dot(error, error) / len(error))
             wandb.summary['ATE/mean'] = np.mean(error)
-
+    wandb.finish()
     print('finished')
 
 

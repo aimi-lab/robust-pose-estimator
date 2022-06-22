@@ -14,8 +14,16 @@ from alley_oop.utils.trajectory import save_freiburg
 class ScaredDataset(Dataset):
     def __init__(self, input_folder:str, baseline_orig:float, img_size: Tuple):
         super().__init__()
-        self.imgs = sorted(glob.glob(os.path.join(input_folder, 'data','video_frames', '*l.png')))
+        imgs = sorted(glob.glob(os.path.join(input_folder, 'data','video_frames', '*l.png')))
         self.disparity = sorted(glob.glob(os.path.join(input_folder, 'data','disparity_frames_psmnet', '*.pfm')))
+        disparity_names = [os.path.basename(d).split('d')[0] for d in self.disparity]
+        self.imgs = []
+        for img in imgs:
+            img_name = os.path.basename(img).split('l.png')[0]
+            if img_name not in disparity_names:
+                print(f'missing disparity {img_name}. skip frame')
+            else:
+                self.imgs.append(img)
         assert len(self.imgs) == len(self.disparity)
         assert len(self.imgs) > 0
 
