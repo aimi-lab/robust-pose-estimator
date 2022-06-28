@@ -3,6 +3,6 @@
   maxdisp: 192
   lr: 0.001
   lr_mode: 'multi'
-  loadmodel: dataset/preprocess/prmsnet/ckpts/psmnet_flyingthings_24hrs_hahnec.ckpt #${work_dir}/data/psmnet_trained/pretrained_sceneflow_new.tar
+  loadmodel: dataset/preprocess/psmnet/psmnet_flyingthings_24hrs_hahnec.ckpt
   beta_lo: 0.9
   beta_hi: 0.999
