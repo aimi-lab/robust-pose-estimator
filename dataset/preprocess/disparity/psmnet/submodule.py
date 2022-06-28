@@ -53,7 +53,7 @@ class disparityregression(nn.Module):
         out = torch.sum(x*self.disp.data,1, keepdim=True)
         return out
 
-class feature_extraction(LightningModule):
+class feature_extraction(nn.Module):
     def __init__(self):
         super(feature_extraction, self).__init__()
         self.inplanes = 32

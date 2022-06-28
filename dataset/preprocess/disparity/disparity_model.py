@@ -15,8 +15,9 @@ class Struct:
 class DisparityModel(nn.Module):
     def __init__(self, calibration, device=torch.device('cpu'), infer_depth=True, depth_clipping=(-float('inf'), float('inf'))):
         super().__init__()
-        with open('stereo_slam/disparity/psmnet/PSMNet.yaml', 'r') as ymlfile:
-            config = Struct(**yaml.load(ymlfile, Loader=yaml.SafeLoader))
+        with open('../dataset/preprocess/disparity/psmnet/PSMNet.yaml', 'r') as ymlfile:
+            #config = Struct(**yaml.load(ymlfile, Loader=yaml.SafeLoader))
+            config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
 
         self.model = self._load(config)
         self.infer_depth = infer_depth
@@ -59,7 +60,9 @@ class DisparityModel(nn.Module):
 
     def _load(self, config):
         model = PSMNet(config)
-        assert os.path.isfile(config.loadmodel), 'no PSMNet model loaded'
-        checkpoint = torch.load(config.loadmodel)
+        assert os.path.isfile(config['loadmodel']), 'no PSMNet model loaded'
+        checkpoint = torch.load(config['loadmodel'], map_location='cpu')
+        for key in list(checkpoint['state_dict'].keys()):
+            checkpoint['state_dict'][key.replace('model.module.', '')] = checkpoint['state_dict'].pop(key)
         model.load_state_dict(checkpoint['state_dict'])
         return model
