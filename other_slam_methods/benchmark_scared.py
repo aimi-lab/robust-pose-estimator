@@ -12,12 +12,14 @@ if __name__ == '__main__':
     mp.set_start_method('spawn')
     for sequence in sequences:
         print(sequence)
+
         try:
             sequence = sequence.replace(PATH_REPLACEMENT[1], PATH_REPLACEMENT[0])
             sequence = sequence.replace('\n', '')
             with open('configuration/efusion_scared.yaml', 'r') as ymlfile:
                 config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
-
+            if os.path.isfile(os.path.join(sequence, 'data/efusion/trajectory.json')):
+                continue
             #elfusion(sequence, os.path.join(sequence, '/data/efusion'), config, 'cpu', 0, 10000000000, 1, None)#, 'efusion')
 
             with open('configuration/orbslam2.yaml', 'r') as ymlfile:
