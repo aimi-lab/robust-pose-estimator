@@ -19,6 +19,13 @@ class StereoVideoDataset(IterableDataset):
             self.rectify = StereoRectifier(calib_file, img_size)
         else:
             self.rectify = None
+        time_stamp_file = self.video_file.replace('.mp4', '.json')
+        if os.path.isfile(time_stamp_file):
+            with open(time_stamp_file, 'r') as f:
+                self.timestamps = json.load(f)
+            self.timestamps = [s['timestamp'] for s in self.timestamps]
+        else:
+            self.timestamps = None
         self.transform = ResizeStereo(img_size)
         vid_grabber = cv2.VideoCapture(self.video_file)
         self.length = int(vid_grabber.get(cv2.CAP_PROP_FRAME_COUNT)/sample)
@@ -55,7 +62,8 @@ class StereoVideoDataset(IterableDataset):
                 img_left, img_right = self.rectify(img_left, img_right)
             img_left = torch.tensor(img_left).permute(2,0,1).float() / 255.0
             img_right = torch.tensor(img_right).permute(2,0,1).float() / 255.0
-            yield img_left, img_right, pose, counter
+            img_number = self.timestamps[counter] if self.timestamps is not None else counter
+            yield img_left, img_right, pose, img_number
         vid_grabber.release()
 
     def __len__(self):
