@@ -62,7 +62,7 @@ class StereoVideoDataset(IterableDataset):
                 img_left, img_right = self.rectify(img_left, img_right)
             img_left = torch.tensor(img_left).permute(2,0,1).float() / 255.0
             img_right = torch.tensor(img_right).permute(2,0,1).float() / 255.0
-            img_number = self.timestamps[counter] if self.timestamps is not None else counter
+            img_number = self.timestamps[counter-1] if self.timestamps is not None else counter
             yield img_left, img_right, pose, img_number
         vid_grabber.release()
 
