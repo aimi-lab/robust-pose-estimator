@@ -13,20 +13,18 @@ class Struct:
 
 
 class DisparityModel(nn.Module):
-    def __init__(self, calibration, device=torch.device('cpu'), infer_depth=True, depth_clipping=(-float('inf'), float('inf'))):
+    def __init__(self, calibration, device=torch.device('cpu')):
         super().__init__()
         with open('../dataset/preprocess/disparity/psmnet/PSMNet.yaml', 'r') as ymlfile:
             #config = Struct(**yaml.load(ymlfile, Loader=yaml.SafeLoader))
             config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
 
         self.model = self._load(config)
-        self.infer_depth = infer_depth
         self.baseline_f = torch.nn.Parameter(torch.tensor(calibration['bf']))
         self.device = device
         self.model.eval()
         self.to(device)
         self.tensor = ToTensor()
-        self.clipping = depth_clipping
         # network input size
         self.th, self.tw = 256, 512
         self.upscale_factor = calibration['img_size'][0]/self.tw
@@ -46,17 +44,14 @@ class DisparityModel(nn.Module):
             limg = self.resize_for_inf(limg)
             rimg = self.resize_for_inf(rimg)
 
-            out = self.model(limg, rimg)
-            out = self.resize_to_orig(out)*self.upscale_factor
-            clip_mask = torch.ones_like(out, dtype=bool)
-            if self.infer_depth:
-                out = self.baseline_f / out
-                out = torch.clip(out, self.clipping[0], self.clipping[1])
-                clip_mask = (out != self.clipping[0]) & (out != self.clipping[1])
+            disp = self.model(limg, rimg)
+            disp = self.resize_to_orig(disp)*self.upscale_factor
+            clip_mask = torch.ones_like(disp, dtype=bool)
+            depth = self.baseline_f / disp
         if is_numpy:
-            out = out.cpu().numpy()
-            clip_mask = clip_mask.cpu().numpy()
-        return out.squeeze(), clip_mask.squeeze()
+            disp = disp.cpu().numpy()
+            depth = depth.cpu().numpy()
+        return disp, depth
 
     def _load(self, config):
         model = PSMNet(config)
