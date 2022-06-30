@@ -114,6 +114,8 @@ class DeepLabTAM(nn.Module):
 
         """
         # Backbone Encoder
+        if x.ndim == 4:
+            x = x.unsqueeze(1)
         x = x.permute(1,0,2,3,4)  # reshape to sequence first (S,B,C,W,H)
         s,b,c,w,h = x.shape
         features = self.segmentation_model.encoder(x.reshape(s*b, c, w, h))

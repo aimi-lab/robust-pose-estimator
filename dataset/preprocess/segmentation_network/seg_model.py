@@ -11,7 +11,7 @@ from dataset.preprocess.segmentation_network.tmp_scaler import TempScaling
 
 def get_model(checkpoint):
     assert os.path.isfile(checkpoint)
-    checkp = torch.load(checkpoint)
+    checkp = torch.load(checkpoint, map_location='cpu')
     num_classes = checkp['config']['model']['num_classes']
 
     model = smp.DeepLabV3Plus(
@@ -27,9 +27,14 @@ def get_model(checkpoint):
         out_channels=model.decoder.out_channels,
         atrous_rates=(12, 24, 36),
         output_stride=16)
-    model = DeepLabTAM(model, input_size=checkp['config']['data'][0]['train']['img_size'])
-    model.load_state_dict(checkp['model_state'])
-    model = model.segmentation_model
+    if checkp['config']['model']['temporal_aggregation'] == 'TAM':
+        model = DeepLabTAM(model, input_size=checkp['config']['data'][0]['train']['img_size'])
+        model.load_state_dict(checkp['model_state'])
+        model = model.segmentation_model
+    elif checkp['config']['model']['temporal_aggregation'] == 'none':
+        model.load_state_dict(checkp['model_state'])
+    else:
+        raise ValueError(f"{checkp['config']['model']['temporal_aggregation']} not supported")
     return model, num_classes
 
 
