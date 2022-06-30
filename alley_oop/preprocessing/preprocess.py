@@ -19,8 +19,13 @@ class PreProcess(object):
         self.cmp_illumination = compensate_illumination
 
     def __call__(self, img:ndarray, depth:ndarray, mask:ndarray=None, img_r:ndarray=None, disp:ndarray=None):
-        # normalize img
-        img = img.astype(np.float32) / 255.0
+        is_numpy = not torch.is_tensor(img)
+        if is_numpy:
+            # normalize img
+            img = img.astype(np.float32) / 255.0
+        else:
+            depth = depth.numpy().squeeze()
+            mask = mask.numpy().squeeze()
         # normalize depth for numerical stability
         depth = depth * self.depth_scale
 
@@ -36,13 +41,14 @@ class PreProcess(object):
 
         depth = (torch.tensor(depth).unsqueeze(0)).to(self.dtype)
         mask = (torch.tensor(mask).unsqueeze(0)).to(torch.bool)
-        img = (torch.tensor(img).permute(2, 0, 1)).to(self.dtype)
+        img = (torch.tensor(img).permute(2, 0, 1)).to(self.dtype) if is_numpy else img
 
         if img_r is not None:
             assert disp is not None
-            img_r = img_r.astype(np.float32) / 255.0
-            img_r = (torch.tensor(img_r).permute(2, 0, 1)).to(self.dtype)
-            disp = torch.tensor(disp)
+            if is_numpy:
+                img_r = img_r.astype(np.float32) / 255.0
+                img_r = (torch.tensor(img_r).permute(2, 0, 1)).to(self.dtype)
+                disp = torch.tensor(disp)
             confidence = disparity_photo_loss(img.unsqueeze(0), img_r.unsqueeze(0), disp.unsqueeze(0), alpha=5.437).squeeze(0)
         else:
             # use generic depth based uncertainty model
@@ -56,7 +62,10 @@ class PreProcess(object):
     def specularity_mask(self, img, spec_thr=0.96):
         """ specularities can cause issues in the photometric pose estimation.
             We can easily mask them by looking for maximum intensity values in all color channels """
-        mask = img.sum(axis=-1) < (3*spec_thr)
+        if torch.is_tensor(img):
+            mask = (img.sum(dim=0) < (3*spec_thr)).numpy()
+        else:
+            mask = img.sum(axis=-1) < (3*spec_thr)
         return mask
 
     @staticmethod
