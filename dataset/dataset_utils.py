@@ -16,6 +16,8 @@ def get_data(input_path: str, img_size: Tuple, sample_video: int=1):
     calib_file = None
     if os.path.isfile(os.path.join(input_path, 'camcal.json')):
         calib_file = os.path.join(input_path, 'camcal.json')
+    elif os.path.isfile(os.path.join(input_path, 'camera_calibration.json')):
+        calib_file = os.path.join(input_path, 'camera_calibration.json')
     elif os.path.isfile(os.path.join(input_path, 'StereoCalibration.ini')):
         calib_file = os.path.join(input_path, 'StereoCalibration.ini')
     elif os.path.isfile(os.path.join(input_path, 'endoscope_calibration.yaml')):
@@ -39,7 +41,7 @@ def get_data(input_path: str, img_size: Tuple, sample_video: int=1):
                 dataset = ScaredDataset(input_path, calib['bf_orig'], img_size=calib['img_size'])
             except AssertionError:
                 video_file = glob.glob(os.path.join(input_path, '*.mp4'))[0]
-                pose_file = os.path.join(input_path, 'camera-poses.json')
+                pose_file = os.path.join(input_path, 'camera_poses.json')
                 dataset = StereoVideoDataset(video_file, calib_file, pose_file, img_size=calib['img_size'], sample=sample_video)
 
     return dataset, calib

@@ -46,15 +46,15 @@ class Compose(object):
 
 
 class StereoTransform(object):
-    def __call__(self, left, depth, mask=None):
-        return left, depth, mask
+    def __call__(self, left, depth):
+        return left, depth
 
 
 class ResizeStereo(StereoTransform):
     def __init__(self, size):
         self.size = int(size[0]), int(size[1])
 
-    def __call__(self, left_img, right_img, mask=None):
+    def __call__(self, left_img, right_img):
         # resize with cropping to conserve aspect ratio
         h, w = left_img.shape[:2]
         scale = max(self.size[0] / w, self.size[1] / h)
@@ -64,7 +64,4 @@ class ResizeStereo(StereoTransform):
         right_img = cv2.resize(right_img, (int(w * scale), int(h * scale)))
         right_img = right_img[int(crop[1] / 2):int(h * scale - crop[1] / 2),
                    int(crop[0] / 2):int(w * scale - crop[0] / 2)]
-        if mask is not None:
-            mask = cv2.resize(mask, (int(w * scale), int(h * scale)), cv2.INTER_NEAREST)
-            mask = mask[int(crop[1] / 2):int(h * scale - crop[1] / 2), int(crop[0] / 2):int(w * scale - crop[0] / 2)]
-        return left_img, right_img, mask
+        return left_img, right_img

@@ -2,10 +2,11 @@ import cv2
 import os
 import json
 from torch.utils.data import IterableDataset
-from dataset.transforms import ResizeStereo
+from dataset.transforms import ResizeStereo, Compose
 from typing import Tuple
 from dataset.rectification import StereoRectifier
 import numpy as np
+import torch
 
 
 class StereoVideoDataset(IterableDataset):
@@ -52,6 +53,8 @@ class StereoVideoDataset(IterableDataset):
                 img_left, img_right = self.transform(img_left, img_right)
             if self.rectify is not None:
                 img_left, img_right = self.rectify(img_left, img_right)
+            img_left = torch.tensor(img_left).permute(2,0,1).float() / 255.0
+            img_right = torch.tensor(img_right).permute(2,0,1).float() / 255.0
             yield img_left, img_right, pose, counter
         vid_grabber.release()
 

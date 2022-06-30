@@ -30,19 +30,15 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log):
         config.update({'data': os.path.split(input_path)[-1]})
         wandb.init(project='Alley-OOP', config=config, group=log)
 
-    dataset, calib = get_data(input_path, config['img_size'])
+    dataset, calib = get_data(input_path, config['img_size'], sample_video=step)
     slam = SLAM(torch.tensor(calib['intrinsics']['left']), config['slam'], img_shape=config['img_size']).to(device)
-    if not isinstance(dataset, StereoVideoDataset):
-        dataset.transform = Compose([dataset.transform, slam.pre_process])  # add pre-processing to data loading (CPU)
-        sampler = SequentialSubSampler(dataset, start, stop, step)
-    else:
-        warnings.warn('start/stop arguments not supported for video dataset. ignored.', UserWarning)
-        sampler = None
+    dataset.transform = Compose([dataset.transform, slam.pre_process])  # add pre-processing to data loading (CPU)
+    sampler = SequentialSubSampler(dataset, start, stop, step)
     loader = DataLoader(dataset, num_workers=0 if config['slam']['debug'] else 1, pin_memory=True, sampler=sampler)
 
     if isinstance(dataset, StereoVideoDataset):
-        disp_model = DisparityModel(calibration=calib, device=device)
-        seg_model = SemanticSegmentationModel('../dataset/preprocess/segmentation_network/trained/deepLabv3plus_trained_intuitive.pth',
+        disp_model = DisparityModel(calibration=calib, device=device, depth_clipping=config['depth_clipping'])
+        seg_model = SemanticSegmentationModel('stereo_slam/segmentation_network/trained/PvtB2_combined_TAM_fold1.pth',
                                               device)
 
     # check for ground-truth pose data for logging purposes
@@ -61,13 +57,13 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log):
         os.makedirs(output_path, exist_ok=True)
         for i, data in enumerate(tqdm(loader, total=min(len(dataset), (stop-start)//step))):
             if isinstance(dataset, StereoVideoDataset):
+                raise NotImplementedError
                 limg, rimg, pose_kinematics, img_number = data
-                disparity, depth = disp_model(limg, rimg)
+                depth, depth_valid = disp_model(limg, rimg)
                 mask = seg_model.get_mask(limg)[0]
-                # preprocess here as data has not been available before
-                data = slam.pre_process(limg.squeeze(), depth.squeeze(), mask.squeeze(), rimg.squeeze(), disparity.squeeze())
-                data = [d.unsqueeze(0) for d in data] + [img_number]
-            limg, depth, mask, confidence, img_number = data
+                mask &= depth_valid  # mask tools and non-valid depth
+            else:
+                limg, depth, mask, confidence, img_number = data
             pose, scene, pose_relscale = slam.processFrame(limg.to(device), depth.to(device), mask.to(device),
                                                            confidence.to(device))
 
