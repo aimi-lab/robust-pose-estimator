@@ -38,14 +38,6 @@ def get_model(checkpoint):
     return model, num_classes
 
 
-class ToTensor(object):
-    def __call__(self, input):
-        if torch.is_tensor(input):
-            return input.unsqueeze(0).permute(0,3,1,2).float()/255.0
-        else:
-            return torch.tensor(input).unsqueeze(0).permute(0,3,1,2).float() / 255.0
-
-
 class SemanticSegmentationModel(nn.Module):
     def __init__(self, checkpoint, device, temperature=1.0, background_prior=1.0):
         super(SemanticSegmentationModel, self).__init__()
@@ -54,7 +46,7 @@ class SemanticSegmentationModel(nn.Module):
         prior = torch.ones(self.n_classes)
         prior[0] = background_prior
         self.calibration = TempScaling(apply_softmax=True, temperature=temperature, prior=prior).to(device)
-        self.transform = Compose([ToTensor(), Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+        self.transform = Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         self.device = device
         self.model.eval()
         self.eval()
@@ -62,14 +54,10 @@ class SemanticSegmentationModel(nn.Module):
 
     def get_mask(self, image):
         with torch.no_grad():
-            is_numpy = not torch.is_tensor(image)
             image = self.transform(image).to(self.device)
             soft_predictions = self.forward(image)
             mask = self.get_mask_from_prediction(soft_predictions)
             soft_predictions = soft_predictions.squeeze(0)
-        if is_numpy:
-            mask = mask.cpu().numpy()
-            soft_predictions = soft_predictions.cpu().numpy()
         return mask, soft_predictions
 
     def get_mask_from_prediction(self, predictions):
