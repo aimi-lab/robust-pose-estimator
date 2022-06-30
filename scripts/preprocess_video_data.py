@@ -29,7 +29,6 @@ def main(input_path, output_path, device_sel, step, log):
     dataset, calib = get_data(input_path, (640, 512))
     assert isinstance(dataset, StereoVideoDataset)
 
-    warnings.warn('start/stop arguments not supported for video dataset. ignored.', UserWarning)
     sampler = None
     loader = DataLoader(dataset, num_workers=1, pin_memory=True, sampler=sampler)
 
@@ -58,6 +57,7 @@ def main(input_path, output_path, device_sel, step, log):
             cv2.imwrite(os.path.join(output_path, 'video_frames', img_name + 'r.png'),
                         cv2.cvtColor(255.0*rimg.squeeze().permute(1,2,0).cpu().numpy(), cv2.COLOR_RGB2BGR).astype(np.uint8))
             cv2.imwrite(os.path.join(output_path, 'semantic_predictions', img_name + 'l.png'), cv2.cvtColor(segmentation, cv2.COLOR_RGB2BGR))
+            cv2.imwrite(os.path.join(output_path, 'disparity_frames', img_name + 'l.png'), disparity.cpu().squeeze().numpy().astype(np.uint8))
             save_pfm(disparity.cpu().squeeze().numpy(),os.path.join(output_path, 'disparity_frames', img_name + 'l.pfm'))
 
         print('finished')
