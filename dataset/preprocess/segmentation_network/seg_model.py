@@ -70,7 +70,8 @@ class SemanticSegmentationModel(nn.Module):
         with torch.no_grad():
             image = self.transform(image)
             predictions = self.forward(image)
-            return predictions
+            predictions_hard = torch.argmax(predictions, dim=-1)
+            return predictions, predictions_hard
 
     def forward(self, img):
         out = self.model(img)
