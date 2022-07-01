@@ -42,3 +42,4 @@ for method in METHODS:
     df = runs_df[runs_df.method.eq(method)]
     df = pd.DataFrame({'mean': df.groupby('dataset').mean()['ATE/RMSE'], 'std':df.groupby('dataset').std()['ATE/RMSE']})
     print(df)
+    print('average:', df.mean()['mean'],'+/-', df.std()['mean'])
