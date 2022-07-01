@@ -30,7 +30,8 @@ def main(input_path, outpath, config, device_sel, start, stop, step, log, genera
             warnings.warn('No GPU available, fallback to CPU')
 
     if log is not None:
-        config.update({'data': os.path.split(input_path)[-1]})
+        config.update({'keyframe': os.path.split(input_path)[-1]})
+        config.update({'dataset': os.path.split(input_path)[-2]})
         wandb.init(project='Alley-OOP', config=config, group=log)
 
     dataset, calib = get_data(input_path, config['img_size'])
