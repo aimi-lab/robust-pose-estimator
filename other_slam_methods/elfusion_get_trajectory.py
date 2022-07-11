@@ -24,7 +24,7 @@ def save_ply(pcl_array, path):
     open3d.io.write_point_cloud(path, pcl)
 
 
-def main(input_path, output_path, config, device_sel, start, stop, step, log):
+def main(input_path, output_path, config, device_sel, start, stop, step, log, generate_map=True):
     device = torch.device('cpu')
     # if device_sel == 'gpu':
     #     if torch.cuda.is_available():
@@ -83,10 +83,10 @@ def main(input_path, output_path, config, device_sel, start, stop, step, log):
                                      'error/z': tr_err[2],
                                      'error/rot': rot_err_deg})
             wandb.log(log_dict, step=idx)
-
+    print('finished slam, save results...')
     os.makedirs(output_path, exist_ok=True)
     save_trajectory(trajectory, output_path)
-    scene = slam.getPointCloud()
+    scene = slam.getPointCloud() if generate_map else None
     if scene is not None:
         save_ply(scene, os.path.join(output_path, 'map.ply'))
 
