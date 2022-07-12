@@ -93,11 +93,14 @@ def main(input_path, output_path, config, device_sel, start, stop, step, log, ge
     if log is not None:
         wandb.save(os.path.join(output_path, 'trajectory.freiburg'))
         wandb.save(os.path.join(output_path, 'trajectory.json'))
+        print('trajectories saved...')
         if scene is not None:
             wandb.save(os.path.join(output_path, 'map.ply'))
         if os.path.isfile(os.path.join(input_path, 'groundtruth.txt')):
+            print('evaluated...')
             error = evaluate(os.path.join(input_path, 'groundtruth.txt'),
                              os.path.join(output_path, 'trajectory.freiburg'))
+            print('save evaluation results...')
             wandb.define_metric('trans_error', step_metric='frame')
             for i, e in enumerate(error):
                 wandb.log({'trans_error': e, 'frame': i})
