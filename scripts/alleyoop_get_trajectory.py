@@ -92,7 +92,8 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log):
         fig, ax = slam.plot_recordings()
         plt.savefig(os.path.join(output_path, 'optimization_plot.pdf'))
 
-        scene.save_ply(os.path.join(output_path, 'map.ply'), stable=True)
+        scene.save_ply(os.path.join(output_path, 'stable_map.ply'), stable=True)
+        scene.save_ply(os.path.join(output_path, 'all_map.ply'), stable=False)
         if log is not None:
             wandb.save(os.path.join(output_path, 'trajectory.freiburg'))
             wandb.save(os.path.join(output_path, 'trajectory.json'))
