@@ -25,7 +25,9 @@ if __name__ == '__main__':
         print(sequence)
         sequence = sequence.replace(PATH_REPLACEMENT[1], PATH_REPLACEMENT[0])
         sequence = sequence.replace('\n', '')
-        gt_files = sorted(glob.glob(os.path.join(sequence, 'data', 'frame_data', '*.json')))
-        pose_list = load_scared_pose(gt_files)
-        save_freiburg(pose_list, sequence)
-        shutil.move(os.path.join(sequence, 'trajectory.freiburg'), os.path.join(sequence, 'groundtruth.txt'))
+        if not os.path.isfile(os.path.join(sequence, 'groundtruth.txt')):
+            gt_files = sorted(glob.glob(os.path.join(sequence, 'data', 'frame_data', '*.json')))
+            assert len(gt_files) > 0
+            pose_list = load_scared_pose(gt_files)
+            save_freiburg(pose_list, sequence)
+            shutil.move(os.path.join(sequence, 'trajectory.freiburg'), os.path.join(sequence, 'groundtruth.txt'))
