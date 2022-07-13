@@ -10,13 +10,27 @@ from alley_oop.geometry.pinhole_transforms import create_img_coords_t, reverse_p
 
 
 class PreProcess(object):
-    def __init__(self, scale, depth_min, intrinsics, dtype=torch.float32, mask_specularities:bool=True, compensate_illumination:bool=False):
+    """
+        Pre-Process rgbd (from stereo) data for alley-oop slam
+
+            :param scale: depth scaling for normalization
+            :param depth_min: minimum depth, if depth is smaller it is masked out
+            :param intrinsics: camera intrinsics
+            :param dtype: data-type
+            :param mask_specularities: mask-out specularities
+            :param compensate_illumination: transform to albedo space (do not use with noisy depth)
+            :param conf_thr: minimum depth confidence, if depth-confidence is smaller it is masked out
+            """
+    def __init__(self, scale:float, depth_min:float, intrinsics:torch.tensor, dtype=torch.float32, mask_specularities:bool=True,
+                 compensate_illumination:bool=False, conf_thr:float=0.1):
+
         self.depth_scale = scale
         self.depth_min = depth_min
         self.intrinsics = intrinsics
         self.dtype = dtype
         self.mask_specularities = mask_specularities
         self.cmp_illumination = compensate_illumination
+        self.conf_thr = conf_thr
 
     def __call__(self, img:ndarray, depth:ndarray, mask:ndarray=None, img_r:ndarray=None, disp:ndarray=None):
         is_numpy = not torch.is_tensor(img)
@@ -53,6 +67,7 @@ class PreProcess(object):
         else:
             # use generic depth based uncertainty model
             confidence = torch.exp(-.5 * depth ** 2 / .6 ** 2)
+        mask &= confidence > self.conf_thr
         # compensate illumination and transform to gray-scale image
         if self.cmp_illumination:
             img = self.compensate_illumination(rgb2gray_t(img, ax0=0), depth, self.intrinsics)
