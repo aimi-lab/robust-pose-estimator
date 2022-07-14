@@ -40,6 +40,7 @@ for method in METHODS:
     print('\n------------')
     print(method)
     df = runs_df[runs_df.method.eq(method)]
+    print('average duration in frames:', df['frame'].mean(), '+/-', df['frame'].std())
     df = pd.DataFrame({'mean': df.groupby('dataset').mean()['ATE/RMSE'], 'std':df.groupby('dataset').std()['ATE/RMSE']})
     print(df)
     print('average:', df.mean()['mean'],'+/-', df.std()['mean'])
