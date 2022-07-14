@@ -26,10 +26,31 @@ for run in runs:
     all_dict.update({"run_name": run.name})
     all_dict.update({"state": run.state})
     all_dict.update({"method": run._attrs['group']})
+    all_dict.update({"id": run.id})
     summary_list.append(all_dict)
 
 runs_df = pd.DataFrame(summary_list)
-runs_df['ATE/RMSE'] *= 1000.0
+
+#########################
+print("this is a fix for the scared Benchmarking. The GT files were not correct such that we have to recompute the error locally")
+import os
+from scripts.evaluate_ate_freiburg import main as evaluate
+import numpy as np
+for i, run in runs_df.iterrows():
+    if run['method'] in METHODS:
+        datapath = run['dataset'].replace('/storage/workspaces/artorg_aimi/ws_00000', '/home/mhayoz/research')
+        gt_file = os.path.join(datapath, run['keyframe'], 'groundtruth.txt')
+        method = run['method']
+        method = method.replace('alleyoop_scared', 'alley_oop')
+        pred_file = os.path.join(datapath, run['keyframe'], 'data', method ,'trajectory.freiburg')
+
+        assert os.path.isfile(gt_file), f'missing {gt_file}'
+        assert os.path.isfile(pred_file), f'missing {pred_file}'
+
+        error = evaluate(pred_file, gt_file) * 1000
+        runs_df.loc[i,'ATE/RMSE'] = np.sqrt(np.dot(error, error) / len(error))
+
+#########################
 
 runs_df.to_csv("project.csv")
 
