@@ -407,7 +407,8 @@ class SurfelMap(object):
             rgb = self.gray.repeat((3, 1)).T[stable_pts].cpu().numpy()
         else:
             rgb = np.zeros_like(opts)
-        save_ply(opts, rgb, path)
+        if (len(opts) > 0) & (len(rgb) > 0):
+            save_ply(opts, rgb, path)
 
     def to(self, d: Union[torch.device, torch.dtype]):
         self.radi = self.radi.to(d)
