@@ -35,7 +35,8 @@ class ScaredDataset(Dataset):
         img_number = os.path.basename(self.imgs[item]).split('l.png')[0]
         img_r = cv2.cvtColor(cv2.imread(self.imgs[item].replace('l.png', 'r.png')), cv2.COLOR_BGR2RGB)
         # find depth map according to file-look up
-        disparity = cv2.imread(self.disparity[item], cv2.IMREAD_UNCHANGED)
+        disparity = cv2.imread(self.disparity[item], cv2.IMREAD_UNCHANGED) / 2
+        warnings.warn("somehow disparity is scaled by factor 2. Why????", UserWarning)
         depth = self.baseline / disparity  # get depth from disparity (fc * baseline) / disparity
         data = self.transform(img_l, depth, np.ones(depth.shape, dtype=np.uint8), img_r, disparity)
         return (*data, img_number)
