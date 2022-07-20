@@ -45,8 +45,8 @@ def read_freiburg(path: str):
     pose_list = []
     for t, q in zip(translation, quaternions):
         pose = np.eye(4)
-        pose[:3, 3] = -1000.0*np.asarray(t).astype(float)  #m to mm
-        pose[:3,:3] = Rotation.from_quat(q).as_matrix().T
+        pose[:3, 3] = 1000.0*np.asarray(t).astype(float)  #m to mm
+        pose[:3,:3] = Rotation.from_quat(q).as_matrix()
         pose_list.append(pose)
     return pose_list
 
