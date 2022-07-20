@@ -41,6 +41,12 @@ class PyramidPoseEstimator(torch.nn.Module):
                                              dist_thr=self.config['dist_thr'],
                                              association_mode=self.config['mode'][i], dbg_opt=config['debug'],
                                              conf_weighing=self.config['conf_weighing']))
+        # perform single step ICP at the end of optimization to compensate for z-drifts
+        self.pose_estimator.append(RGBICPPoseEstimator(shape_pyr[0], intrinsics_pyr[0],
+                                                       1e6*self.config['icp_weight'], 1,
+                                                       dist_thr=self.config['dist_thr'],
+                                                       association_mode=self.config['mode'][i],
+                                                       conf_weighing=self.config['conf_weighing']))
         self.pose_estimator = torch.nn.ModuleList(self.pose_estimator)
 
     def estimate(self, frame: FrameClass, scene: SurfelMap, div_thr=0.1):
@@ -70,6 +76,11 @@ class PyramidPoseEstimator(torch.nn.Module):
                     pose_cur2last_lie = pose_cur2last_lie_old
                 self.cost[pyr_level] = self.pose_estimator[pyr_level].best_cost
                 self.optim_res[pyr_level] = optim_res
+            # perform single step ICP at the end of optimization to compensate for z-drifts
+            pose_cur2last_lie, _, optim_res = self.pose_estimator[-1].estimate_gn(frame_pyr[0],
+                                                                                 model_frame_pyr[0],
+                                                                                 scene_tlast,
+                                                                                 init_x=pose_cur2last_lie)
             pose = self.last_pose_lie - pose_cur2last_lie
             self.last_pose_lie.data = pose
         self.last_frame_pyr = frame_pyr
