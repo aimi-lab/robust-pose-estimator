@@ -84,6 +84,8 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log):
             trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
             if (log is not None) & (i > 0):
                 slam.recorder.log(step=i)
+            if (i%10) == 1:
+                scene.save_ply(os.path.join(output_path, f'stable_map_{i}.ply'), stable=True)
 
         save_trajectory(trajectory, output_path)
 
