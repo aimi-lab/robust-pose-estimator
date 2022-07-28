@@ -5,7 +5,7 @@ import matplotlib as mpl
 mpl.use('Qt5Agg')
 from alley_oop.pose.trajectory_analyzer import TrajectoryAnalyzer
 from alley_oop.utils.trajectory import read_freiburg
-from scripts.evaluate_ate_freiburg import main as evaluate
+from evaluation.evaluate_ate_freiburg import main as evaluate
 
 
 if __name__ == '__main__':
