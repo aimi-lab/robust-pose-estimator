@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 import warnings
 import wandb
 import numpy as np
-from scripts.evaluate_ate_freiburg import main as evaluate
+from evaluation.evaluate_ate_freiburg import main as evaluate
 
 
 def tuple2list(listpose):

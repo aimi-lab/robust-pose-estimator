@@ -1,44 +1,33 @@
+from typing import Tuple, List
+import json
+from alley_oop.utils.trajectory import save_freiburg
 import cv2
 import os
 import numpy as np
 import glob
 import torch
-import warnings
 from torch.utils.data import Dataset
-from dataset.transforms import ResizeRGBD
-from typing import Tuple, List
-import json
-from alley_oop.utils.trajectory import save_freiburg
+from dataset.transforms import ResizeStereo
+from typing import Tuple
 
 
 class ScaredDataset(Dataset):
-    def __init__(self, input_folder:str, baseline_orig:float, img_size: Tuple):
+    def __init__(self, input_folder:str, img_size:Tuple):
         super().__init__()
-        imgs = sorted(glob.glob(os.path.join(input_folder, 'data','video_frames', '*l.png')))
-        self.disparity = sorted(glob.glob(os.path.join(input_folder, 'data','disparity_frames_psmnet', '*.pfm')))
-        disparity_names = [os.path.basename(d).split('d')[0] for d in self.disparity]
-        self.imgs = []
-        for img in imgs:
-            img_name = os.path.basename(img).split('l.png')[0]
-            if img_name not in disparity_names:
-                print(f'missing disparity {img_name}. skip frame')
-            else:
-                self.imgs.append(img)
-        assert len(self.imgs) == len(self.disparity)
+        self.imgs = sorted(glob.glob(os.path.join(input_folder, 'data', 'video_frames*', '*l.png')))
         assert len(self.imgs) > 0
-
-        self.transform = ResizeRGBD(img_size)
-        self.baseline = baseline_orig
+        self.transform = ResizeStereo(img_size)
 
     def __getitem__(self, item):
         img_l = cv2.cvtColor(cv2.imread(self.imgs[item]), cv2.COLOR_BGR2RGB)
-        img_number = os.path.basename(self.imgs[item]).split('l.png')[0]
         img_r = cv2.cvtColor(cv2.imread(self.imgs[item].replace('l.png', 'r.png')), cv2.COLOR_BGR2RGB)
-        # find depth map according to file-look up
-        disparity = cv2.imread(self.disparity[item], cv2.IMREAD_UNCHANGED) / 2
-        warnings.warn("somehow disparity is scaled by factor 2. Why????", UserWarning)
-        depth = self.baseline / disparity  # get depth from disparity (fc * baseline) / disparity
-        data = self.transform(img_l, depth, np.ones(depth.shape, dtype=np.uint8), img_r, disparity)
+        img_number = os.path.basename(self.imgs[item]).split('l.png')[0]
+        # to torch tensor
+        img_l = torch.tensor(img_l).permute(2,0,1).float()/255.0
+        img_r = torch.tensor(img_r).permute(2, 0, 1).float() / 255.0
+        mask = torch.ones((1, *img_l.shape[-2:]), dtype=torch.bool)
+        semantics = torch.zeros((1, *img_l.shape[-2:]), dtype=torch.long)
+        data = self.transform(img_l, img_r, mask, semantics)
         return (*data, img_number)
 
     def __len__(self):

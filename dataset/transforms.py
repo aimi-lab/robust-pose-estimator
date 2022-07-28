@@ -1,38 +1,5 @@
-import cv2
-
-
-class RGBDTransform(object):
-    def __call__(self, left, depth, mask=None, right=None, disp=None):
-        return left, depth, mask, right, disp
-
-
-class ResizeRGBD(RGBDTransform):
-    def __init__(self, size):
-        self.size = int(size[0]), int(size[1])
-
-    def __call__(self, img, depth=None, mask=None, right=None, disp=None):
-        # resize with cropping to conserve aspect ratio
-        h, w = img.shape[:2]
-        scale = max(self.size[0] / w, self.size[1] / h)
-        crop = w * scale - self.size[0], h * scale - self.size[1]
-        img = cv2.resize(img, (int(w * scale), int(h * scale)))
-        img = img[int(crop[1] / 2):int(h * scale - crop[1] / 2), int(crop[0] / 2):int(w * scale - crop[0] / 2)]
-        if right is not None:
-            right = cv2.resize(right, (int(w * scale), int(h * scale)))
-            right = right[int(crop[1] / 2):int(h*scale-crop[1] / 2), int(crop[0] / 2):int(w*scale-crop[0] / 2)]
-        if depth is not None:
-            depth = cv2.resize(depth, (int(w * scale), int(h * scale)), cv2.INTER_NEAREST)
-            depth = depth[int(crop[1] / 2):int(h*scale-crop[1] / 2), int(crop[0] / 2):int(w*scale-crop[0] / 2)]
-        if disp is not None:
-            disp = cv2.resize(disp, (int(w * scale), int(h * scale)), cv2.INTER_NEAREST)
-            disp = disp[int(crop[1] / 2):int(h * scale - crop[1] / 2),
-                    int(crop[0] / 2):int(w * scale - crop[0] / 2)]
-            # we need to scale the disparity when resizing
-            disp *= scale
-        if mask is not None:
-            mask = cv2.resize(mask, (int(w * scale), int(h * scale)), cv2.INTER_NEAREST)
-            mask = mask[int(crop[1] / 2):int(h * scale - crop[1] / 2), int(crop[0] / 2):int(w * scale - crop[0] / 2)]
-        return img, depth, mask, right, disp
+from torchvision.transforms.functional import resize, center_crop
+from torchvision.transforms import InterpolationMode
 
 
 class Compose(object):
@@ -46,22 +13,56 @@ class Compose(object):
 
 
 class StereoTransform(object):
-    def __call__(self, left, depth):
-        return left, depth
+    def __call__(self, left, right, mask, semantics):
+        return left, right, mask, semantics
 
 
 class ResizeStereo(StereoTransform):
     def __init__(self, size):
-        self.size = int(size[0]), int(size[1])
+        self.size = [int(size[1]), int(size[0])]
 
-    def __call__(self, left_img, right_img):
+    def __call__(self, left, right, mask=None, semantics=None):
         # resize with cropping to conserve aspect ratio
-        h, w = left_img.shape[:2]
-        scale = max(self.size[0] / w, self.size[1] / h)
-        crop = w * scale - self.size[0], h * scale - self.size[1]
-        left_img = cv2.resize(left_img, (int(w * scale), int(h * scale)))
-        left_img = left_img[int(crop[1] / 2):int(h * scale - crop[1] / 2), int(crop[0] / 2):int(w * scale - crop[0] / 2)]
-        right_img = cv2.resize(right_img, (int(w * scale), int(h * scale)))
-        right_img = right_img[int(crop[1] / 2):int(h * scale - crop[1] / 2),
-                   int(crop[0] / 2):int(w * scale - crop[0] / 2)]
-        return left_img, right_img
+        h, w = left.shape[-2:]
+
+        scale = max(self.size[0] / h, self.size[1] / w)
+        size = [int(scale*h), int(scale*w)]
+        left = self._resize_with_crop(left, size)
+        right = self._resize_with_crop(right, size)
+        mask = self._resize_with_crop(mask, size, InterpolationMode.NEAREST)
+        semantics = self._resize_with_crop(semantics, size, InterpolationMode.NEAREST)
+        return left, right, mask, semantics
+
+    def _resize_with_crop(self, img, size, mode=InterpolationMode.BILINEAR):
+        if img is not None:
+            img = resize(img, size=size, interpolation=mode)
+            img = center_crop(img, self.size)
+        return img
+
+
+class RGBDTransform(object):
+    def __call__(self, img, depth, mask, semantics):
+        return img, depth, mask, semantics
+
+
+class ResizeRGBD(RGBDTransform):
+    def __init__(self, size):
+        self.size = [int(size[1]), int(size[0])]
+
+    def __call__(self, img, depth, mask=None, semantics=None):
+        # resize with cropping to conserve aspect ratio
+        h, w = img.shape[-2:]
+
+        scale = max(self.size[0] / h, self.size[1] / w)
+        size = [int(scale * h), int(scale * w)]
+        img = self._resize_with_crop(img, size)
+        depth = self._resize_with_crop(depth, size)
+        mask = self._resize_with_crop(mask, size, InterpolationMode.NEAREST)
+        semantics = self._resize_with_crop(semantics, size, InterpolationMode.NEAREST)
+        return img, depth, mask, semantics
+
+    def _resize_with_crop(self, img, size, mode=InterpolationMode.BILINEAR):
+        if img is not None:
+            img = resize(img, size=size, interpolation=mode)
+            img = center_crop(img, self.size)
+        return img

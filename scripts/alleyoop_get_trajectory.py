@@ -15,10 +15,11 @@ from dataset.transforms import Compose
 import warnings
 from torch.utils.data import DataLoader
 import wandb
-from scripts.evaluate_ate_freiburg import main as evaluate
+from evaluation.evaluate_ate_freiburg import main as evaluate
+from alley_oop.metrics.projected_photo_metrics import disparity_photo_loss
 
 
-def main(input_path, output_path, config, device_sel, stop, start, step, log):
+def main(input_path, output_path, config, device_sel, stop, start, step, log, force_video):
     device = torch.device('cpu')
     if device_sel == 'gpu':
         if torch.cuda.is_available():
@@ -31,20 +32,18 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log):
         config.update({'dataset': os.path.split(input_path)[-2]})
         wandb.init(project='Alley-OOP', config=config, group=log)
 
-    dataset, calib = get_data(input_path, config['img_size'])
+    dataset, calib = get_data(input_path, config['img_size'], force_video=force_video)
     slam = SLAM(torch.tensor(calib['intrinsics']['left']), config['slam'], img_shape=config['img_size']).to(device)
     if not isinstance(dataset, StereoVideoDataset):
-        dataset.transform = Compose([dataset.transform, slam.pre_process])  # add pre-processing to data loading (CPU)
         sampler = SequentialSubSampler(dataset, start, stop, step)
     else:
         warnings.warn('start/stop arguments not supported for video dataset. ignored.', UserWarning)
         sampler = None
     loader = DataLoader(dataset, num_workers=0 if config['slam']['debug'] else 1, pin_memory=True, sampler=sampler)
-
+    disp_model = DisparityModel(calibration=calib, device=device)
     if isinstance(dataset, StereoVideoDataset):
-        disp_model = DisparityModel(calibration=calib, device=device)
         seg_model = SemanticSegmentationModel('../dataset/preprocess/segmentation_network/trained/deepLabv3plus_trained_intuitive.pth',
-                                              device)
+                                              device, config['img_size'])
 
     # check for ground-truth pose data for logging purposes
     gt_file = os.path.join(input_path, 'groundtruth.txt')
@@ -53,7 +52,6 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log):
     with torch.inference_mode():
         viewer = None
         if config['viewer']['enable']:
-            import open3d
             from viewer.viewer3d import Viewer3D
             viewer = Viewer3D((2 * config['img_size'][0], 2 * config['img_size'][1]),
                               blocking=config['viewer']['blocking'])
@@ -63,29 +61,29 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log):
         for i, data in enumerate(tqdm(loader, total=min(len(dataset), (stop-start)//step))):
             if isinstance(dataset, StereoVideoDataset):
                 limg, rimg, pose_kinematics, img_number = data
-                disparity, depth = disp_model(limg, rimg)
-                mask = seg_model.get_mask(limg)[0]
-                # preprocess here as data has not been available before
-                data = slam.pre_process(limg.squeeze(), depth.squeeze(), mask.squeeze(), rimg.squeeze(), disparity.squeeze())
-                data = [d.unsqueeze(0) for d in data] + [img_number]
-            limg, depth, mask, confidence, img_number = data
+                mask, semantics = seg_model.get_mask(limg.to(device))
+            else:
+                limg, rimg, mask, semantics, img_number = data
+            disparity, depth, depth_noise = disp_model(limg.to(device), rimg.to(device))
+            limg, depth, mask, confidence, depth_noise = slam.pre_process(limg, depth, mask, semantics, depth_noise)
+            if config['disparity_conf']:
+                confidence = disparity_photo_loss(rimg.to(device), limg.to(device), disparity.squeeze(1), alpha=5.437)
             pose, scene, pose_relscale = slam.processFrame(limg.to(device), depth.to(device), mask.to(device),
                                                            confidence.to(device))
 
             if viewer is not None:
                 curr_pcl = SurfelMap(frame=slam.get_frame(), kmat=torch.tensor(calib['intrinsics']['left']).float(),
                                      pmat=pose_relscale, depth_scale=scene.depth_scale).pcl2open3d(stable=False)
-                if scene.patch_colors is not None:
-                    curr_pcl.colors = open3d.utility.Vector3dVector(scene.patch_colors[slam.get_frame().mask.view(-1)])
-                else:
-                    curr_pcl.paint_uniform_color([0.5,0.5,0.5])
-                viewer(pose.cpu(), scene.pcl2open3d(stable=config['viewer']['stable']), add_pcd=curr_pcl,
-                       frame=slam.get_frame(), synth_frame=slam.get_rendered_frame(), optim_results=slam.get_optimization_res())
+
+                canonical_scene = scene.pcl2open3d(stable=config['viewer']['stable'])
+                print('Current Frame vs Scene (Canonical/Deformed)')
+                viewer(pose.cpu(), canonical_scene, add_pcd=curr_pcl,
+                       frame=slam.get_frame(), synth_frame=slam.get_rendered_frame(),
+                       optim_results=slam.get_optimization_res())
+
             trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
             if (log is not None) & (i > 0):
                 slam.recorder.log(step=i)
-            if (i%10) == 1:
-                scene.save_ply(os.path.join(output_path, f'stable_map_{i}.ply'), stable=True)
 
         save_trajectory(trajectory, output_path)
 
@@ -109,10 +107,6 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log):
                 wandb.summary['ATE/RMSE'] = np.sqrt(np.dot(error,error) / len(error))
                 wandb.summary['ATE/mean'] = np.mean(error)
 
-        if viewer is not None:
-            viewer.blocking = True
-            viewer(pose, scene.pcl2open3d(stable=config['viewer']['stable']), frame=slam.get_frame(),
-                   synth_frame=slam.get_rendered_frame())
         print('finished')
 
 
@@ -166,10 +160,15 @@ if __name__ == '__main__':
         default=None,
         help='wandb group logging name. No logging if none set'
     )
+    parser.add_argument(
+        '--force_video',
+        action="store_true",
+        help='force to use video input and recompute depth'
+    )
     args = parser.parse_args()
     with open(args.config, 'r') as ymlfile:
         config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
     if args.outpath is None:
         args.outpath = os.path.join(args.input, 'data','alleyoop')
 
-    main(args.input, args.outpath, config, args.device, args.stop, args.start, args.step, args.log)
+    main(args.input, args.outpath, config, args.device, args.stop, args.start, args.step, args.log, args.force_video)

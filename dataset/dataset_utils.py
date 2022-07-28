@@ -3,13 +3,13 @@ import glob
 from dataset.scared_dataset import ScaredDataset
 from dataset.tum_dataset import TUMDataset
 from dataset.video_dataset import StereoVideoDataset
-from dataset.semantic_dataset import RGBDDataset
+from dataset.semantic_dataset import StereoDataset
 from dataset.rectification import StereoRectifier
 from typing import Tuple
 from torch.utils.data import Sampler
 
 
-def get_data(input_path: str, img_size: Tuple, sample_video: int=1):
+def get_data(input_path: str, img_size: Tuple, sample_video: int=1, rect_mode: str='conventional', force_video: bool=False):
 
     # check the format of the calibration file
     img_size = tuple(img_size)
@@ -31,18 +31,20 @@ def get_data(input_path: str, img_size: Tuple, sample_video: int=1):
             raise RuntimeError('no calibration file found')
 
     if calib_file is not None:
-        rect = StereoRectifier(calib_file, img_size_new=img_size)
+        rect = StereoRectifier(calib_file, img_size_new=img_size, mode=rect_mode)
         calib = rect.get_rectified_calib()
 
         try:
-            dataset = RGBDDataset(input_path, calib['bf_orig'], img_size=calib['img_size'])
+            assert not force_video
+            dataset = StereoDataset(input_path, img_size=calib['img_size'])
         except AssertionError:
             try:
-                dataset = ScaredDataset(input_path, calib['bf_orig'], img_size=calib['img_size'])
+                assert not force_video
+                dataset = ScaredDataset(input_path, img_size=calib['img_size'])
             except AssertionError:
                 video_file = glob.glob(os.path.join(input_path, '*.mp4'))[0]
-                pose_file = os.path.join(input_path, 'camera_poses.json')
-                dataset = StereoVideoDataset(video_file, calib_file, pose_file, img_size=calib['img_size'], sample=sample_video)
+                pose_file = os.path.join(input_path, 'groundtruth.txt')
+                dataset = StereoVideoDataset(video_file, pose_file, img_size=calib['img_size'], sample=sample_video, rectify=rect)
 
     return dataset, calib
 

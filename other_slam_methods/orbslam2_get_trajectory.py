@@ -12,7 +12,7 @@ import warnings
 import torch
 import wandb
 import numpy as np
-from scripts.evaluate_ate_freiburg import main as evaluate
+from evaluation.evaluate_ate_freiburg import main as evaluate
 
 
 def tuple2list(listpose):
@@ -39,11 +39,11 @@ def main(input_path, outpath, config, device_sel, start, stop, step, log, genera
     assert os.path.isfile(settings_path)
     slam = orbslam2.System(os.path.join('Vocabulary', 'ORBvoc.txt'), settings_path, orbslam2.Sensor.RGBD)
     sampler = SequentialSubSampler(dataset, start, stop, step)
-    loader = DataLoader(dataset, num_workers=0 if config['slam']['debug'] else 1, pin_memory=True, sampler=sampler)
+    loader = DataLoader(dataset, num_workers=0 if config['slam']['debug'] else 1, pin_memory=False, sampler=sampler)
+    disp_model = DisparityModel(calibration=calib, device=device)
     if isinstance(dataset, StereoVideoDataset):
-        disp_model = DisparityModel(calibration=calib, device=device, depth_clipping=config['depth_clipping'])
         seg_model = SemanticSegmentationModel('stereo_slam/segmentation_network/trained/PvtB2_combined_TAM_fold1.pth',
-                                              device)
+                                              device, config['img_size'])
 
     slam.set_use_viewer(config['viewer']['enable'])
     slam.initialize()
@@ -56,13 +56,12 @@ def main(input_path, outpath, config, device_sel, start, stop, step, log, genera
     scene = None
     for idx, data in enumerate(tqdm(loader, total=min(len(dataset), (stop-start)//step))):
         if isinstance(dataset, StereoVideoDataset):
-            raise NotImplementedError
             limg, rimg, pose_kinematics, img_number = data
-            depth, depth_valid = disp_model(limg, rimg)
-            mask = seg_model.get_mask(limg)[0]
-            mask &= depth_valid  # mask tools and non-valid depth
+            mask, semantics = seg_model.get_mask(limg)
         else:
-            limg, depth, mask, rimg, disp, img_number = data
+            limg, depth, mask, rimg, disparity, semantics, img_number = data
+        disparity, depth, depth_noise = disp_model(limg, rimg)
+        limg, depth, mask, *_  = slam.pre_process(limg, depth, mask, semantics, depth_noise)
 
         slam.process_image_rgbd(limg.squeeze().numpy(), depth.squeeze().numpy(), mask.squeeze().numpy(), float(idx))
 

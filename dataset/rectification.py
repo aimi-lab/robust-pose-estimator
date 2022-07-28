@@ -3,11 +3,12 @@ import os
 import numpy as np
 import configparser
 import json
-from dataset.preprocess.disparity.stereo_rectify import rectify_pair, get_rect_maps
+import torch
+from dataset.preprocess.disparity.stereo_rectify import rectify_pair, get_rect_maps, pseudo_rectify_2d
 
 
 class StereoRectifier(object):
-    def __init__(self, calib_file, img_size_new=None):
+    def __init__(self, calib_file, img_size_new=None, mode='conventional'):
         if os.path.splitext(calib_file)[1] == '.json':
             cal = self._load_calib_json(calib_file)
         elif os.path.splitext(calib_file)[1] == '.ini':
@@ -16,6 +17,9 @@ class StereoRectifier(object):
             cal = self._load_calib_yaml(calib_file)
         else:
             raise NotImplementedError
+
+        assert mode in ['conventional', 'pseudo']
+        self.mode = mode
 
         self.scale = 1.0
         if img_size_new is not None:
@@ -29,6 +33,7 @@ class StereoRectifier(object):
             cal['rkmat'][1, 2] -= h_crop
             cal['img_size'] = img_size_new
         self.img_size = cal['img_size']
+        self.cal = cal
 
         self.maps, self.l_intr, self.r_intr = get_rect_maps(
             lcam_mat=cal['lkmat'],
@@ -41,7 +46,17 @@ class StereoRectifier(object):
         )
 
     def __call__(self, img_left, img_right):
-        return rectify_pair(img_left, img_right, self.maps)
+        img_left = img_left.permute(1,2,0).numpy()
+        img_right = img_right.permute(1, 2, 0).numpy()
+        if self.mode == 'pseudo':
+            x0, x1, y0, y1 = self.cal['lkmat'][0][-1], self.cal['rkmat'][0][-1], self.cal['lkmat'][1][-1], self.cal['rkmat'][1][-1]
+            img_right_rect = pseudo_rectify_2d(img_right, x0, x1, y0, y1)
+            img_left_rect = img_left
+        else:
+            img_left_rect, img_right_rect = rectify_pair(img_left, img_right, self.maps)
+        img_left_rect = torch.tensor(img_left_rect).permute(2,0,1)
+        img_right_rect = torch.tensor(img_right_rect).permute(2,0,1)
+        return img_left_rect, img_right_rect
 
     def get_rectified_calib(self):
         calib_rectifed = {'intrinsics': {}}

@@ -5,7 +5,7 @@ import glob
 import torch
 import warnings
 from torch.utils.data import Dataset
-from dataset.transforms import ResizeRGBD
+from dataset.transforms import ResizeStereo
 from typing import Tuple
 
 LABEL_LOOKUP = [
@@ -281,31 +281,31 @@ class RGBDecoder(object):
         return orig_label
 
 
-class RGBDDataset(Dataset):
-    def __init__(self, input_folder:str, baseline:float, img_size:Tuple):
+class StereoDataset(Dataset):
+    def __init__(self, input_folder:str, img_size:Tuple):
         super().__init__()
-        self.imgs = sorted(glob.glob(os.path.join(input_folder, 'video_frames_10.0fps', '*l.png')))
-        self.disparity = sorted(glob.glob(os.path.join(input_folder, 'disparity_frames_10.0fps_hires', '*.pfm')))
-        self.semantics = sorted(glob.glob(os.path.join(input_folder, 'semantic_predictions_10.0fps', '*l.png')))
-        assert len(self.imgs) == len(self.disparity)
+        self.imgs = sorted(glob.glob(os.path.join(input_folder, 'video_frames*', '*l.png')))
+        self.semantics = sorted(glob.glob(os.path.join(input_folder, 'semantic_predictions*', '*l.png')))
         assert len(self.imgs) == len(self.semantics)
         assert len(self.imgs) > 0
 
-        self.transform = ResizeRGBD(img_size)
-        self.baseline = baseline
+        self.transform = ResizeStereo(img_size)
         self.rgb_decoder = RGBDecoder()
 
     def __getitem__(self, item):
-        img = cv2.cvtColor(cv2.imread(self.imgs[item]), cv2.COLOR_BGR2RGB)
+        img_l = cv2.cvtColor(cv2.imread(self.imgs[item]), cv2.COLOR_BGR2RGB)
         img_r = cv2.cvtColor(cv2.imread(self.imgs[item].replace('l.png', 'r.png')), cv2.COLOR_BGR2RGB)
         img_number = os.path.basename(self.imgs[item]).split('l.png')[0]
-        # find depth map according to file-look up
-        disparity = cv2.imread(self.disparity[item], cv2.IMREAD_UNCHANGED)
         semantic = cv2.cvtColor(cv2.imread(self.semantics[item]), cv2.COLOR_BGR2RGB)
         mask = self.rgb_decoder.getToolMask(semantic)
-        # get depth from disparity (fc * baseline) / disparity
-        depth = self.baseline / disparity
-        data = self.transform(img, depth, mask, img_r, disparity)
+        semantic = self.rgb_decoder.mergelabels(self.rgb_decoder.rgbDecode(semantic))
+        # to torch tensor
+        img_l = torch.tensor(img_l).permute(2,0,1).float()/255.0
+        img_r = torch.tensor(img_r).permute(2, 0, 1).float() / 255.0
+        mask = torch.tensor(mask).unsqueeze(0)
+        semantic = torch.tensor(semantic).unsqueeze(0)
+
+        data = self.transform(img_l, img_r, mask, semantic)
         return (*data, img_number)
 
     def __len__(self):

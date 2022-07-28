@@ -1,0 +1,43 @@
+slam:
+  pyramid_levels: 3
+  rot:
+    n_iter: 10
+    Ftol: 1.0e-4
+  icp_weight:  10.0
+  dist_thr: 0.05 # relative distance threshold for data association
+  n_iter:
+    - 10
+    - 4
+    - 5
+  Ftol:
+    - 1.0e-4
+    - 1.0e-4
+    - 1.0e-4
+  mode:
+    - 'projective'
+    - 'projective'
+    - 'projective'
+  depth_clipping:
+    - 1
+    - 300 # in mm
+  debug: False
+  mask_specularities: True
+  conf_weighing: True
+  compensate_illumination: False  # do not use this with noisy depth estimates
+  deformation:
+    length_scale: 0.1
+    noise_level: 0.001
+
+img_size:
+  - 640
+  - 512
+
+rect_mode: pseudo
+disparity_conf: True
+
+
+
+viewer:
+  enable: False
+  blocking: True
+  stable: False

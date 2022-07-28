@@ -2,7 +2,6 @@ import torch
 from numpy import ndarray
 import numpy as np
 import cv2
-from alley_oop.metrics.projected_photo_metrics import disparity_photo_loss
 from alley_oop.geometry.normals import normals_from_regular_grid
 from alley_oop.utils.pytorch import batched_dot_product
 from alley_oop.utils.rgb2gray import rgb2gray_t
@@ -32,16 +31,15 @@ class PreProcess(object):
         self.cmp_illumination = compensate_illumination
         self.conf_thr = conf_thr
 
-    def __call__(self, img:ndarray, depth:ndarray, mask:ndarray=None, img_r:ndarray=None, disp:ndarray=None):
-        is_numpy = not torch.is_tensor(img)
-        if is_numpy:
-            # normalize img
-            img = img.astype(np.float32) / 255.0
-        else:
-            depth = depth.numpy().squeeze()
-            mask = mask.numpy().squeeze()
+    def __call__(self, img:torch.tensor, depth:torch.tensor, mask:torch.tensor=None, semantics:torch.tensor=None, depth_noise:torch.tensor=None):
+        assert torch.is_tensor(img)
+
+        # need to go back to numpy to use opencv functions
+        depth = depth.cpu().numpy().squeeze()
+        mask = mask.cpu().numpy().squeeze()
         # normalize depth for numerical stability
         depth = depth * self.depth_scale
+        depth_noise = depth_noise * self.depth_scale**2
 
         # filter depth to smooth out noisy points
         depth = cv2.bilateralFilter(depth, d=-1, sigmaColor=0.01, sigmaSpace=10)
@@ -51,36 +49,26 @@ class PreProcess(object):
         # depth clipping
         mask &= (depth > self.depth_min) & (depth < 1.0)
         # border points are usually unstable, mask them out
-        mask = cv2.erode(mask.astype(np.uint8), kernel=np.ones((7, 7)))
+        mask = cv2.erode(mask.astype(np.uint8), kernel=np.ones((11, 11)))
 
-        depth = (torch.tensor(depth).unsqueeze(0)).to(self.dtype)
-        mask = (torch.tensor(mask).unsqueeze(0)).to(torch.bool)
-        img = (torch.tensor(img).permute(2, 0, 1)).to(self.dtype) if is_numpy else img
+        depth = (torch.tensor(depth)[None,None,...]).to(self.dtype)
+        mask = (torch.tensor(mask)[None,None,...]).to(torch.bool)
 
-        if img_r is not None:
-            assert disp is not None
-            if is_numpy:
-                img_r = img_r.astype(np.float32) / 255.0
-                img_r = (torch.tensor(img_r).permute(2, 0, 1)).to(self.dtype)
-                disp = torch.tensor(disp)
-            confidence = disparity_photo_loss(img.unsqueeze(0), img_r.unsqueeze(0), disp.unsqueeze(0), alpha=5.437).squeeze(0)
-        else:
-            # use generic depth based uncertainty model
-            confidence = torch.exp(-.5 * depth ** 2 / .6 ** 2)
-        mask &= confidence > self.conf_thr
         # compensate illumination and transform to gray-scale image
         if self.cmp_illumination:
-            img = self.compensate_illumination(rgb2gray_t(img, ax0=0), depth, self.intrinsics)
+            img = self.compensate_illumination(rgb2gray_t(img.cpu(), ax0=0), depth, self.intrinsics)
 
-        return img, depth, mask, confidence
+        # compute confidence from depth noise
+        depth_noise = torch.ones_like(depth) if depth_noise is None else depth_noise
+        confidence = torch.special.erf(5e-3/torch.sqrt(depth_noise)).cpu()
+        # mask out values with low depth confidence
+        mask &= confidence > self.conf_thr
+        return img, depth, mask, confidence, depth_noise
 
     def specularity_mask(self, img, spec_thr=0.96):
         """ specularities can cause issues in the photometric pose estimation.
             We can easily mask them by looking for maximum intensity values in all color channels """
-        if torch.is_tensor(img):
-            mask = (img.sum(dim=0) < (3*spec_thr)).numpy()
-        else:
-            mask = img.sum(axis=-1) < (3*spec_thr)
+        mask = (img.sum(dim=1) < (3*spec_thr)).squeeze().numpy()
         return mask
 
     @staticmethod
