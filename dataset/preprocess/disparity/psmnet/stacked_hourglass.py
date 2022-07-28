@@ -115,4 +115,4 @@ class PSMNet(nn.Module):
         if train_opt:
             return pred1, pred2, pred3
         else:
-            return pred3
+            return pred3, cost3
