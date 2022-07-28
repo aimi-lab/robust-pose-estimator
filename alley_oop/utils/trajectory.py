@@ -50,3 +50,16 @@ def read_freiburg(path: str):
         pose_list.append(pose)
     return pose_list
 
+
+def read_json_intuitive(path: str):
+    with open(os.path.join(path), 'r') as f:
+        raw = json.load(f)
+    time_stamps = np.asarray([r["timestamp"] for r in raw])
+    poses = []
+
+    for i, r in enumerate(raw):
+        pose = np.eye(4)
+        pose[:3,:3] = np.asarray(r["camera_pose"][3:]).reshape(3,3)
+        pose[:3,3] = np.asarray(r["camera_pose"][:3])
+        poses.append(pose)
+    return poses, time_stamps
