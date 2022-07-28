@@ -73,9 +73,6 @@ class SLAM(object):
         self.intrinsics = self.intrinsics.to(device)
         return self
 
-    def getPointCloud(self):
-        return self.scene.opts.T/self.depth_scale, self.scene.gray.T/self.depth_scale
-
     def get_rendered_frame(self):
         return self.rendered_frame
 
