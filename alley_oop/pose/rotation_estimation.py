@@ -62,8 +62,6 @@ class RotationEstimator(torch.nn.Module):
             #     break
             # update rotation estimate
             x += x0.squeeze()
-        if not converged:
-            warnings.warn(f"EMS not converged after {self.n_iter}", RuntimeWarning)
         return best_sol[0], best_sol[1]
 
     @staticmethod
