@@ -20,7 +20,7 @@ slam:
   depth_clipping:
     - 1
     - 300 # in mm
-  debug: True
+  debug: False
   mask_specularities: True
   conf_weighing: True
   compensate_illumination: False  # do not use this with noisy depth estimates
@@ -29,6 +29,8 @@ img_size:
   - 640
   - 512
 
+rect_mode: conventional
+disparity_conf: True
 
 
 
