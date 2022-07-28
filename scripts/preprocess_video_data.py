@@ -15,7 +15,42 @@ import cv2
 from alley_oop.utils.pfm_handler import save_pfm
 
 
-def main(input_path, output_path, device_sel, step, log):
+class ColorMatcher(object):
+    """
+        match color histograms of images
+    """
+    def __init__(self, template_src=None, template_trg=None):
+        if (template_src is not None) & (template_trg is not None):
+            self.interp_a_values = []
+            for c in range(3):
+                src_values, src_unique_indices, src_counts = np.unique(np.concatenate((template_src[..., c].ravel(), np.arange(0,255))),
+                                                                       return_inverse=True,
+                                                                       return_counts=True)
+                src_counts -= 1
+
+                tmpl_values, tmpl_counts = np.unique(template_trg[..., c].ravel(), return_counts=True)
+
+                # calculate normalized quantiles for each array
+                src_quantiles = np.cumsum(src_counts) / template_src[..., c].size
+                tmpl_quantiles = np.cumsum(tmpl_counts) / template_trg[..., c].size
+
+                self.interp_a_values.append(np.interp(src_quantiles, tmpl_quantiles, tmpl_values))
+        else:
+            self.interp_a_values = np.load('color_hist.npy')
+
+    def __call__(self, srcl, srcr):
+        return self._match(srcl), self._match(srcr)
+
+    def _match(self, src):
+        src = (src.permute(1,2,0).numpy()*255.0).astype(np.uint8)
+        matched = np.empty_like(src)
+        for c in range(3):
+            src_values, src_unique_indices = np.unique(np.concatenate((src[..., c].ravel(), np.arange(0,255))),return_inverse=True)
+            matched[..., c] = self.interp_a_values[c][src_unique_indices[:src[..., c].size]].reshape(src[..., c].shape)
+        return torch.tensor(matched, dtype=torch.float).permute(2,0,1)/255.0
+
+
+def main(input_path, output_path, device_sel, step, log, match_color):
     device = torch.device('cpu')
     if device_sel == 'gpu':
         if torch.cuda.is_available():
@@ -26,15 +61,19 @@ def main(input_path, output_path, device_sel, step, log):
     if log is not None:
         wandb.init(project='Alley-OOP-dataextraction', group=log)
 
-    dataset, calib = get_data(input_path, (640, 512))
+
+    dataset, calib = get_data(input_path, (1280, 1024), force_video=True)
     assert isinstance(dataset, StereoVideoDataset)
+    if match_color:
+        cmatcher = ColorMatcher()
+        dataset.transform = cmatcher
 
     sampler = None
     loader = DataLoader(dataset, num_workers=1, pin_memory=True, sampler=sampler)
 
     disp_model = DisparityModel(calibration=calib, device=device)
     seg_model = SemanticSegmentationModel('../dataset/preprocess/segmentation_network/trained/deepLabv3plus_trained_intuitive.pth',
-                                          device)
+                                          device, (1280, 1024))
 
     rgb_decoder = RGBDecoder()
 
@@ -47,7 +86,7 @@ def main(input_path, output_path, device_sel, step, log):
         os.makedirs(output_path, exist_ok=True)
         for i, data in enumerate(tqdm(loader, total=len(dataset))):
             limg, rimg, pose_kinematics, img_number = data
-            disparity, depth = disp_model(limg.to(device), rimg.to(device))
+            disparity, depth, depth_noise_std = disp_model(limg.to(device), rimg.to(device))
             segmentation = seg_model.segment(limg.to(device))[1]
             segmentation = rgb_decoder.colorize(segmentation.squeeze().cpu().numpy()).astype(np.uint8)
 
@@ -96,8 +135,13 @@ if __name__ == '__main__':
         default=None,
         help='wandb group logging name. No logging if none set'
     )
+    parser.add_argument(
+        '--match_color',
+        action='store_true',
+        help='match color of images with a template img. Enable this for phantom data'
+    )
     args = parser.parse_args()
     if args.outpath is None:
-        args.outpath = os.path.join(args.input, 'data')
+        args.outpath = args.input
 
-    main(args.input, args.outpath, args.device, args.step, args.log)
+    main(args.input, args.outpath, args.device, args.step, args.log, args.match_color)
