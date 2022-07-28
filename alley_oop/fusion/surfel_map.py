@@ -20,28 +20,24 @@ class SurfelMap(object):
         """
         super().__init__()
         self.pmat = kwargs['pmat'] if 'pmat' in kwargs else torch.eye(4)  # extrinsics
-        self.kmat = kwargs['kmat'] if 'kmat' in kwargs else torch.eye(3)  # intrinsics
         self.conf_thr = kwargs['conf_thr'] if 'conf_thr' in kwargs else 7
         self.t_max = kwargs['t_max'] if 't_max' in kwargs else 15
-        self.upscale = kwargs['upscale'] if 'upscale' in kwargs else 4
+        self.upscale = kwargs['upscale'] if 'upscale' in kwargs else 1
         self.d_thresh = kwargs['d_thresh'] if 'd_thresh' in kwargs else 100.0
         self.dbug_opt = False
         self.interpolate = SparseImgInterpolator(5, 2, 0)
-        # initiliaze focal length
-        self.flen = (self.kmat[0, 0] + self.kmat[1, 1]) / 2
         self.depth_scale = kwargs['depth_scale'] if 'depth_scale' in kwargs else 1.0  # only used for open3d pcl
         self.patch_colors = None
         # either provide opts, normals and color or a frame class
         if 'opts' in kwargs:
             assert 'normals' in kwargs
             assert 'gray' in kwargs
-
+            self.kmat = kwargs['kmat'] if 'kmat' in kwargs else torch.eye(3)  # intrinsics
             self.opts = kwargs['opts']
             self.device = self.opts.device
             dtype = self.opts.dtype
             self.gray = kwargs['gray']
             self.nrml = kwargs['normals']
-            self.radi = kwargs['radi'] if 'radi' in kwargs else torch.ones((1, self.opts.shape[1])).to(self.device)
             self.img_shape = kwargs['img_shape'] if 'img_shape' in kwargs else None
             # initialize confidence
             if 'conf' in kwargs:
@@ -51,6 +47,8 @@ class SurfelMap(object):
                 self.conf = torch.exp(-.5 * gamma ** 2 / .6 ** 2)[None, :]
         else:
             assert 'frame' in kwargs
+            assert 'kmat' in kwargs
+            self.kmat = kwargs['kmat']
             frame = kwargs['frame']
             self.device = frame.depth.device
             dtype = frame.depth.dtype
@@ -67,8 +65,6 @@ class SurfelMap(object):
             self.gray = frame.img_gray[mask].view(1, -1)
             self.nrml = frame.normals.view(3, -1)[:, mask.view(-1)]
             self.conf = frame.confidence[mask].view(1, -1) / self.conf_thr  # normalize confidence
-            # initialize radii
-            self.radi = ((frame.depth[mask].view(-1)) / (self.flen* 2**.5 * abs(self.nrml[2,:]))).unsqueeze(0)
 
         self.kmat = self.kmat.to(self.device).to(dtype)
         self.pmat = self.pmat.to(self.device).to(dtype)
@@ -130,8 +126,6 @@ class SurfelMap(object):
         bidx[vidx.clone()] &= (frame.mask.view(-1)[(midx/self.upscale**2).long()]).type(torch.bool)
         midx = midx[frame.mask.view(-1)[(midx/self.upscale**2).long()]]
 
-        # compute radii
-        radi = (opts[2, :] * 2**.5) / (self.flen * abs(normals[2, :]))[None, :]
 
         # pre-select confidence elements
         conf = frame.confidence.view(1, -1) / self.conf_thr
@@ -141,7 +135,6 @@ class SurfelMap(object):
         # update existing points, intensities, normals, radii and confidences
         self.opts[:, vidx] = (conf_idx*self.opts[:, vidx] + ccor*opts[:, midx]) / (conf_idx + ccor)
         self.gray[:, vidx] = (conf_idx*self.gray[:, vidx] + ccor*gray[:, midx]) / (conf_idx + ccor)
-        self.radi[:, vidx] = (conf_idx*self.radi[:, vidx] + ccor*radi[:, midx]) / (conf_idx + ccor)
         self.nrml[:, vidx] = (conf_idx*self.nrml[:, vidx] + ccor*normals[:, midx]) / (conf_idx + ccor)
         self.conf[:, vidx] = torch.clamp(conf_idx + ccor, 0.0, 1.0)  # saturate confidence to 1
 
@@ -160,7 +153,6 @@ class SurfelMap(object):
         # concatenate unmatched points, intensities, normals, radii and confidences
         self.opts = torch.cat((self.opts, self._downsample(opts)[:, mask]), dim=-1)
         self.gray = torch.cat((self.gray, self._downsample(gray)[:, mask]), dim=-1)
-        self.radi = torch.cat((self.radi, self._downsample(radi)[:, mask]), dim=-1)
         self.nrml = torch.cat((self.nrml, self._downsample(normals)[:, mask]), dim=-1)
         self.conf = torch.cat((self.conf, self._downsample(conf)[:, mask]), dim=-1)
         self.t_created = torch.cat((self.t_created, self.tick*torch.ones(1, mask.sum()).to(self.device)), dim=-1)
@@ -176,10 +168,10 @@ class SurfelMap(object):
         ok_pts = ((self.conf >= 1.0) | ((self.tick - self.t_created) < self.t_max)).squeeze()
         self.opts = self.opts[:, ok_pts]
         self.gray = self.gray[:, ok_pts]
-        self.radi = self.radi[:, ok_pts]
         self.nrml = self.nrml[:, ok_pts]
         self.conf = self.conf[:, ok_pts]
         self.t_created = self.t_created[:, ok_pts]
+        return ok_pts
 
     def _downsample(self, x):
         x = x.view(-1, self.img_shape[0] * self.upscale, self.img_shape[1] * self.upscale)
@@ -328,7 +320,7 @@ class SurfelMap(object):
         opts = transform[:3,:3]@self.opts + transform[:3,3,None]
         normals = transform[:3,:3] @ self.nrml
         return SurfelMap(opts=opts, normals=normals, kmat=self.kmat, gray=self.gray, img_shape=self.img_shape,
-                         radi=self.radi, depth_scale=self.depth_scale, conf=self.conf).to(self.device)
+                         depth_scale=self.depth_scale, conf=self.conf).to(self.device)
 
     @property
     def grid_pts(self):
@@ -411,7 +403,6 @@ class SurfelMap(object):
             save_ply(opts, rgb, path)
 
     def to(self, d: Union[torch.device, torch.dtype]):
-        self.radi = self.radi.to(d)
         self.nrml = self.nrml.to(d)
         self.gray = self.gray.to(d)
         self.kmat = self.kmat.to(d)
@@ -422,3 +413,7 @@ class SurfelMap(object):
         self.conf = self.conf.to(d)
         self.t_created = self.t_created.to(d)
         return self
+
+    def __getitem__(self, item):
+        return SurfelMap(opts=self.opts[:, item], normals=self.nrml[:, item], kmat=self.kmat, gray=self.gray[:, item], img_shape=self.img_shape,
+                         depth_scale=self.depth_scale, conf=self.conf[:, item]).to(self.device)
