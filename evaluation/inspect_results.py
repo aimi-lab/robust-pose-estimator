@@ -2,7 +2,7 @@ import pandas as pd
 import wandb
 api = wandb.Api()
 
-METHODS = ['alleyoop_scared', 'efusion', 'orbslam2']
+METHODS = ['alleyoop_scared', 'efusion', 'orbslam2', 'alley_oop_deformable']
 
 # Download data from WANDB
 
@@ -34,7 +34,7 @@ runs_df = pd.DataFrame(summary_list)
 #########################
 print("this is a fix for the scared Benchmarking. The GT files were not correct such that we have to recompute the error locally")
 import os
-from scripts.evaluate_ate_freiburg import main as evaluate
+from evaluation.evaluate_ate_freiburg import main as evaluate
 import numpy as np
 for i, run in runs_df.iterrows():
     if run['method'] in METHODS:

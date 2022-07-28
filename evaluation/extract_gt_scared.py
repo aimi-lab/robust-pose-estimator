@@ -16,7 +16,7 @@ if __name__ == '__main__':
         for i, fname in enumerate(fnames):
             with open(str(fname), 'r') as f: pose_elem = json.load(f)
             pose = np.array(pose_elem['camera-pose'])
-            pose[:3, 3] = -pose[:3, 3]/2 #ToDo this is an issue with SCARED depth extraction. We should fix the depth and remove the factor 2.
+            pose[:3, 3] = -pose[:3, 3]
             pose[:3, :3] = pose[:3, :3].T
             pose_list.append({'camera-pose': pose, 'timestamp': i})
         return pose_list
