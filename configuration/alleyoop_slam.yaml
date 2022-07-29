@@ -1,22 +1,6 @@
 slam:
-  pyramid_levels: 3
-  rot:
-    n_iter: 10
-    Ftol: 1.0e-4
-  icp_weight:  10.0
+  frame2frame: True
   dist_thr: 0.05 # relative distance threshold for data association
-  n_iter:
-    - 10
-    - 4
-    - 5
-  Ftol:
-    - 1.0e-4
-    - 1.0e-4
-    - 1.0e-4
-  mode:
-    - 'projective'
-    - 'projective'
-    - 'projective'
   depth_clipping:
     - 1
     - 300 # in mm

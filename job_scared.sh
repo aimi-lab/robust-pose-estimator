@@ -23,7 +23,7 @@ sequence=$(cat $param_store | awk -v var=$SLURM_ARRAY_TASK_ID 'NR==var {print $1
 
 cd scripts
 
-python -u alleyoop_get_trajectory.py ${sequence} --device gpu --outpath ${sequence}/data/alley_oop --log scared_benchmark
+python -u alleyoop_get_trajectory.py ${sequence} --device gpu --outpath ${sequence}/data/endoslam --log scared_endoslam
 
 
 

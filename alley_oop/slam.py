@@ -1,6 +1,6 @@
 import torch
 from alley_oop.fusion.surfel_map import SurfelMap
-from alley_oop.pose.pyramid_pose_estimator import PyramidPoseEstimator
+from alley_oop.pose.attention_pose_estimator import AttentionPoseEstimator
 from alley_oop.pose.frame_class import FrameClass
 from typing import Union, Tuple
 from torch import tensor
@@ -20,7 +20,7 @@ class SLAM(object):
         self.device = intrinsics.device
         self.dtype = torch.float32
         self.intrinsics = intrinsics.to(self.dtype)
-        self.pose_estimator = PyramidPoseEstimator(intrinsics=self.intrinsics, config=config, img_shape=img_shape)
+        self.pose_estimator = AttentionPoseEstimator(self.intrinsics, config)
         self.cnt = 0
         self.rendered_frame = None
         self.frame = None
@@ -59,8 +59,6 @@ class SLAM(object):
                 self.scene.fuse(self.frame, pose)
                 if self.dbg_opt:
                     print(f"number of surfels: {self.scene.opts.shape[1]}, stable: {(self.scene.conf >= 1.0).sum().item()}")
-                self.recorder(self.scene, self.pose_estimator, pose_scaled)
-                self.optim_res = self.pose_estimator.optim_res
             self.cnt += 1
 
             return pose_scaled, self.scene, pose
