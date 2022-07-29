@@ -33,9 +33,6 @@ img_size:
   - 512
 
 rect_mode: pseudo
-disparity_conf: True
-
-
 
 viewer:
   enable: False

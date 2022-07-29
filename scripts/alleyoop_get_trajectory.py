@@ -10,7 +10,7 @@ from dataset.preprocess.segmentation_network.seg_model import SemanticSegmentati
 import matplotlib.pyplot as plt
 from alley_oop.fusion.surfel_map import SurfelMap
 from alley_oop.utils.trajectory import save_trajectory, read_freiburg
-from dataset.dataset_utils import get_data, StereoVideoDataset, SequentialSubSampler
+from dataset.dataset_utils import get_data, StereoVideoDataset, SequentialSubSampler, RGBDDataset
 from dataset.transforms import Compose
 import warnings
 from torch.utils.data import DataLoader
@@ -40,10 +40,12 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fo
         warnings.warn('start/stop arguments not supported for video dataset. ignored.', UserWarning)
         sampler = None
     loader = DataLoader(dataset, num_workers=0 if config['slam']['debug'] else 1, pin_memory=True, sampler=sampler)
-    disp_model = DisparityModel(calibration=calib, device=device)
+
     if isinstance(dataset, StereoVideoDataset):
         seg_model = SemanticSegmentationModel('../dataset/preprocess/segmentation_network/trained/deepLabv3plus_trained_intuitive.pth',
                                               device, config['img_size'])
+    if not isinstance(dataset, RGBDDataset):
+        disp_model = DisparityModel(calibration=calib, device=device)
 
     # check for ground-truth pose data for logging purposes
     gt_file = os.path.join(input_path, 'groundtruth.txt')
@@ -62,12 +64,13 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fo
             if isinstance(dataset, StereoVideoDataset):
                 limg, rimg, pose_kinematics, img_number = data
                 mask, semantics = seg_model.get_mask(limg.to(device))
+                disparity, depth, depth_noise = disp_model(limg.to(device), rimg.to(device))
+            elif isinstance(dataset, RGBDDataset):
+                limg, depth, depth_noise, mask, semantics, img_number = data
             else:
                 limg, rimg, mask, semantics, img_number = data
-            disparity, depth, depth_noise = disp_model(limg.to(device), rimg.to(device))
+                disparity, depth, depth_noise = disp_model(limg.to(device), rimg.to(device))
             limg, depth, mask, confidence, depth_noise = slam.pre_process(limg, depth, mask, semantics, depth_noise)
-            if config['disparity_conf']:
-                confidence = disparity_photo_loss(rimg.to(device), limg.to(device), disparity.squeeze(1), alpha=5.437)
             pose, scene, pose_relscale = slam.processFrame(limg.to(device), depth.to(device), mask.to(device),
                                                            confidence.to(device))
 

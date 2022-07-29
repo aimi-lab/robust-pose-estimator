@@ -30,9 +30,6 @@ img_size:
   - 512
 
 rect_mode: conventional
-disparity_conf: True
-
-
 
 viewer:
   enable: False

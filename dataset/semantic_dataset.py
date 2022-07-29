@@ -5,8 +5,10 @@ import glob
 import torch
 import warnings
 from torch.utils.data import Dataset
-from dataset.transforms import ResizeStereo
+from dataset.transforms import ResizeStereo, ResizeRGBD
 from typing import Tuple
+
+from alley_oop.utils.pfm_handler import load_pfm
 
 LABEL_LOOKUP = [
     {
@@ -306,6 +308,44 @@ class StereoDataset(Dataset):
         semantic = torch.tensor(semantic).unsqueeze(0)
 
         data = self.transform(img_l, img_r, mask, semantic)
+        return (*data, img_number)
+
+    def __len__(self):
+        return len(self.imgs)
+
+
+class RGBDDataset(Dataset):
+    def __init__(self, input_folder:str, img_size:Tuple, baseline:float):
+        super().__init__()
+        self.imgs = sorted(glob.glob(os.path.join(input_folder, 'video_frames', '*l.png')))
+        self.semantics = sorted(glob.glob(os.path.join(input_folder, 'semantic_predictions', '*l.png')))
+        self.disparity = sorted(glob.glob(os.path.join(input_folder, 'disparity_frames', '*l.pfm')))
+        self.disp_noise = sorted(glob.glob(os.path.join(input_folder, 'disparity_noise', '*l.pfm')))
+        assert len(self.imgs) == len(self.semantics)
+        assert len(self.imgs) == len(self.disparity)
+        #assert len(self.imgs) == len(self.disp_noise)
+        assert len(self.imgs) > 0
+
+        self.transform = ResizeRGBD(img_size)
+        self.rgb_decoder = RGBDecoder()
+        self.baseline = baseline
+
+    def __getitem__(self, item):
+        img_l = cv2.cvtColor(cv2.imread(self.imgs[item]), cv2.COLOR_BGR2RGB)
+        disp = load_pfm(self.disparity[item])[0]
+        disp_noise = load_pfm(self.disp_noise[item])[0]
+        img_number = os.path.basename(self.imgs[item]).split('l.png')[0]
+        semantic = cv2.cvtColor(cv2.imread(self.semantics[item]), cv2.COLOR_BGR2RGB)
+        mask = self.rgb_decoder.getToolMask(semantic)
+        semantic = self.rgb_decoder.mergelabels(self.rgb_decoder.rgbDecode(semantic))
+        # to torch tensor
+        img_l = torch.tensor(img_l).permute(2,0,1).float()/255.0
+        mask = torch.tensor(mask).unsqueeze(0)
+        semantic = torch.tensor(semantic).unsqueeze(0)
+        depth = torch.tensor(self.baseline/disp).unsqueeze(0)
+        disp_noise = torch.from_numpy(disp_noise.copy()).unsqueeze(0)
+
+        data = self.transform(img_l, depth, disp_noise, mask, semantic)
         return (*data, img_number)
 
     def __len__(self):
