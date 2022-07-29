@@ -1,8 +1,12 @@
 import pandas as pd
 import wandb
+import seaborn as snb
+import matplotlib.pyplot as plt
+import os
+
 api = wandb.Api()
 
-METHODS = ['alleyoop_scared', 'efusion', 'orbslam2', 'alley_oop_deformable']
+METHODS = ['alleyoop_rigid_entropy', 'alleyoop_rigid', 'alleyoop_rigid_dispconf']
 
 # Download data from WANDB
 
@@ -30,8 +34,9 @@ for run in runs:
     summary_list.append(all_dict)
 
 runs_df = pd.DataFrame(summary_list)
-
+runs_df = runs_df[runs_df.method.isin(METHODS)]
 runs_df.to_csv("project.csv")
+runs_df['dataset'] = [os.path.basename(d) for d in runs_df['dataset']]
 
 # Group into methods and datasets
 print('\n------------')
@@ -57,3 +62,5 @@ for run in runs_df.dataset.unique():
         df1 = df[df.keyframe.eq(kf)]
         print(df1[['method', 'ATE/RMSE']])
 
+snb.violinplot(y='ATE/RMSE', x='dataset', hue='method', data=runs_df)
+plt.show()
