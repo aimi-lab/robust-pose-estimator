@@ -80,6 +80,7 @@ def main(input_path, output_path, device_sel, step, log, match_color):
     os.makedirs(os.path.join(output_path, 'video_frames'), exist_ok=True)
     os.makedirs(os.path.join(output_path, 'semantic_predictions'), exist_ok=True)
     os.makedirs(os.path.join(output_path, 'disparity_frames'), exist_ok=True)
+    os.makedirs(os.path.join(output_path, 'disparity_noise'), exist_ok=True)
 
 
     with torch.inference_mode():
@@ -98,6 +99,8 @@ def main(input_path, output_path, device_sel, step, log, match_color):
             cv2.imwrite(os.path.join(output_path, 'semantic_predictions', img_name + 'l.png'), cv2.cvtColor(segmentation, cv2.COLOR_RGB2BGR))
             cv2.imwrite(os.path.join(output_path, 'disparity_frames', img_name + 'l.png'), disparity.cpu().squeeze().numpy().astype(np.uint8))
             save_pfm(disparity.cpu().squeeze().numpy(),os.path.join(output_path, 'disparity_frames', img_name + 'l.pfm'))
+            save_pfm(depth_noise_std.cpu().squeeze().numpy(),
+                     os.path.join(output_path, 'disparity_noise', img_name + 'l.pfm'))
 
         print('finished')
 
