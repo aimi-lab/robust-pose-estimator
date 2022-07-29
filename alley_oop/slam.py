@@ -27,7 +27,7 @@ class SLAM(object):
         self.depth_scale = 1/config['depth_clipping'][1]
         depth_min = config['depth_clipping'][0]*self.depth_scale  # internal normalization of depth
         self.dbg_opt = config['debug']
-        self.recorder = OptimizationRecordings(config['pyramid_levels'])
+        self.recorder = OptimizationRecordings()
         self.optim_res = None
         self.config = config
         self.pre_process = PreProcess(self.depth_scale, depth_min, self.intrinsics,
@@ -49,8 +49,6 @@ class SLAM(object):
                 self.scene = SurfelMap(frame=self.frame, kmat=self.intrinsics, upscale=1,
                                        d_thresh=self.config['dist_thr'], depth_scale=self.depth_scale).to(self.device)
             pose, self.rendered_frame = self.pose_estimator.estimate(self.frame, self.scene)
-            if self.dbg_opt:
-                print(f"optimization costs: {self.pose_estimator.cost}")
 
             pose_scaled = pose.clone()
             pose_scaled[:3, 3] /= self.depth_scale  # de-normalize depth scaling
@@ -59,6 +57,7 @@ class SLAM(object):
                 self.scene.fuse(self.frame, pose)
                 if self.dbg_opt:
                     print(f"number of surfels: {self.scene.opts.shape[1]}, stable: {(self.scene.conf >= 1.0).sum().item()}")
+                self.recorder(self.scene, pose_scaled)
             self.cnt += 1
 
             return pose_scaled, self.scene, pose
@@ -77,8 +76,3 @@ class SLAM(object):
     def get_frame(self):
         return self.frame
 
-    def get_optimization_res(self):
-        return self.optim_res
-
-    def plot_recordings(self, show=False):
-        return self.recorder.plot(show)

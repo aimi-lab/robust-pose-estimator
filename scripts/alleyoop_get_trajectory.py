@@ -81,19 +81,13 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fo
                 canonical_scene = scene.pcl2open3d(stable=config['viewer']['stable'])
                 print('Current Frame vs Scene (Canonical/Deformed)')
                 viewer(pose.cpu(), canonical_scene, add_pcd=curr_pcl,
-                       frame=slam.get_frame(), synth_frame=slam.get_rendered_frame(),
-                       optim_results=slam.get_optimization_res())
+                       frame=slam.get_frame(), synth_frame=slam.get_rendered_frame())
 
             trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
             if (log is not None) & (i > 0):
                 slam.recorder.log(step=i)
 
         save_trajectory(trajectory, output_path)
-
-
-        plt.close()
-        fig, ax = slam.plot_recordings()
-        plt.savefig(os.path.join(output_path, 'optimization_plot.pdf'))
 
         scene.save_ply(os.path.join(output_path, 'stable_map.ply'), stable=True)
         scene.save_ply(os.path.join(output_path, 'all_map.ply'), stable=False)
