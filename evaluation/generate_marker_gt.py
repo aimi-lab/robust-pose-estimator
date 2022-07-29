@@ -151,16 +151,8 @@ class MarkerTracker(object):
             idx = np.where([k["timestamp"] for k in self.markers_3d["deformed"]] == timestamp)
             assert len(idx) > 0, f"timestamp {timestamp} not found"
         canonical = open3d.geometry.PointCloud(points=open3d.cuda.pybind.utility.Vector3dVector(self.markers_3d["centroids"]))
-        canonical.estimate_normals()
-        canonical_mesh = open3d.geometry.TriangleMesh.create_from_point_cloud_poisson(canonical, depth=2)[0]
-        canonical_mesh.compute_triangle_normals()
-        canonical_mesh.paint_uniform_color([0.0, 1.0, 1.0])
         deformed = open3d.geometry.PointCloud(points=open3d.cuda.pybind.utility.Vector3dVector(self.markers_3d["deformed"][idx]["centroids"]))
-        deformed.estimate_normals()
-        deformed_mesh = open3d.geometry.TriangleMesh.create_from_point_cloud_poisson(deformed, depth=2)[0]
-        deformed_mesh.compute_triangle_normals()
-        deformed_mesh.paint_uniform_color([0.0, 1.0, 0.0])
-        return canonical_mesh, deformed_mesh
+        return canonical, deformed
 
 
 def main(input_path, output_path, visualize):
@@ -168,7 +160,7 @@ def main(input_path, output_path, visualize):
     video_file = glob.glob(os.path.join(input_path, '*.mp4'))[0]
     pose_file = os.path.join(input_path, 'groundthruth.txt')
     calib_file = os.path.join(input_path, 'camera_calibration.json')
-    rect = StereoRectifier(calib_file, img_size_new=(640, 512))
+    rect = StereoRectifier(calib_file, img_size_new=(640, 512), mode='conventional')
     calib = rect.get_rectified_calib()
     dataset = StereoVideoDataset(video_file, pose_file, img_size=calib['img_size'], rectify=rect)
     loader = DataLoader(dataset, num_workers=1)
@@ -191,7 +183,7 @@ def main(input_path, output_path, visualize):
 
             # show depth and sparse gt
             if visualize:
-                disparity, depth = disp_model(limg, rimg)
+                disparity, depth, noise = disp_model(limg, rimg)
                 frame = FrameClass(limg, depth, intrinsics=torch.tensor(calib['intrinsics']['left']).float())
                 pcd = SurfelMap(frame=frame, kmat=torch.tensor(calib['intrinsics']['left']).float(),
                                 pmat=pose_kinematics.squeeze(), depth_scale=1)
