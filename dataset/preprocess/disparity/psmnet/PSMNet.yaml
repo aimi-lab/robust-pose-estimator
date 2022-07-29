@@ -8,4 +8,4 @@
   beta_hi: 0.999
   temperature: 4.0
   score_scale: 0.1
-  conf_metric: entropy #maximum_likelihood #matching_score # ,
+  conf_metric: matching_score #maximum_likelihood #entropy # ,
