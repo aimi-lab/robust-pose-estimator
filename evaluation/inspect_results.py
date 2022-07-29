@@ -31,27 +31,6 @@ for run in runs:
 
 runs_df = pd.DataFrame(summary_list)
 
-#########################
-print("this is a fix for the scared Benchmarking. The GT files were not correct such that we have to recompute the error locally")
-import os
-from evaluation.evaluate_ate_freiburg import main as evaluate
-import numpy as np
-for i, run in runs_df.iterrows():
-    if run['method'] in METHODS:
-        datapath = run['dataset'].replace('/storage/workspaces/artorg_aimi/ws_00000', '/home/mhayoz/research')
-        gt_file = os.path.join(datapath, run['keyframe'], 'groundtruth.txt')
-        method = run['method']
-        method = method.replace('alleyoop_scared', 'alley_oop')
-        pred_file = os.path.join(datapath, run['keyframe'], 'data', method ,'trajectory.freiburg')
-
-        assert os.path.isfile(gt_file), f'missing {gt_file}'
-        assert os.path.isfile(pred_file), f'missing {pred_file}'
-
-        error = evaluate(pred_file, gt_file) * 1000
-        runs_df.loc[i,'ATE/RMSE'] = np.sqrt(np.dot(error, error) / len(error))
-
-#########################
-
 runs_df.to_csv("project.csv")
 
 # Group into methods and datasets
@@ -65,3 +44,16 @@ for method in METHODS:
     df = pd.DataFrame({'mean': df.groupby('dataset').mean()['ATE/RMSE'], 'std':df.groupby('dataset').std()['ATE/RMSE']})
     print(df)
     print('average:', df.mean()['mean'],'+/-', df.std()['mean'])
+
+# Per Run info
+print('\n------------')
+print('ATE-RMSE in mm')
+for run in runs_df.dataset.unique():
+
+    df = runs_df[runs_df.dataset.eq(run)]
+    for kf in df.keyframe.unique():
+        print('\n------------')
+        print(run, kf)
+        df1 = df[df.keyframe.eq(kf)]
+        print(df1[['method', 'ATE/RMSE']])
+
