@@ -27,7 +27,7 @@ class SLAM(object):
         self.depth_scale = 1/config['depth_clipping'][1]
         depth_min = config['depth_clipping'][0]*self.depth_scale  # internal normalization of depth
         self.dbg_opt = config['debug']
-        self.recorder = OptimizationRecordings(config['pyramid_levels'])
+        self.recorder = OptimizationRecordings()
         self.optim_res = None
         self.config = config
         self.pre_process = PreProcess(self.depth_scale, depth_min, self.intrinsics,
@@ -77,8 +77,3 @@ class SLAM(object):
     def get_frame(self):
         return self.frame
 
-    def get_optimization_res(self):
-        return self.optim_res
-
-    def plot_recordings(self, show=False):
-        return self.recorder.plot(show)
