@@ -6,7 +6,7 @@ import os
 
 api = wandb.Api()
 
-METHODS = ['alleyoop_rigid_entropy', 'alleyoop_rigid', 'alleyoop_rigid_dispconf']
+METHODS = ['alleyoop_rigid_entropy', 'alleyoop_rigid', 'alley_oop_maxscore', 'alleyoop_rigid_dispconf']
 
 # Download data from WANDB
 
