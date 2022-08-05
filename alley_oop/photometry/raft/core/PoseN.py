@@ -31,7 +31,7 @@ class PoseN(RAFT):
     def init_from_raft(self, raft_ckp):
         raft = RAFT(self.config)
         new_state_dict = OrderedDict()
-        state_dict = torch.load(raft_ckp, map_location='cpu')
+        state_dict = torch.load(raft_ckp)
         for k, v in state_dict.items():
             name = k.replace('module.','')  # remove `module.`
             new_state_dict[name] = v
