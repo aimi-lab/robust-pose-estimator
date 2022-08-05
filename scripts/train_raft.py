@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, SubsetRandomSampler
 
 from alley_oop.photometry.raft.core.PoseN import RAFT, PoseN
 import alley_oop.photometry.raft.core.datasets as datasets
@@ -126,7 +126,7 @@ def main(args, config):
     print(f"train: {len(data_train)} samples, val: {len(data_val)} samples")
     intrinsics = intrinsics.to(device)
     train_loader = DataLoader(data_train, num_workers=4, pin_memory=True, batch_size=config['train']['batch_size'], shuffle=True)
-    val_loader = DataLoader(data_val, num_workers=4, pin_memory=True, batch_size=config['val']['batch_size'])
+    val_loader = DataLoader(data_val, num_workers=4, pin_memory=True, batch_size=config['val']['batch_size'], sampler=SubsetRandomSampler(torch.from_numpy(np.random.choice(len(data_val), size=(400,), replace=False))))
     optimizer, scheduler = fetch_optimizer(config['train'], model)
 
     total_steps = 0
