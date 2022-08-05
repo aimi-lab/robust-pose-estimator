@@ -187,8 +187,6 @@ if __name__ == '__main__':
     parser.add_argument('--log', action="store_true")
     parser.add_argument('--restore_ckpt', help="restore checkpoint")
     parser.add_argument('--config', help="yaml config file", default='../configuration/train_raft.yaml')
-
-    parser.add_argument('--datapath', type=str, default='/home/mhayoz/research/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_phantom/part0007')
     args = parser.parse_args()
 
     torch.manual_seed(1234)
