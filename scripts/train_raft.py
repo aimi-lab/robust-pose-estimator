@@ -132,6 +132,10 @@ def main(args, config):
     total_steps = 0
     scaler = GradScaler()
     logger = Logger(model, scheduler, config, args.name, args.log)
+    if args.log:
+        args.outpath = wandb.run.dir
+    if not os.path.isdir(args.outpath):
+        os.mkdir(args.outpath)
 
     should_keep_training = True
     while should_keep_training:
@@ -173,8 +177,8 @@ def main(args, config):
             if total_steps % VAL_FREQ == VAL_FREQ - 1:
                 val(model, val_loader, device, loss_weights, intrinsics, logger)
 
-                PATH = 'checkpoints/%d_%s.pth' % (total_steps+1, args.name)
-                torch.save({"state_dict": model.state_dict(), "config": config}, PATH)
+                path = os.path.join(args.outpath, f'%d_%s.pth' % (total_steps+1, args.name))
+                torch.save({"state_dict": model.state_dict(), "config": config}, path)
             total_steps += 1
 
             if total_steps > config['train']['epochs']:
@@ -192,6 +196,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     import yaml
     parser.add_argument('--name', default='RAFT-poseEstimator', help="name your experiment")
+    parser.add_argument('--outpath', default='output', help="output path")
     parser.add_argument('--log', action="store_true")
     parser.add_argument('--restore_ckpt', help="restore checkpoint")
     parser.add_argument('--config', help="yaml config file", default='../configuration/train_raft.yaml')
@@ -201,6 +206,4 @@ if __name__ == '__main__':
     np.random.seed(1234)
     with open(args.config, 'r') as ymlfile:
         config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
-    if not os.path.isdir('checkpoints'):
-        os.mkdir('checkpoints')
     main(args, config)
