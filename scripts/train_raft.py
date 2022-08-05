@@ -174,7 +174,7 @@ def main(args, config):
                 val(model, val_loader, device, loss_weights, intrinsics, logger)
 
                 PATH = 'checkpoints/%d_%s.pth' % (total_steps+1, args.name)
-                torch.save(model.state_dict(), PATH)
+                torch.save({"state_dict": model.state_dict(), "config": config}, PATH)
             total_steps += 1
 
             if total_steps > config['train']['epochs']:
