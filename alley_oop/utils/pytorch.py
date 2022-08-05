@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 
 def batched_dot_product(t1:torch.tensor, t2:torch.tensor):
-    return (t1.unsqueeze(1) @ t2.unsqueeze(-1)).squeeze()
+    return (t1.unsqueeze(1) @ t2.unsqueeze(-1)).squeeze(0).squeeze(0)
 
 
 def beye(shape:Iterable, device=None, dtype=None):

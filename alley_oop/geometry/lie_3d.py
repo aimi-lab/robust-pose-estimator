@@ -7,6 +7,7 @@ import torch
 from typing import Union
 
 from alley_oop.utils.lib_handling import get_lib, get_class
+from alley_oop.utils.pytorch import beye, batched_dot_product
 
 
 def lie_so3_to_SO3(
@@ -122,6 +123,52 @@ def lie_se3_to_SE3(
     return pmat
 
 
+def lie_se3_to_SE3_batch(
+        pvec: Union[np.ndarray, torch.Tensor] = None,
+        tol: float = 10e-12,
+    ) -> Union[np.ndarray, torch.Tensor]:
+    """
+    create 4x4 projection matrix in SE(3) from Lie input vector
+
+    :param pvec: concatenated Lie angle 3-vector and Lie translation 3-vector
+    :return: projection matrix in SE(3), translation vector R^3
+    """
+
+    if pvec.ndim == 1:
+        pvec = pvec.unsqueeze(0)
+    b = pvec.shape[0]
+    # define identity matrix in advance to account for torch device
+    eye_3 = beye((b, 3), dtype=pvec.dtype, device=pvec.device)
+
+    # compute scale from vector norm
+    theta = batched_dot_product(pvec[:, :3],pvec[:, :3]).squeeze(-1)**.5
+    theta = torch.clamp(theta, tol)
+
+    # Taylor coefficients for rotation
+    a_term = torch.sin(theta).unsqueeze(-1)
+    b_term = (1-torch.cos(theta)).unsqueeze(-1)
+
+    # normalize vector
+    wvec_norm = pvec[:, :3] / theta
+
+    # construct hat-map which is so(3)
+    wmat = lie_hatmap_batch(wvec_norm)
+    rmat = eye_3 + a_term * wmat + b_term * torch.bmm(wmat,wmat)
+
+    # Taylor coefficients for translation (theta terms do not cancel out as for rotation)
+    c_term = (1 - a_term.squeeze(-1) / theta).unsqueeze(-1)
+    b_term2 = (b_term.squeeze(-1)/theta).unsqueeze(-1)
+    vmat = eye_3 + b_term2 * wmat + c_term * torch.bmm(wmat,wmat)
+
+    tvec = torch.bmm(vmat, pvec[:, 3:, None])
+
+    pmat = beye((b, 4), dtype=pvec.dtype, device=pvec.device)
+    pmat[:, :3, :3] = rmat
+    pmat[:, :3, -1] = tvec.squeeze(-1)
+
+    return pmat
+
+
 def lie_SE3_to_se3(
         pmat: Union[np.ndarray, torch.Tensor] = None, 
         tol: float = 10e-12,
@@ -179,6 +226,29 @@ def lie_hatmap(
 
     return wmat
 
+
+def lie_hatmap_batch(
+        wvec: Union[np.ndarray, torch.Tensor] = None,
+) -> Union[np.ndarray, torch.Tensor]:
+    """
+    create hat-map in so(3) from Euler vector in R^3
+
+    :param wvec: Euler vector in R^3
+    :return: hat-map in so(3)
+    """
+
+    if wvec.ndim == 1:
+        wvec = wvec.unsqueeze(0)
+    assert wvec.shape[1] == 3, 'argument must be a 3-vector'
+
+    W_row0 = torch.tensor([0, 0, 0, 0, 0, 1, 0, -1, 0.0], device=wvec.device, dtype=wvec.dtype).view(3, 3)
+    W_row1 = torch.tensor([0, 0, -1, 0, 0, 0, 1, 0, 0.0], device=wvec.device, dtype=wvec.dtype).view(3, 3)
+    W_row2 = torch.tensor([0, 1, 0, -1, 0, 0, 0, 0, 0.0], device=wvec.device, dtype=wvec.dtype).view(3, 3)
+
+    wmat = torch.stack(
+        [torch.matmul(wvec, W_row0.T), torch.matmul(wvec, W_row1.T), torch.matmul(wvec, W_row2.T)], dim=-1)
+
+    return wmat
 
 def is_SO3(
         rmat: Union[np.ndarray, torch.Tensor], 
