@@ -62,7 +62,7 @@ class SepConvGRU(nn.Module):
 class SmallMotionEncoder(nn.Module):
     def __init__(self, args):
         super(SmallMotionEncoder, self).__init__()
-        cor_planes = args.corr_levels * (2*args.corr_radius + 1)**2
+        cor_planes = args['corr_levels'] * (2*args['corr_radius'] + 1)**2
         self.convc1 = nn.Conv2d(cor_planes, 96, 1, padding=0)
         self.convf1 = nn.Conv2d(2, 64, 7, padding=3)
         self.convf2 = nn.Conv2d(64, 32, 3, padding=1)
@@ -79,7 +79,7 @@ class SmallMotionEncoder(nn.Module):
 class BasicMotionEncoder(nn.Module):
     def __init__(self, args):
         super(BasicMotionEncoder, self).__init__()
-        cor_planes = args.corr_levels * (2*args.corr_radius + 1)**2
+        cor_planes = args['corr_levels'] * (2*args['corr_radius'] + 1)**2
         self.convc1 = nn.Conv2d(cor_planes, 256, 1, padding=0)
         self.convc2 = nn.Conv2d(256, 192, 3, padding=1)
         self.convf1 = nn.Conv2d(2, 128, 7, padding=3)

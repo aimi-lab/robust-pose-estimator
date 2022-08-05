@@ -1,0 +1,24 @@
+model:
+  pretrained: ../alley_oop/photometry/raft/pretrained/raft-things.pth
+  iters: 12
+  dropout: 0.0
+  small: False
+
+train:
+  batch_size: 6
+  learning_rate: 2.0e-5
+  weight_decay: 5.0e-5
+  epsilon: 1.0e-8
+  epochs: 100000
+  gamma: 0.8
+  grad_clip: 1.0
+  loss_weights:
+    pose: 1.0
+    2d: 0.1
+    3d: 0.1
+
+  add_noise: False
+
+image_shape:
+  - 512
+  - 640

@@ -8,14 +8,14 @@ from alley_oop.photometry.raft.core.raft import RAFT
 
 
 class PoseN(RAFT):
-    def __init__(self, args):
-        super(PoseN, self).__init__(args)
+    def __init__(self, config):
+        super(PoseN, self).__init__(config)
 
         # replace by 4-channel input conv (RGB + D)
-        self.fnet = RGBDEncoder(output_dim=256, norm_fn='instance', dropout=args.dropout)
-        self.cnet = RGBDEncoder(output_dim=self.hidden_dim + self.context_dim, norm_fn='batch', dropout=args.dropout)
+        self.fnet = RGBDEncoder(output_dim=256, norm_fn='instance', dropout=config['dropout'])
+        self.cnet = RGBDEncoder(output_dim=self.hidden_dim + self.context_dim, norm_fn='batch', dropout=config['dropout'])
 
-        H, W = args.image_shape
+        H, W = config['image_shape']
         self.pose_regressor = nn.Sequential(nn.Linear(in_features=(H*W) // 32,out_features=64),
                                              nn.ReLU(),
                                              nn.Linear(in_features=64, out_features=6))
@@ -28,7 +28,7 @@ class PoseN(RAFT):
         return flow, lie_se3
 
     def init_from_raft(self, raft_ckp):
-        raft = RAFT(self.args)
+        raft = RAFT(self.config)
         raft.load_state_dict(torch.load(raft_ckp))
 
         # replace first conv layer for RGB + D

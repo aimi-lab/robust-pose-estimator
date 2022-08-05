@@ -31,23 +31,24 @@ def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
-def fetch_optimizer(args, model):
+def fetch_optimizer(config, model):
     """ Create the optimizer and learning rate scheduler """
-    optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wdecay, eps=args.epsilon)
+    optimizer = optim.AdamW(model.parameters(), lr=config['learning_rate'], weight_decay=config['weight_decay'], eps=config['epsilon'])
 
-    scheduler = optim.lr_scheduler.OneCycleLR(optimizer, args.lr, args.num_steps+100,
+    scheduler = optim.lr_scheduler.OneCycleLR(optimizer, config['learning_rate'], config['epochs']+100,
         pct_start=0.05, cycle_momentum=False, anneal_strategy='linear')
 
     return optimizer, scheduler
     
 
 class Logger:
-    def __init__(self, model, scheduler):
+    def __init__(self, model, scheduler, config, project_name, log):
         self.model = model
         self.scheduler = scheduler
         self.total_steps = 0
         self.running_loss = {}
-        #wandb.init(project='RAFT_PoseEstimator')
+        if log:
+            wandb.init(project=project_name, config=config)
 
     def _print_training_status(self):
         metrics_data = [self.running_loss[k]/SUM_FREQ for k in sorted(self.running_loss.keys())]
@@ -80,28 +81,28 @@ class Logger:
         wandb.finish()
 
 
-def train(args):
-    loss_weights = {'pose':1.0, '2d':0.1, '3d':0.1}
-    device = torch.device('cpu')
-    model = PoseN(args)
-    ref_model = nn.DataParallel(RAFT(args))
+def train(args, config):
+    loss_weights = config['train']['loss_weights']
+    config['model']['image_shape'] = config['image_shape']
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    model = PoseN(config['model'])
+    model.init_from_raft(config['model']['pretrained'])
+    #ref_model = nn.DataParallel(RAFT(config['model']))
     print("Parameter Count: %d" % count_parameters(model))
 
     if args.restore_ckpt is not None:
-        ref_model.load_state_dict(torch.load(args.restore_ckpt), strict=False)
-        model.init_from_raft(args.restore_ckpt)
+        model.load_state_dict(torch.load(args.restore_ckpt), strict=False)
 
-    #model =nn.DataParallel(model).to(device)
+    model =nn.DataParallel(model).to(device)
     model.train()
-    #model.module.freeze_bn()
-    model.freeze_bn()
-    dataset, intrinsics = datasets.get_data(args.datapath, args.image_shape)
-    train_loader = DataLoader(dataset, num_workers=1, pin_memory=True, batch_size=2)
-    optimizer, scheduler = fetch_optimizer(args, model)
+    model.module.freeze_bn()
+    dataset, intrinsics = datasets.get_data(args.datapath, config['image_shape'])
+    train_loader = DataLoader(dataset, num_workers=os.cpu_count(), pin_memory=True, batch_size=config['train']['batch_size'])
+    optimizer, scheduler = fetch_optimizer(config['train'], model)
 
     total_steps = 0
-    scaler = GradScaler(enabled=args.mixed_precision)
-    logger = Logger(model, scheduler)
+    scaler = GradScaler()
+    logger = Logger(model, scheduler, config, args.name, args.log)
 
     VAL_FREQ = 5000
 
@@ -112,12 +113,12 @@ def train(args):
             optimizer.zero_grad()
             ref_img, trg_img, ref_depth, trg_depth, valid, pose = [x.to(device)for x in data_blob]
 
-            if args.add_noise:
+            if config['train']['add_noise']:
                 stdv = np.random.uniform(0.0, 5.0)
                 ref_img = (ref_img + stdv * torch.randn(*ref_img.shape).to(device)).clamp(0.0, 255.0)
                 trg_img = (trg_img + stdv * torch.randn(*trg_img.shape).to(device)).clamp(0.0, 255.0)
 
-            flow_predictions, pose_predictions = model(ref_img, trg_img, iters=args.iters)
+            flow_predictions, pose_predictions = model(ref_img, trg_img, iters=config['model']['iters'])
 
             loss2d = seq_loss(geometric_2d_loss, (flow_predictions, pose_predictions, intrinsics, trg_depth, valid,))
             loss3d = seq_loss(geometric_3d_loss, (flow_predictions, pose_predictions, intrinsics, trg_depth, ref_depth, valid,))
@@ -125,7 +126,7 @@ def train(args):
             loss = loss_weights['pose']*loss_pose+loss_weights['2d']*loss2d+loss_weights['3d']*loss3d
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)                
-            torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), config['train']['grad_clip'])
             metrics = {"loss2d": loss2d.detach().mean().cpu().item(),
                       "loss3d": loss3d.detach().mean().cpu().item(),
                       "loss_pose": loss_pose.detach().mean().cpu().item(),
@@ -145,12 +146,10 @@ def train(args):
                 logger.write_dict(results)
                 
                 model.train()
-                if args.stage != 'chairs':
-                    model.module.freeze_bn()
             
             total_steps += 1
 
-            if total_steps > args.num_steps:
+            if total_steps > config['train']['epochs']:
                 should_keep_training = False
                 break
 
@@ -163,31 +162,19 @@ def train(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--name', default='raft', help="name your experiment")
-    parser.add_argument('--stage', help="determines which dataset to use for training") 
+    import yaml
+    parser.add_argument('--name', default='RAFT-poseEstimator', help="name your experiment")
+    parser.add_argument('--log', action="store_true")
     parser.add_argument('--restore_ckpt', help="restore checkpoint")
-    parser.add_argument('--small', action='store_true', help='use small model')
-    parser.add_argument('--validation', type=str, nargs='+')
-    parser.add_argument('--datapath', type=str, default='/home/mhayoz/research/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_phantom/part0007')
-    parser.add_argument('--lr', type=float, default=0.00002)
-    parser.add_argument('--num_steps', type=int, default=100000)
-    parser.add_argument('--batch_size', type=int, default=6)
-    parser.add_argument('--image_shape', type=int, nargs='+', default=[512, 640])
-    parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
+    parser.add_argument('--config', help="yaml config file", default='../configuration/train_raft.yaml')
 
-    parser.add_argument('--iters', type=int, default=12)
-    parser.add_argument('--wdecay', type=float, default=.00005)
-    parser.add_argument('--epsilon', type=float, default=1e-8)
-    parser.add_argument('--clip', type=float, default=1.0)
-    parser.add_argument('--dropout', type=float, default=0.0)
-    parser.add_argument('--gamma', type=float, default=0.8, help='exponential weighting')
-    parser.add_argument('--add_noise', action='store_true')
+    parser.add_argument('--datapath', type=str, default='/home/mhayoz/research/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_phantom/part0007')
     args = parser.parse_args()
 
     torch.manual_seed(1234)
     np.random.seed(1234)
-
+    with open(args.config, 'r') as ymlfile:
+        config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
     if not os.path.isdir('checkpoints'):
         os.mkdir('checkpoints')
-
-    train(args)
+    train(args, config)

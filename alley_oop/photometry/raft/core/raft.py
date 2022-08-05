@@ -22,38 +22,32 @@ except:
 
 
 class RAFT(nn.Module):
-    def __init__(self, args):
+    def __init__(self, config):
         super(RAFT, self).__init__()
-        self.args = args
+        self.config = config
 
-        if args.small:
+        if config['small']:
             self.hidden_dim = hdim = 96
             self.context_dim = cdim = 64
-            args.corr_levels = 4
-            args.corr_radius = 3
+            config['corr_levels'] = 4
+            config['corr_radius'] = 3
         
         else:
             self.hidden_dim = hdim = 128
             self.context_dim = cdim = 128
-            args.corr_levels = 4
-            args.corr_radius = 4
-
-        if 'dropout' not in self.args:
-            self.args.dropout = 0
-
-        if 'alternate_corr' not in self.args:
-            self.args.alternate_corr = False
+            config['corr_levels'] = 4
+            config['corr_radius'] = 4
 
         # feature network, context network, and update block
-        if args.small:
-            self.fnet = SmallEncoder(output_dim=128, norm_fn='instance', dropout=args.dropout)        
-            self.cnet = SmallEncoder(output_dim=hdim+cdim, norm_fn='none', dropout=args.dropout)
-            self.update_block = SmallUpdateBlock(self.args, hidden_dim=hdim)
+        if config['small']:
+            self.fnet = SmallEncoder(output_dim=128, norm_fn='instance', dropout=config['dropout'])
+            self.cnet = SmallEncoder(output_dim=hdim+cdim, norm_fn='none', dropout=config['dropout'])
+            self.update_block = SmallUpdateBlock(config, hidden_dim=hdim)
 
         else:
-            self.fnet = BasicEncoder(output_dim=256, norm_fn='instance', dropout=args.dropout)        
-            self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_fn='batch', dropout=args.dropout)
-            self.update_block = BasicUpdateBlock(self.args, hidden_dim=hdim)
+            self.fnet = BasicEncoder(output_dim=256, norm_fn='instance', dropout=config['dropout'])
+            self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_fn='batch', dropout=config['dropout'])
+            self.update_block = BasicUpdateBlock(config, hidden_dim=hdim)
 
     def freeze_bn(self):
         for m in self.modules():
@@ -82,7 +76,6 @@ class RAFT(nn.Module):
         up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)
         return up_flow.reshape(N, 2, 8*H, 8*W)
 
-
     def forward(self, image1, image2, iters=12, flow_init=None, test_mode=False, upsample=False):
         """ Estimate optical flow between pair of frames """
 
@@ -96,18 +89,15 @@ class RAFT(nn.Module):
         cdim = self.context_dim
 
         # run the feature network
-        with autocast(enabled=self.args.mixed_precision):
+        with autocast():
             fmap1, fmap2 = self.fnet([image1, image2])        
         
         fmap1 = fmap1.float()
         fmap2 = fmap2.float()
-        if self.args.alternate_corr:
-            corr_fn = AlternateCorrBlock(fmap1, fmap2, radius=self.args.corr_radius)
-        else:
-            corr_fn = CorrBlock(fmap1, fmap2, radius=self.args.corr_radius)
+        corr_fn = CorrBlock(fmap1, fmap2, radius=self.config['corr_radius'])
 
         # run the context network
-        with autocast(enabled=self.args.mixed_precision):
+        with autocast():
             cnet = self.cnet(image1)
             net, inp = torch.split(cnet, [hdim, cdim], dim=1)
             net = torch.tanh(net)
@@ -124,7 +114,7 @@ class RAFT(nn.Module):
             corr = corr_fn(coords1) # index correlation volume
 
             flow = coords1 - coords0
-            with autocast(enabled=self.args.mixed_precision):
+            with autocast():
                 net, up_mask, delta_flow = self.update_block(net, inp, corr, flow)
 
             # F(t+1) = F(t) + \Delta(t)
