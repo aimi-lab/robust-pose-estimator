@@ -105,7 +105,7 @@ def geometric_3d_loss(flow_preds, se3_preds, intrinsics, trg_depth, src_depth, v
     ref_opts = _reproject(src_depth, intrinsics, img_coordinates)
 
     # get optical flow correspondences
-    offset = torch.arange(h*w).reshape(1,1,h,w)
+    offset = torch.arange(h*w).reshape(1,1,h,w).to(flow_preds.device)
     flow_off = (flow_preds[:,1]*w).unsqueeze(1)
     flow_unravel = (offset+flow_off + flow_preds[:,0].unsqueeze(1)).view(n,1,-1).round().long().repeat(1,4,1)
     flow_unravel = flow_unravel.clamp(0,h*w-1)
