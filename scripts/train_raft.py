@@ -81,12 +81,15 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger):
     model.eval()
     with torch.no_grad():
         for i_batch, data_blob in enumerate(dataloader):
-            ref_img, trg_img, ref_depth, trg_depth, valid, pose = [x.to(device) for x in data_blob]
-            flow_predictions, pose_predictions = model(ref_img, trg_img, iters=config['model']['iters'])
+            ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, pose = [x.to(device) for x in data_blob]
+            flow_predictions, pose_predictions = model(ref_img, trg_img, ref_depth, trg_depth,
+                                                       iters=config['model']['iters'])
 
-            loss2d = seq_loss(geometric_2d_loss, (flow_predictions, pose_predictions, intrinsics, trg_depth, valid,))
+            loss2d = seq_loss(geometric_2d_loss,
+                              (flow_predictions, pose_predictions, intrinsics, trg_depth, trg_conf, valid,))
             loss3d = seq_loss(geometric_3d_loss,
-                              (flow_predictions, pose_predictions, intrinsics, trg_depth, ref_depth, valid,))
+                              (flow_predictions, pose_predictions, intrinsics, trg_depth, ref_depth, trg_conf, ref_conf,
+                               valid,))
             loss_pose = seq_loss(supervised_pose_loss, (pose_predictions, pose))
             loss = loss_weights['pose'] * loss_pose + loss_weights['2d'] * loss2d + loss_weights['3d'] * loss3d
 
@@ -135,7 +138,7 @@ def main(args, config):
 
         for i_batch, data_blob in enumerate(train_loader):
             optimizer.zero_grad()
-            ref_img, trg_img, ref_depth, trg_depth, valid, pose = [x.to(device)for x in data_blob]
+            ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, pose = [x.to(device)for x in data_blob]
 
             if config['train']['add_noise']:
                 stdv = np.random.uniform(0.0, 5.0)
@@ -145,8 +148,10 @@ def main(args, config):
             flow_predictions, pose_predictions = model(ref_img, trg_img, ref_depth, trg_depth,
                                                        iters=config['model']['iters'])
 
-            loss2d = seq_loss(geometric_2d_loss, (flow_predictions, pose_predictions, intrinsics, trg_depth, valid,))
-            loss3d = seq_loss(geometric_3d_loss, (flow_predictions, pose_predictions, intrinsics, trg_depth, ref_depth, valid,))
+            loss2d = seq_loss(geometric_2d_loss,
+                              (flow_predictions, pose_predictions, intrinsics, trg_depth, trg_conf, valid,))
+            loss3d = seq_loss(geometric_3d_loss,
+                              (flow_predictions, pose_predictions, intrinsics, trg_depth, ref_depth,trg_conf, ref_conf, valid,))
             loss_pose = seq_loss(supervised_pose_loss, (pose_predictions, pose))
             loss = loss_weights['pose']*loss_pose+loss_weights['2d']*loss2d+loss_weights['3d']*loss3d
             scaler.scale(loss).backward()

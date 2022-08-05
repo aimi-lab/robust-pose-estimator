@@ -32,7 +32,7 @@ def get_data(input_path: str, sequences: str, img_size: Tuple):
 
     rect = StereoRectifier(calib_file, img_size_new=(img_size[1], img_size[0]), mode='conventional')
     calib = rect.get_rectified_calib()
-    dataset = MultiSeqPoseDataset(root=input_path, seqs=sequences, baseline=calib['bf_orig'], depth_scale=250, conf_thr=0.3, step=1, img_size=img_size)
+    dataset = MultiSeqPoseDataset(root=input_path, seqs=sequences, baseline=calib['bf_orig'], depth_scale=250, conf_thr=0.0, step=1, img_size=img_size)
 
     intrinsics_lowres = torch.tensor(calib['intrinsics']['left']).float()
     intrinsics_lowres[:2,:3] /= 8
@@ -51,7 +51,7 @@ class PoseDataset(Dataset):
         assert len(images) == len(depth_noise)
         self.baseline = baseline
         self.depth_scale = depth_scale
-        self.noise_thr = 5e-3/(torch.special.erfinv(torch.tensor(conf_thr))+1e-8)*self.depth_scale
+        self.conf_thr = conf_thr
         self.image_list = []
         self.disp_list = []
         self.rel_pose_list = []
@@ -79,8 +79,10 @@ class PoseDataset(Dataset):
 
         # generate mask
         # depth confidence threshold
-        valid = self._read_disp(self.depth_noise_list[index][0]) < self.noise_thr
-        valid &= self._read_disp(self.depth_noise_list[index][0]) < self.noise_thr
+        depth_conf1 = torch.special.erf(5e-3/torch.sqrt(self._read_disp(self.depth_noise_list[index][0])))
+        depth_conf2 = torch.special.erf(5e-3/torch.sqrt(self._read_disp(self.depth_noise_list[index][1])))
+        valid = depth_conf1 > self.conf_thr
+        valid &= depth_conf2 > self.conf_thr
         # depth threshold
         valid &= depth1 < 255.0
         valid &= depth2 < 255.0
@@ -88,7 +90,8 @@ class PoseDataset(Dataset):
         valid &= depth2 > 1e-3
         # ToDo add tool mask!
 
-        return img1, img2, self.resize_lowres(depth1), self.resize_lowres(depth2), self.resize_lowres_msk(valid), pose_se3.float()
+        return img1, img2, self.resize_lowres(depth1), self.resize_lowres(depth2), self.resize_lowres(depth_conf1), \
+               self.resize_lowres(depth_conf2), self.resize_lowres_msk(valid), pose_se3.float()
 
     def _read_img(self, path):
         img = torch.from_numpy(cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)).permute(2, 0, 1).float()

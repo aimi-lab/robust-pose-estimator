@@ -1,9 +1,6 @@
 import torch
-
 from alley_oop.geometry.lie_3d import lie_se3_to_SE3_batch
-from alley_oop.fusion.surfel_map import SurfelMap, FrameClass
-from alley_oop.geometry.pinhole_transforms import forward_project, create_img_coords_t, reverse_project
-from alley_oop.utils.pytorch import beye_like
+from alley_oop.geometry.pinhole_transforms import create_img_coords_t
 
 
 def _warp_frame(depth: torch.Tensor, T: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.Tensor):
@@ -80,7 +77,7 @@ def seq_loss(loss_func, args, gamma=0.8):
     return loss
 
 
-def geometric_2d_loss(flow_preds, se3_preds, intrinsics, trg_depth, valid):
+def geometric_2d_loss(flow_preds, se3_preds, intrinsics, trg_depth, trg_confidence, valid):
     n = flow_preds.shape[0]
     img_coordinates = create_img_coords_t(y=trg_depth.shape[-2], x=trg_depth.shape[-1]).to(flow_preds.device)
     T_est = lie_se3_to_SE3_batch(-se3_preds)  # invert transform to be consistent with other pose estimators
@@ -88,14 +85,13 @@ def geometric_2d_loss(flow_preds, se3_preds, intrinsics, trg_depth, valid):
     residuals = torch.linalg.norm(img_coordinates[None,:2] + flow_preds.view(n,2, -1) - warped_pts, ord=2, dim=1)
     mask = torch.isnan(flow_preds[:, 0]).view(n, -1) | torch.isnan(flow_preds[:, 1]).view(n,-1) | ~valid.view(n, -1)
     # weight residuals by confidences
-    # if self.conf_weighing:
-    #     residuals = torch.sqrt(trg_frame.confidence.view(-1)) * residuals
+    residuals = torch.sqrt(trg_confidence.view(n, -1)) * residuals
     residuals[mask] = 0.0
     loss = torch.mean(residuals)
     return loss
 
 
-def geometric_3d_loss(flow_preds, se3_preds, intrinsics, trg_depth, src_depth, valid):
+def geometric_3d_loss(flow_preds, se3_preds, intrinsics, trg_depth, src_depth, trg_confidence, src_confidence, valid):
     n,_,h,w = flow_preds.shape
     # reproject to 3D
     T_est = lie_se3_to_SE3_batch(-se3_preds)   #
@@ -114,8 +110,7 @@ def geometric_3d_loss(flow_preds, se3_preds, intrinsics, trg_depth, src_depth, v
     residuals = torch.linalg.norm(torch.gather(trg_opts, 2,flow_unravel)-ref_opts, ord=2, dim=1)
     mask = torch.isnan(flow_preds[:, 0]).view(n, -1) | torch.isnan(flow_preds[:, 1]).view(n, -1) | ~valid.view(n, -1)
     # weight residuals by confidences
-    # if self.conf_weighing:
-    #     residuals = torch.sqrt(trg_frame.confidence.view(-1)) * residuals
+    residuals = torch.sqrt(trg_confidence.view(n, -1)*torch.gather(src_confidence.view(n, -1), 1,flow_unravel[:,0])) * residuals
     residuals[mask] = 0.0
     loss = torch.mean(residuals)
     return loss
