@@ -90,7 +90,7 @@ def train(args, config):
     model.train()
     model.module.freeze_bn()
     dataset, intrinsics = datasets.get_data(args.datapath, config['image_shape'])
-    train_loader = DataLoader(dataset, num_workers=os.cpu_count(), pin_memory=True, batch_size=config['train']['batch_size'])
+    train_loader = DataLoader(dataset, num_workers=4, pin_memory=True, batch_size=config['train']['batch_size'])
     optimizer, scheduler = fetch_optimizer(config['train'], model)
 
     total_steps = 0
