@@ -141,7 +141,8 @@ def main(args, config):
                 ref_img = (ref_img + stdv * torch.randn(*ref_img.shape).to(device)).clamp(0.0, 255.0)
                 trg_img = (trg_img + stdv * torch.randn(*trg_img.shape).to(device)).clamp(0.0, 255.0)
 
-            flow_predictions, pose_predictions = model(ref_img, trg_img, iters=config['model']['iters'])
+            flow_predictions, pose_predictions = model(ref_img, trg_img, ref_depth, trg_depth,
+                                                       iters=config['model']['iters'])
 
             loss2d = seq_loss(geometric_2d_loss, (flow_predictions, pose_predictions, intrinsics, trg_depth, valid,))
             loss3d = seq_loss(geometric_3d_loss, (flow_predictions, pose_predictions, intrinsics, trg_depth, ref_depth, valid,))

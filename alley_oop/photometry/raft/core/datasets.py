@@ -74,8 +74,8 @@ class PoseDataset(Dataset):
         pose = torch.from_numpy(self.rel_pose_list[index])
         pose[:3,3] /= self.depth_scale
         pose_se3 = lie_SE3_to_se3(pose)
-        depth1 = self.baseline / disp1/self.depth_scale*255.0
-        depth2 = self.baseline / disp2/self.depth_scale*255.0
+        depth1 = self.baseline / disp1/self.depth_scale
+        depth2 = self.baseline / disp2/self.depth_scale
 
         # generate mask
         # depth confidence threshold
@@ -87,10 +87,6 @@ class PoseDataset(Dataset):
         valid &= depth1 > 1e-3
         valid &= depth2 > 1e-3
         # ToDo add tool mask!
-
-        # stack rgbd
-        img1 = torch.cat((img1, depth1), dim=0)
-        img2 = torch.cat((img2, depth2), dim=0)
 
         return img1, img2, self.resize_lowres(depth1), self.resize_lowres(depth2), self.resize_lowres_msk(valid), pose_se3.float()
 
