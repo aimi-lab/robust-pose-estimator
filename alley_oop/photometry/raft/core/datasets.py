@@ -18,15 +18,15 @@ def get_data(input_path: str, sequences: str, img_size: Tuple):
 
     # check the format of the calibration file
     img_size = tuple(img_size)
-    calib_file = None
-    if os.path.isfile(os.path.join(input_path, 'camcal.json')):
-        calib_file = os.path.join(input_path, 'camcal.json')
-    elif os.path.isfile(os.path.join(input_path, 'camera_calibration.json')):
-        calib_file = os.path.join(input_path, 'camera_calibration.json')
-    elif os.path.isfile(os.path.join(input_path, 'StereoCalibration.ini')):
-        calib_file = os.path.join(input_path, 'StereoCalibration.ini')
-    elif os.path.isfile(os.path.join(input_path, 'endoscope_calibration.yaml')):
-        calib_file = os.path.join(input_path, 'endoscope_calibration.yaml')
+    calib_path = os.path.join(input_path,sequences[0],'keyframe_1')
+    if os.path.isfile(os.path.join(calib_path, 'camcal.json')):
+        calib_file = os.path.join(calib_path, 'camcal.json')
+    elif os.path.isfile(os.path.join(calib_path, 'camera_calibration.json')):
+        calib_file = os.path.join(calib_path, 'camera_calibration.json')
+    elif os.path.isfile(os.path.join(calib_path, 'StereoCalibration.ini')):
+        calib_file = os.path.join(calib_path, 'StereoCalibration.ini')
+    elif os.path.isfile(os.path.join(calib_path, 'endoscope_calibration.yaml')):
+        calib_file = os.path.join(calib_path, 'endoscope_calibration.yaml')
     else:
         raise RuntimeError('no calibration file found')
 
@@ -108,18 +108,19 @@ class PoseDataset(Dataset):
 
 class MultiSeqPoseDataset(PoseDataset):
     def __init__(self, root, seqs, baseline, depth_scale=1.0, conf_thr=0.0, step=1, img_size=(512, 640)):
-        datasets = [glob(os.path.join(root, s, 'keyframes_*')) for s in seqs]
+        datasets = [glob(os.path.join(root, s, 'keyframe_*')) for s in seqs]
         datasets = [item for sublist in datasets for item in sublist]
         image_list1 = []
         disp_list1 = []
         rel_pose_list1 = []
         depth_noise_list1 = []
         for d in datasets:
-            super(PoseDataset, self).__init__(d, baseline, depth_scale, conf_thr, step, img_size)
-            image_list1 += self.image_list
-            disp_list1 += self.disp_list
-            rel_pose_list1 += self.rel_pose_list
-            depth_noise_list1 += self.depth_noise_list
+            if os.path.isfile(os.path.join(d, 'groundtruth.txt')):
+                super().__init__(d, baseline, depth_scale, conf_thr, step, img_size)
+                image_list1 += self.image_list
+                disp_list1 += self.disp_list
+                rel_pose_list1 += self.rel_pose_list
+                depth_noise_list1 += self.depth_noise_list
         self.image_list = image_list1
         self.disp_list = disp_list1
         self.rel_pose_list = rel_pose_list1
