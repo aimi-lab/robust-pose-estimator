@@ -14,7 +14,7 @@ from torch.utils.data import Dataset
 from dataset.rectification import StereoRectifier
 
 
-def get_data(input_path: str, img_size: Tuple):
+def get_data(input_path: str, sequences: str, img_size: Tuple):
 
     # check the format of the calibration file
     img_size = tuple(img_size)
@@ -32,7 +32,7 @@ def get_data(input_path: str, img_size: Tuple):
 
     rect = StereoRectifier(calib_file, img_size_new=(img_size[1], img_size[0]), mode='conventional')
     calib = rect.get_rectified_calib()
-    dataset = PoseDataset(root=input_path, baseline=calib['bf_orig'], depth_scale=250, conf_thr=0.3, step=1, img_size=img_size)
+    dataset = MultiSeqPoseDataset(root=input_path, seqs=sequences, baseline=calib['bf_orig'], depth_scale=250, conf_thr=0.3, step=1, img_size=img_size)
 
     intrinsics_lowres = torch.tensor(calib['intrinsics']['left']).float()
     intrinsics_lowres[:2,:3] /= 8
@@ -105,3 +105,22 @@ class PoseDataset(Dataset):
     def __len__(self):
         return len(self.image_list)
 
+
+class MultiSeqPoseDataset(PoseDataset):
+    def __init__(self, root, seqs, baseline, depth_scale=1.0, conf_thr=0.0, step=1, img_size=(512, 640)):
+        datasets = [glob(os.path.join(root, s, 'keyframes_*')) for s in seqs]
+        datasets = [item for sublist in datasets for item in sublist]
+        image_list1 = []
+        disp_list1 = []
+        rel_pose_list1 = []
+        depth_noise_list1 = []
+        for d in datasets:
+            super(PoseDataset, self).__init__(d, baseline, depth_scale, conf_thr, step, img_size)
+            image_list1 += self.image_list
+            disp_list1 += self.disp_list
+            rel_pose_list1 += self.rel_pose_list
+            depth_noise_list1 += self.depth_noise_list
+        self.image_list = image_list1
+        self.disp_list = disp_list1
+        self.rel_pose_list = rel_pose_list1
+        self.depth_noise_list = depth_noise_list1

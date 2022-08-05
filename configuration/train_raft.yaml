@@ -4,8 +4,23 @@ model:
   dropout: 0.0
   small: False
 
+data:
+  train:
+    basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/01_stereo/01_intuitive_scared
+    sequences:
+      - dataset_1
+      - dataset_2
+      - dataset_3
+      - dataset_6
+  val:
+    basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/01_stereo/01_intuitive_scared
+    sequences:
+      - dataset_7
+      - dataset_8
+      - dataset_9
+
 train:
-  batch_size: 6
+  batch_size: 10
   learning_rate: 2.0e-5
   weight_decay: 5.0e-5
   epsilon: 1.0e-8
@@ -16,8 +31,10 @@ train:
     pose: 1.0
     2d: 0.1
     3d: 0.1
-
   add_noise: False
+
+val:
+  batch_size: 16
 
 image_shape:
   - 512

@@ -45,7 +45,7 @@ class Logger:
             wandb.init(project=project_name, config=config)
 
     def _print_training_status(self):
-        metrics_data = [self.running_loss[k]/SUM_FREQ for k in sorted(self.running_loss.keys())]
+        metrics_data = [self.running_loss[k] for k in sorted(self.running_loss.keys())]
         training_str = "[{:6d}, {:10.7f}] ".format(self.total_steps+1, self.scheduler.get_last_lr()[0])
         metrics_str = ("{:10.4f}, "*len(metrics_data)).format(*metrics_data)
         
@@ -55,53 +55,77 @@ class Logger:
         for k in self.running_loss:
             self.running_loss[k] = 0.0
 
-    def push(self, metrics):
+    def push(self, metrics, freq):
         self.total_steps += 1
 
         for key in metrics:
             if key not in self.running_loss:
                 self.running_loss[key] = 0.0
 
-            self.running_loss[key] += metrics[key]
-
-        if self.total_steps % SUM_FREQ == SUM_FREQ-1:
-            if self.log:
-                self.write_dict(self.running_loss)
-            self._print_training_status()
-            self.running_loss = {}
+            self.running_loss[key] += metrics[key]/freq
 
     def write_dict(self, results):
         wandb.log(results)
+
+    def log(self):
+        if self.log:
+            self.write_dict(self.running_loss)
+        self._print_training_status()
+        self.running_loss = {}
 
     def close(self):
         wandb.finish()
 
 
-def train(args, config):
+def val(model, dataloader, device, loss_weights, intrinsics, logger):
+    model.eval()
+    for i_batch, data_blob in enumerate(dataloader):
+        ref_img, trg_img, ref_depth, trg_depth, valid, pose = [x.to(device) for x in data_blob]
+        flow_predictions, pose_predictions = model(ref_img, trg_img, iters=config['model']['iters'])
+
+        loss2d = seq_loss(geometric_2d_loss, (flow_predictions, pose_predictions, intrinsics, trg_depth, valid,))
+        loss3d = seq_loss(geometric_3d_loss,
+                          (flow_predictions, pose_predictions, intrinsics, trg_depth, ref_depth, valid,))
+        loss_pose = seq_loss(supervised_pose_loss, (pose_predictions, pose))
+        loss = loss_weights['pose'] * loss_pose + loss_weights['2d'] * loss2d + loss_weights['3d'] * loss3d
+
+        metrics = {"val/loss2d": loss2d.detach().mean().cpu().item(),
+                   "val/loss3d": loss3d.detach().mean().cpu().item(),
+                   "val/loss_pose": loss_pose.detach().mean().cpu().item(),
+                   "val/loss_total": loss.detach().mean().cpu().item()}
+        logger.push(metrics, len(dataloader))
+    logger.log()
+    model.train()
+
+
+def main(args, config):
+    # general
     loss_weights = config['train']['loss_weights']
     config['model']['image_shape'] = config['image_shape']
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+
+    # get model
     model = PoseN(config['model'])
     model.init_from_raft(config['model']['pretrained'])
     #ref_model = nn.DataParallel(RAFT(config['model']))
-    print("Parameter Count: %d" % count_parameters(model))
-
     if args.restore_ckpt is not None:
         model.load_state_dict(torch.load(args.restore_ckpt), strict=False)
 
     model =nn.DataParallel(model).to(device)
     model.train()
     model.module.freeze_bn()
-    dataset, intrinsics = datasets.get_data(args.datapath, config['image_shape'])
+
+    # get data
+    data_train, intrinsics = datasets.get_data(config['data']['train']['basepath'],config['data']['train']['sequences'], config['image_shape'])
+    data_val, intrinsics = datasets.get_data(config['data']['val']['basepath'],config['data']['val']['sequences'], config['image_shape'])
     intrinsics = intrinsics.to(device)
-    train_loader = DataLoader(dataset, num_workers=4, pin_memory=True, batch_size=config['train']['batch_size'])
+    train_loader = DataLoader(data_train, num_workers=4, pin_memory=True, batch_size=config['train']['batch_size'], shuffle=True)
+    val_loader = DataLoader(data_val, num_workers=4, pin_memory=True, batch_size=config['val']['batch_size'])
     optimizer, scheduler = fetch_optimizer(config['train'], model)
 
     total_steps = 0
     scaler = GradScaler()
     logger = Logger(model, scheduler, config, args.name, args.log)
-
-    VAL_FREQ = 5000
 
     should_keep_training = True
     while should_keep_training:
@@ -124,26 +148,24 @@ def train(args, config):
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)                
             torch.nn.utils.clip_grad_norm_(model.parameters(), config['train']['grad_clip'])
-            metrics = {"loss2d": loss2d.detach().mean().cpu().item(),
-                      "loss3d": loss3d.detach().mean().cpu().item(),
-                      "loss_pose": loss_pose.detach().mean().cpu().item(),
-                      "loss_total": loss.detach().mean().cpu().item()}
+            metrics = {"train/loss2d": loss2d.detach().mean().cpu().item(),
+                      "train/loss3d": loss3d.detach().mean().cpu().item(),
+                      "train/loss_pose": loss_pose.detach().mean().cpu().item(),
+                      "train/loss_total": loss.detach().mean().cpu().item()}
             
             scaler.step(optimizer)
             scaler.update()
             scheduler.step()
 
-            logger.push(metrics)
+            logger.push(metrics, SUM_FREQ)
+            if total_steps % SUM_FREQ == SUM_FREQ - 1:
+                logger.log()
 
             if total_steps % VAL_FREQ == VAL_FREQ - 1:
+                val(model, val_loader, device, loss_weights, intrinsics)
+
                 PATH = 'checkpoints/%d_%s.pth' % (total_steps+1, args.name)
                 torch.save(model.state_dict(), PATH)
-
-                results = {}
-                logger.write_dict(results)
-                
-                model.train()
-            
             total_steps += 1
 
             if total_steps > config['train']['epochs']:
@@ -174,4 +196,4 @@ if __name__ == '__main__':
         config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
     if not os.path.isdir('checkpoints'):
         os.mkdir('checkpoints')
-    train(args, config)
+    main(args, config)
