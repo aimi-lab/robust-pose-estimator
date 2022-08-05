@@ -43,3 +43,12 @@ class PoseN(RAFT):
             new_state_dict[name] = v
         self.load_state_dict(new_state_dict, strict=False)
         return self
+
+    def freeze_flow(self, freeze=True):
+        for param in self.parameters():
+            param.requires_grad = not freeze
+        for param in self.convs.parameters():
+            param.requires_grad = True
+        for param in self.mlp.parameters():
+            param.requires_grad = True
+        return self

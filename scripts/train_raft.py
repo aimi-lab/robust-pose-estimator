@@ -115,6 +115,7 @@ def main(args, config):
     model =nn.DataParallel(model).to(device)
     model.train()
     model.module.freeze_bn()
+    model.module.freeze_flow()
 
     # get data
     data_train, intrinsics = datasets.get_data(config['data']['train']['basepath'],config['data']['train']['sequences'], config['image_shape'])
