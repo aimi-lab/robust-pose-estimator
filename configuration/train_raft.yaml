@@ -29,8 +29,8 @@ train:
   grad_clip: 1.0
   loss_weights:
     pose: 1.0
-    2d: 0.1
-    3d: 0.1
+    2d: 0.001
+    3d: 1.0
   add_noise: False
 
 val:
