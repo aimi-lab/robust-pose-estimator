@@ -14,21 +14,21 @@ class PoseN(RAFT):
 
         H, W = config['image_shape']
         self.convs = nn.Sequential(
-            nn.Conv2d(in_channels=4, out_channels=32, kernel_size=(3, 3), padding='same'),
+            nn.Conv2d(in_channels=6, out_channels=32, kernel_size=(3, 3), padding='same'),
             nn.Conv2d(in_channels=32, out_channels=1, kernel_size=(3, 3), padding='same'))
         self.mlp = nn.Sequential(nn.Linear(in_features=(H*W) // 64,out_features=64),
                                     nn.ReLU(),
                                     nn.Linear(in_features=64, out_features=6))
 
-    def forward(self, image1, image2, depth1, depth2, iters=12, flow_init=None, test_mode=False):
+    def forward(self, image1, image2, depth1, depth2, conf1, conf2, iters=12, flow_init=None, test_mode=False):
         """ Estimate optical flow and pose between pair of frames """
         flow = super().forward(image1, image2, iters, flow_init, test_mode)
         # stack the flows + depth
-        lie_se3 = [self.regress_pose(f, depth1, depth2) for f in flow]
+        lie_se3 = [self.regress_pose(f, depth1, depth2, conf1, conf2) for f in flow]
         return flow, lie_se3
 
-    def regress_pose(self, flow, depth1, depth2):
-        x = torch.cat((flow, depth1, depth2), dim=1)
+    def regress_pose(self, *args):
+        x = torch.cat(args, dim=1)
         x = self.convs(x).view(x.shape[0], -1)
         return self.mlp(x)
 

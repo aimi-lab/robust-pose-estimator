@@ -82,7 +82,7 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger):
     with torch.no_grad():
         for i_batch, data_blob in enumerate(dataloader):
             ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, pose = [x.to(device) for x in data_blob]
-            flow_predictions, pose_predictions = model(ref_img, trg_img, ref_depth, trg_depth,
+            flow_predictions, pose_predictions = model(ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf,
                                                        iters=config['model']['iters'])
 
             loss2d = seq_loss(geometric_2d_loss,
@@ -145,7 +145,7 @@ def main(args, config):
                 ref_img = (ref_img + stdv * torch.randn(*ref_img.shape).to(device)).clamp(0.0, 255.0)
                 trg_img = (trg_img + stdv * torch.randn(*trg_img.shape).to(device)).clamp(0.0, 255.0)
 
-            flow_predictions, pose_predictions = model(ref_img, trg_img, ref_depth, trg_depth,
+            flow_predictions, pose_predictions = model(ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf,
                                                        iters=config['model']['iters'])
 
             loss2d = seq_loss(geometric_2d_loss,
