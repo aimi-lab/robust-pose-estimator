@@ -1,6 +1,6 @@
 import torch
 from alley_oop.fusion.surfel_map import SurfelMap
-from alley_oop.pose.attention_pose_estimator import AttentionPoseEstimator
+from alley_oop.pose.raft_pose_estimator import RAFTPoseEstimator
 from alley_oop.pose.frame_class import FrameClass
 from typing import Union, Tuple
 from torch import tensor
@@ -20,7 +20,7 @@ class SLAM(object):
         self.device = intrinsics.device
         self.dtype = torch.float32
         self.intrinsics = intrinsics.to(self.dtype)
-        self.pose_estimator = AttentionPoseEstimator(self.intrinsics, config)
+        self.pose_estimator = RAFTPoseEstimator(self.intrinsics, config['checkpoint'], config['frame2frame'])
         self.cnt = 0
         self.rendered_frame = None
         self.frame = None
