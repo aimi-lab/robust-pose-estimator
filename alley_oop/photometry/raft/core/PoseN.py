@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from collections import OrderedDict
 
 from alley_oop.photometry.raft.core.extractor import RGBDEncoder
 from alley_oop.photometry.raft.core.raft import RAFT
@@ -29,18 +30,23 @@ class PoseN(RAFT):
 
     def init_from_raft(self, raft_ckp):
         raft = RAFT(self.config)
-        raft.load_state_dict(torch.load(raft_ckp))
+        new_state_dict = OrderedDict()
+        state_dict = torch.load(raft_ckp, map_location='cpu')
+        for k, v in state_dict.items():
+            name = k.replace('module.','')  # remove `module.`
+            new_state_dict[name] = v
+        raft.load_state_dict(new_state_dict)
 
         # replace first conv layer for RGB + D
-        tmp_conv_weights = raft.fnet.conv0.weight.data.clone()
+        tmp_conv_weights = raft.fnet.conv1.weight.data.clone()
         # copy RGB weights
-        self.fnet.conv0.weight.data[:, :3, :, :] = tmp_conv_weights.clone()
+        self.fnet.conv1.weight.data[:, :3, :, :] = tmp_conv_weights.clone()
         # compute average weights over RGB channels and use that to initialize the depth channel
         # technique from Temporal Segment Network, L. Wang 2016
         mean_weights = torch.mean(tmp_conv_weights[:, :3, :, :], dim=1, keepdim=True)
-        self.cnet.conv0.weight.data[:, 3:4, :, :] = mean_weights
-        tmp_conv_weights = raft.cnet.conv0.weight.data.clone()
-        self.cnet.conv0.weight.data[:, :3, :, :] = tmp_conv_weights.clone()
+        self.cnet.conv1.weight.data[:, 3:4, :, :] = mean_weights
+        tmp_conv_weights = raft.cnet.conv1.weight.data.clone()
+        self.cnet.conv1.weight.data[:, :3, :, :] = tmp_conv_weights.clone()
         mean_weights = torch.mean(tmp_conv_weights[:, :3, :, :], dim=1, keepdim=True)
-        self.cnet.conv0.weight.data[:, 3:4, :, :] = mean_weights
+        self.cnet.conv1.weight.data[:, 3:4, :, :] = mean_weights
         return self
