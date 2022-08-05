@@ -79,8 +79,8 @@ class PoseDataset(Dataset):
 
         # generate mask
         # depth confidence threshold
-        depth_conf1 = torch.special.erf(5e-3/torch.sqrt(self._read_disp(self.depth_noise_list[index][0])))
-        depth_conf2 = torch.special.erf(5e-3/torch.sqrt(self._read_disp(self.depth_noise_list[index][1])))
+        depth_conf1 = torch.special.erf(5e-3*self.depth_scale/torch.sqrt(self._read_disp(self.depth_noise_list[index][0])))
+        depth_conf2 = torch.special.erf(5e-3*self.depth_scale/torch.sqrt(self._read_disp(self.depth_noise_list[index][1])))
         valid = depth_conf1 > self.conf_thr
         valid &= depth_conf2 > self.conf_thr
         # depth threshold
