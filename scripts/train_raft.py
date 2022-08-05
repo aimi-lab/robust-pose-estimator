@@ -17,7 +17,7 @@ from torch.cuda.amp import GradScaler
 
 # exclude extremly large displacements
 SUM_FREQ = 100
-VAL_FREQ = 5000
+VAL_FREQ = 1000
 
 
 def count_parameters(model):
