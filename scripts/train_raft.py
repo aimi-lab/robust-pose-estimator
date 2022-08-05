@@ -67,7 +67,7 @@ class Logger:
     def write_dict(self, results):
         wandb.log(results)
 
-    def log(self):
+    def flush(self):
         if self.log:
             self.write_dict(self.running_loss)
         self._print_training_status()
@@ -79,22 +79,23 @@ class Logger:
 
 def val(model, dataloader, device, loss_weights, intrinsics, logger):
     model.eval()
-    for i_batch, data_blob in enumerate(dataloader):
-        ref_img, trg_img, ref_depth, trg_depth, valid, pose = [x.to(device) for x in data_blob]
-        flow_predictions, pose_predictions = model(ref_img, trg_img, iters=config['model']['iters'])
+    with torch.no_grad():
+        for i_batch, data_blob in enumerate(dataloader):
+            ref_img, trg_img, ref_depth, trg_depth, valid, pose = [x.to(device) for x in data_blob]
+            flow_predictions, pose_predictions = model(ref_img, trg_img, iters=config['model']['iters'])
 
-        loss2d = seq_loss(geometric_2d_loss, (flow_predictions, pose_predictions, intrinsics, trg_depth, valid,))
-        loss3d = seq_loss(geometric_3d_loss,
-                          (flow_predictions, pose_predictions, intrinsics, trg_depth, ref_depth, valid,))
-        loss_pose = seq_loss(supervised_pose_loss, (pose_predictions, pose))
-        loss = loss_weights['pose'] * loss_pose + loss_weights['2d'] * loss2d + loss_weights['3d'] * loss3d
+            loss2d = seq_loss(geometric_2d_loss, (flow_predictions, pose_predictions, intrinsics, trg_depth, valid,))
+            loss3d = seq_loss(geometric_3d_loss,
+                              (flow_predictions, pose_predictions, intrinsics, trg_depth, ref_depth, valid,))
+            loss_pose = seq_loss(supervised_pose_loss, (pose_predictions, pose))
+            loss = loss_weights['pose'] * loss_pose + loss_weights['2d'] * loss2d + loss_weights['3d'] * loss3d
 
-        metrics = {"val/loss2d": loss2d.detach().mean().cpu().item(),
-                   "val/loss3d": loss3d.detach().mean().cpu().item(),
-                   "val/loss_pose": loss_pose.detach().mean().cpu().item(),
-                   "val/loss_total": loss.detach().mean().cpu().item()}
-        logger.push(metrics, len(dataloader))
-    logger.log()
+            metrics = {"val/loss2d": loss2d.detach().mean().cpu().item(),
+                       "val/loss3d": loss3d.detach().mean().cpu().item(),
+                       "val/loss_pose": loss_pose.detach().mean().cpu().item(),
+                       "val/loss_total": loss.detach().mean().cpu().item()}
+            logger.push(metrics, len(dataloader))
+        logger.flush()
     model.train()
 
 
@@ -160,10 +161,10 @@ def main(args, config):
 
             logger.push(metrics, SUM_FREQ)
             if total_steps % SUM_FREQ == SUM_FREQ - 1:
-                logger.log()
+                logger.flush()
 
             if total_steps % VAL_FREQ == VAL_FREQ - 1:
-                val(model, val_loader, device, loss_weights, intrinsics)
+                val(model, val_loader, device, loss_weights, intrinsics, logger)
 
                 PATH = 'checkpoints/%d_%s.pth' % (total_steps+1, args.name)
                 torch.save(model.state_dict(), PATH)
