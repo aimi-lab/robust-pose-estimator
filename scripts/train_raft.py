@@ -1,20 +1,13 @@
-from __future__ import print_function, division
 import sys
-sys.path.append('core')
-
+sys.path.append('../')
 import argparse
 import os
-import cv2
-import time
 import numpy as np
-import matplotlib.pyplot as plt
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torch.nn.functional as F
-
 from torch.utils.data import DataLoader
+
 from alley_oop.photometry.raft.core.PoseN import RAFT, PoseN
 import alley_oop.photometry.raft.core.datasets as datasets
 from alley_oop.photometry.raft.losses import geometric_2d_loss, geometric_3d_loss, supervised_pose_loss, seq_loss
