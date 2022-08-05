@@ -40,6 +40,7 @@ class Logger:
         self.scheduler = scheduler
         self.total_steps = 0
         self.running_loss = {}
+        self.log = log
         if log:
             wandb.init(project=project_name, config=config)
 
@@ -64,6 +65,8 @@ class Logger:
             self.running_loss[key] += metrics[key]
 
         if self.total_steps % SUM_FREQ == SUM_FREQ-1:
+            if self.log:
+                self.write_dict(self.running_loss)
             self._print_training_status()
             self.running_loss = {}
 
@@ -127,8 +130,8 @@ def train(args, config):
                       "loss_total": loss.detach().mean().cpu().item()}
             
             scaler.step(optimizer)
-            scheduler.step()
             scaler.update()
+            scheduler.step()
 
             logger.push(metrics)
 
