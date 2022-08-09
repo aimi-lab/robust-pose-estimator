@@ -121,10 +121,11 @@ def main(args, config, force_cpu):
     if args.restore_ckpt is not None:
         model.load_state_dict(torch.load(args.restore_ckpt), strict=False)
 
-    model =nn.DataParallel(model).to(device)
     model.train()
-    model.module.freeze_bn()
-    #model.module.freeze_flow()
+    model = model.to(device)
+    model.freeze_bn()
+    if (device != torch.device('cpu')) & (torch.cuda.device_count() > 1):
+        model =nn.DataParallel(model).to(device)
 
     # get data
     data_train, intrinsics = datasets.get_data(config['data']['train']['basepath'],config['data']['train']['sequences'], config['image_shape'])
