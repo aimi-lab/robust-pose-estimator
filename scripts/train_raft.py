@@ -124,6 +124,7 @@ def main(args, config, force_cpu):
     model.train()
     model = model.to(device)
     model.freeze_bn()
+    model.freeze_flow()
     if (device != torch.device('cpu')) & (torch.cuda.device_count() > 1):
         model =nn.DataParallel(model).to(device)
 
@@ -149,6 +150,8 @@ def main(args, config, force_cpu):
     while should_keep_training:
 
         for i_batch, data_blob in enumerate(train_loader):
+            if i_batch == config['train']['freeze_flow_steps']:
+                model.module.freeze_flow(False)
             optimizer.zero_grad()
             ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, pose = [x.to(device)for x in data_blob]
             if config['train']['add_noise']:
