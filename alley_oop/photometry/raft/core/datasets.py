@@ -14,7 +14,7 @@ from torch.utils.data import Dataset
 from dataset.rectification import StereoRectifier
 
 
-def get_data(input_path: str, sequences: str, img_size: Tuple):
+def get_data(input_path: str, sequences: str, img_size: Tuple, depth_scale: float=250.0):
 
     # check the format of the calibration file
     img_size = tuple(img_size)
@@ -32,7 +32,7 @@ def get_data(input_path: str, sequences: str, img_size: Tuple):
 
     rect = StereoRectifier(calib_file, img_size_new=(img_size[1], img_size[0]), mode='conventional')
     calib = rect.get_rectified_calib()
-    dataset = MultiSeqPoseDataset(root=input_path, seqs=sequences, baseline=calib['bf_orig'], depth_scale=250, conf_thr=0.0, step=1, img_size=img_size)
+    dataset = MultiSeqPoseDataset(root=input_path, seqs=sequences, baseline=calib['bf_orig'], depth_scale=depth_scale, conf_thr=0.0, step=1, img_size=img_size)
 
     intrinsics_lowres = torch.tensor(calib['intrinsics']['left']).float()
     intrinsics_lowres[:2,:3] /= 8
