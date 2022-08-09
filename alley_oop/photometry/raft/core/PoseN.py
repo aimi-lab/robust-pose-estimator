@@ -14,13 +14,14 @@ class PoseHead(nn.Module):
     def __init__(self, input_dims):
         super(PoseHead, self).__init__()
         self.convs = nn.Sequential(
-            nn.Conv2d(in_channels=128, out_channels=32, kernel_size=(3, 3), padding='same'),
+            nn.Conv2d(in_channels=130, out_channels=32, kernel_size=(3, 3), padding='same'),
             nn.Conv2d(in_channels=32, out_channels=1, kernel_size=(3, 3), padding='same'))
         self.mlp = nn.Sequential(nn.Linear(in_features=input_dims,out_features=64),
                                     nn.ReLU(),
                                     nn.Linear(in_features=64, out_features=6))
-    def forward(self, net):
-        out = self.convs(net).view(net.shape[0], -1)
+    def forward(self, net, flow):
+
+        out = self.convs(torch.cat((net, flow), dim=1)).view(net.shape[0], -1)
         return self.mlp(out)
 
 
@@ -81,7 +82,7 @@ class PoseN(RAFT):
             flow = coords1 - coords0
             with torch.cuda.amp.autocast():
                 net, up_mask, delta_flow = self.update_block(net, inp, corr, flow)
-                delta_pose = self.pose_head(net)
+                delta_pose = self.pose_head(net, flow)
 
             # F(t+1) = F(t) + \Delta(t)
             coords1 = coords1 + delta_flow
@@ -122,11 +123,9 @@ class PoseN(RAFT):
         self.cnet.conv1.weight.data[:, 3:5, :, :] = mean_weights
         return self, raft
 
-    # def freeze_flow(self, freeze=True):
-    #     for param in self.parameters():
-    #         param.requires_grad = not freeze
-    #     for param in self.convs.parameters():
-    #         param.requires_grad = True
-    #     for param in self.mlp.parameters():
-    #         param.requires_grad = True
-    #     return self
+    def freeze_flow(self, freeze=True):
+        for param in self.parameters():
+            param.requires_grad = not freeze
+        for param in self.pose_head.parameters():
+            param.requires_grad = True
+        return self
