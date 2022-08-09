@@ -88,7 +88,8 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger):
             ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, pose = [x.to(device) for x in data_blob]
             flow_predictions, pose_predictions = model(ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf,
                                                        iters=config['model']['iters'])
-
+            ref_depth, trg_depth, ref_conf, trg_conf = [dataloader.dataset.resize_lowres(d) for d in
+                                                        [ref_depth, trg_depth, ref_conf, trg_conf]]
             loss2d = seq_loss(geometric_2d_loss,
                               (flow_predictions, pose_predictions, intrinsics, trg_depth, trg_conf, valid,))
             loss3d = seq_loss(geometric_3d_loss,
@@ -107,11 +108,11 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger):
     return loss.detach().mean().cpu().item()
 
 
-def main(args, config):
+def main(args, config, force_cpu):
     # general
     loss_weights = config['train']['loss_weights']
     config['model']['image_shape'] = config['image_shape']
-    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    device = torch.device('cuda') if (torch.cuda.is_available() & (not force_cpu)) else torch.device('cpu')
 
     # get model
     model = PoseN(config['model'])
@@ -120,10 +121,10 @@ def main(args, config):
     if args.restore_ckpt is not None:
         model.load_state_dict(torch.load(args.restore_ckpt), strict=False)
 
-    model =nn.DataParallel(model).to(device)
+    #model =nn.DataParallel(model).to(device)
     model.train()
-    model.module.freeze_bn()
-    model.module.freeze_flow()
+    #model.module.freeze_bn()
+    #model.module.freeze_flow()
 
     # get data
     data_train, intrinsics = datasets.get_data(config['data']['train']['basepath'],config['data']['train']['sequences'], config['image_shape'])
@@ -157,7 +158,8 @@ def main(args, config):
 
             flow_predictions, pose_predictions = model(ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf,
                                                        iters=config['model']['iters'])
-
+            ref_depth, trg_depth, ref_conf, trg_conf = [train_loader.dataset.resize_lowres(d) for d in
+                                                        [ref_depth, trg_depth, ref_conf, trg_conf]]
             loss2d = seq_loss(geometric_2d_loss,
                               (flow_predictions, pose_predictions, intrinsics, trg_depth, trg_conf, valid,))
             loss3d = seq_loss(geometric_3d_loss,
@@ -204,10 +206,11 @@ if __name__ == '__main__':
     parser.add_argument('--log', action="store_true")
     parser.add_argument('--restore_ckpt', help="restore checkpoint")
     parser.add_argument('--config', help="yaml config file", default='../configuration/train_raft.yaml')
+    parser.add_argument('--force_cpu', action="store_true")
     args = parser.parse_args()
 
     torch.manual_seed(1234)
     np.random.seed(1234)
     with open(args.config, 'r') as ymlfile:
         config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
-    main(args, config)
+    main(args, config, args.force_cpu)

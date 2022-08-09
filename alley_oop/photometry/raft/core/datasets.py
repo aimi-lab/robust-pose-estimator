@@ -90,8 +90,7 @@ class PoseDataset(Dataset):
         valid &= depth2 > 1e-3
         # ToDo add tool mask!
 
-        return img1, img2, self.resize_lowres(depth1), self.resize_lowres(depth2), self.resize_lowres(depth_conf1), \
-               self.resize_lowres(depth_conf2), self.resize_lowres_msk(valid), pose_se3.float()
+        return img1, img2, depth1, depth2, depth_conf1, depth_conf2, self.resize_lowres_msk(valid), pose_se3.float()
 
     def _read_img(self, path):
         img = torch.from_numpy(cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)).permute(2, 0, 1).float()
