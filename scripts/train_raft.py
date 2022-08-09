@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader, SubsetRandomSampler
 
 from alley_oop.photometry.raft.core.PoseN import RAFT, PoseN
 import alley_oop.photometry.raft.core.datasets as datasets
-from alley_oop.photometry.raft.losses import geometric_2d_loss, geometric_3d_loss, supervised_pose_loss, seq_loss
+from alley_oop.photometry.raft.losses import geometric_2d_loss, geometric_3d_loss, supervised_pose_loss, seq_loss, l1_loss
 
 import wandb
 from torch.cuda.amp import GradScaler
@@ -116,8 +116,8 @@ def main(args, config, force_cpu):
 
     # get model
     model = PoseN(config['model'])
-    model.init_from_raft(config['model']['pretrained'])
-    #ref_model = nn.DataParallel(RAFT(config['model']))
+    model, ref_model = model.init_from_raft(config['model']['pretrained'])
+    ref_model = ref_model.to(device)
     if args.restore_ckpt is not None:
         model.load_state_dict(torch.load(args.restore_ckpt), strict=False)
 
@@ -151,7 +151,6 @@ def main(args, config, force_cpu):
         for i_batch, data_blob in enumerate(train_loader):
             optimizer.zero_grad()
             ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, pose = [x.to(device)for x in data_blob]
-
             if config['train']['add_noise']:
                 stdv = np.random.uniform(0.0, 5.0)
                 ref_img = (ref_img + stdv * torch.randn(*ref_img.shape).to(device)).clamp(0.0, 255.0)
@@ -161,18 +160,25 @@ def main(args, config, force_cpu):
                                                        iters=config['model']['iters'])
             ref_depth, trg_depth, ref_conf, trg_conf = [train_loader.dataset.resize_lowres(d) for d in
                                                         [ref_depth, trg_depth, ref_conf, trg_conf]]
+
+            with torch.inference_mode():
+                ref_flow = ref_model(ref_img, trg_img, iters=config['model']['iters'])
+
+            loss_flow = seq_loss(l1_loss,
+                              (flow_predictions, ref_flow,))
             loss2d = seq_loss(geometric_2d_loss,
                               (flow_predictions, pose_predictions, intrinsics, trg_depth, trg_conf, valid,))
             loss3d = seq_loss(geometric_3d_loss,
                               (flow_predictions, pose_predictions, intrinsics, trg_depth, ref_depth,trg_conf, ref_conf, valid,))
             loss_pose = seq_loss(supervised_pose_loss, (pose_predictions, pose))
-            loss = loss_weights['pose']*loss_pose+loss_weights['2d']*loss2d+loss_weights['3d']*loss3d
+            loss = loss_weights['pose']*loss_pose+loss_weights['2d']*loss2d+loss_weights['3d']*loss3d + loss_weights['flow']*loss_flow
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)                
             torch.nn.utils.clip_grad_norm_(model.parameters(), config['train']['grad_clip'])
             metrics = {"train/loss2d": loss2d.detach().mean().cpu().item(),
                       "train/loss3d": loss3d.detach().mean().cpu().item(),
                       "train/loss_pose": loss_pose.detach().mean().cpu().item(),
+                      "train/loss_flow": loss_flow.detach().mean().cpu().item(),
                       "train/loss_total": loss.detach().mean().cpu().item()}
             
             scaler.step(optimizer)

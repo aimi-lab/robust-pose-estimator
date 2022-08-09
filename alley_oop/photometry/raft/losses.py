@@ -61,6 +61,10 @@ def supervised_pose_loss(pose_pred, pose_gt):
     return (pose_pred - pose_gt).abs().sum()
 
 
+def l1_loss(pred, gt):
+    return (pred - gt).abs().mean()
+
+
 def seq_loss(loss_func, args, gamma=0.8):
     loss = 0.0
     n_predictions = len(args[0])

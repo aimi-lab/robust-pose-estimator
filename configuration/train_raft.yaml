@@ -31,6 +31,7 @@ train:
     pose: 1.0
     2d: 0.001
     3d: 1.0
+    flow: 1.0
   add_noise: False
 
 val:
