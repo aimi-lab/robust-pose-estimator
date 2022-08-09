@@ -51,7 +51,7 @@ class RAFTPoseEstimator(torch.nn.Module):
             model_frame = scene_tlast.render(self.intrinsics)
             model_depth = self.resize(model_frame.depth)
             model_conf = self.resize(model_frame.confidence)
-            rel_pose_se3 = self.model(model_frame.img, frame.img, model_depth, depth, model_conf, confidence)
+            rel_pose_se3 = self.model(model_frame.img, frame.img, model_depth, depth, model_conf, confidence)[1][-1].squeeze(0)
             rel_pose = lie_se3_to_SE3(rel_pose_se3)
             ret_frame = model_frame
         self.last_pose.data = self.last_pose.data @ torch.linalg.inv(rel_pose)
