@@ -19,7 +19,7 @@ from evaluation.evaluate_ate_freiburg import main as evaluate
 from alley_oop.metrics.projected_photo_metrics import disparity_photo_loss
 
 
-def main(input_path, output_path, config, device_sel, stop, start, step, log, force_video):
+def main(input_path, output_path, config, device_sel, stop, start, step, log, force_video, checkpoint):
     device = torch.device('cpu')
     if device_sel == 'gpu':
         if torch.cuda.is_available():
@@ -33,7 +33,8 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fo
         wandb.init(project='Alley-OOP', config=config, group=log)
 
     dataset, calib = get_data(input_path, config['img_size'], force_video=force_video)
-    slam = SLAM(torch.tensor(calib['intrinsics']['left']), config['slam'], img_shape=config['img_size']).to(device)
+    slam = SLAM(torch.tensor(calib['intrinsics']['left']), config['slam'], img_shape=config['img_size'],
+                checkpoint=checkpoint).to(device)
     if not isinstance(dataset, StereoVideoDataset):
         sampler = SequentialSubSampler(dataset, start, stop, step)
     else:
@@ -110,12 +111,18 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fo
 if __name__ == '__main__':
     import argparse
     import yaml
-    parser = argparse.ArgumentParser(description='script to run EMDQ SLAM re-implementation')
+    parser = argparse.ArgumentParser(description='script to run Raft Pose SLAM')
 
     parser.add_argument(
         'input',
         type=str,
         help='Path to input folder.'
+    )
+    parser.add_argument(
+        '--checkpoint',
+        type=str,
+        required=True,
+        help='Path to trained Pose Estimator Checkpoint.'
     )
     parser.add_argument(
         '--outpath',
@@ -167,5 +174,6 @@ if __name__ == '__main__':
         config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
     if args.outpath is None:
         args.outpath = os.path.join(args.input, 'data','alleyoop')
+    assert os.path.isfile(args.checkpoint), 'no valid checkpoint file'
 
-    main(args.input, args.outpath, config, args.device, args.stop, args.start, args.step, args.log, args.force_video)
+    main(args.input, args.outpath, config, args.device, args.stop, args.start, args.step, args.log, args.force_video, args.checkpoint)
