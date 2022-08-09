@@ -219,7 +219,7 @@ class SurfelMap(object):
         valid_depth = torch.abs(depth_diff) < d_thresh
 
         # 2. normals constraint (degrees threshold)
-        valid_normals = torch.abs(batched_dot_product(normals[:, midx].T, self.nrml[:, vidx].T)) > angle_threshold
+        valid_normals = torch.abs(batched_dot_product(normals[:, midx].T, self.nrml[:, vidx].T)).squeeze() > angle_threshold
 
         # 3. check for duplicated surfaces
         if check_duplicate_surfaces:
