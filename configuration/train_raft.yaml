@@ -21,7 +21,7 @@ data:
 
 train:
   batch_size: 10
-  learning_rate: 1.0e-4
+  learning_rate: 2.0e-5
   weight_decay: 5.0e-5
   epsilon: 1.0e-8
   epochs: 100000
