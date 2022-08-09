@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from collections import OrderedDict
+import copy
 
 from alley_oop.photometry.raft.core.corr import CorrBlock, AlternateCorrBlock
 from alley_oop.photometry.raft.core.raft import RAFT
@@ -102,10 +103,14 @@ class PoseN(RAFT):
             name = k.replace('module.','')  # remove `module.`
             new_state_dict[name] = v
         raft.load_state_dict(new_state_dict)
-
+        self.fnet.conv1 = copy.deepcopy(raft.fnet.conv1)
+        self.cnet.conv1 = copy.deepcopy(raft.cnet.conv1)
+        self.load_state_dict(new_state_dict, strict=False)
         # replace first conv layer for RGB + D
         # compute average weights over RGB channels and use that to initialize the depth channel
         # technique from Temporal Segment Network, L. Wang 2016
+        self.fnet.conv1 = nn.Conv2d(5, 64, kernel_size=7, stride=2, padding=3)
+        self.cnet.conv1 = nn.Conv2d(5, 64, kernel_size=7, stride=2, padding=3)
         tmp_conv_weights = raft.fnet.conv1.weight.data.clone()
         self.fnet.conv1.weight.data[:, :3, :, :] = tmp_conv_weights.clone()
         mean_weights = torch.mean(tmp_conv_weights[:, :3, :, :], dim=1, keepdim=True)
@@ -115,7 +120,7 @@ class PoseN(RAFT):
         self.cnet.conv1.weight.data[:, :3, :, :] = tmp_conv_weights.clone()
         mean_weights = torch.mean(tmp_conv_weights[:, :3, :, :], dim=1, keepdim=True)
         self.cnet.conv1.weight.data[:, 3:5, :, :] = mean_weights
-        return self
+        return self, raft
 
     # def freeze_flow(self, freeze=True):
     #     for param in self.parameters():
