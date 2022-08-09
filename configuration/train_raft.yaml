@@ -12,12 +12,14 @@ data:
       - dataset_2
       - dataset_3
       - dataset_6
+    step: 10
   val:
     basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/01_stereo/01_intuitive_scared
     sequences:
       - dataset_7
       - dataset_8
       - dataset_9
+    step: 10
 
 train:
   batch_size: 10

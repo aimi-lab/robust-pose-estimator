@@ -131,8 +131,10 @@ def main(args, config, force_cpu):
         model =nn.DataParallel(model).to(device)
 
     # get data
-    data_train, intrinsics = datasets.get_data(config['data']['train']['basepath'],config['data']['train']['sequences'], config['image_shape'])
-    data_val, intrinsics = datasets.get_data(config['data']['val']['basepath'],config['data']['val']['sequences'], config['image_shape'])
+    data_train, intrinsics = datasets.get_data(config['data']['train']['basepath'],config['data']['train']['sequences'],
+                                               config['image_shape'], step=config['data']['train']['step'])
+    data_val, intrinsics = datasets.get_data(config['data']['val']['basepath'],config['data']['val']['sequences'],
+                                             config['image_shape'], step=config['data']['val']['step'])
     print(f"train: {len(data_train)} samples, val: {len(data_val)} samples")
     intrinsics = intrinsics.to(device)
     train_loader = DataLoader(data_train, num_workers=4, pin_memory=True, batch_size=config['train']['batch_size'], shuffle=True)
