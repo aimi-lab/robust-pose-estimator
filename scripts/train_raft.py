@@ -76,6 +76,10 @@ class Logger:
     def close(self):
         wandb.finish()
 
+    def save_model(self, path):
+        if self.log:
+            wandb.save(path)
+
 
 def val(model, dataloader, device, loss_weights, intrinsics, logger):
     model.eval()
@@ -100,6 +104,7 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger):
             logger.push(metrics, len(dataloader))
         logger.flush()
     model.train()
+    return loss.detach().mean().cpu().item()
 
 
 def main(args, config):
@@ -138,6 +143,7 @@ def main(args, config):
         os.mkdir(args.outpath)
 
     should_keep_training = True
+    best_loss = 1000000.0
     while should_keep_training:
 
         for i_batch, data_blob in enumerate(train_loader):
@@ -175,10 +181,12 @@ def main(args, config):
                 logger.flush()
 
             if total_steps % VAL_FREQ == VAL_FREQ - 1:
-                val(model, val_loader, device, loss_weights, intrinsics, logger)
-
-                path = os.path.join(args.outpath, f'%d_%s.pth' % (total_steps+1, args.name))
-                torch.save({"state_dict": model.state_dict(), "config": config}, path)
+                val_loss = val(model, val_loader, device, loss_weights, intrinsics, logger)
+                if val_loss < best_loss:
+                    best_loss = val_loss
+                    path = os.path.join(args.outpath, f'{args.name}.pth')
+                    torch.save({"state_dict": model.state_dict(), "config": config}, path)
+                    logger.save_model(path)
             total_steps += 1
 
             if total_steps > config['train']['epochs']:
@@ -186,10 +194,6 @@ def main(args, config):
                 break
 
     logger.close()
-    PATH = 'checkpoints/%s.pth' % args.name
-    torch.save(model.state_dict(), PATH)
-
-    return PATH
 
 
 if __name__ == '__main__':
