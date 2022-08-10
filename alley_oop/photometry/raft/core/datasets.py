@@ -106,7 +106,7 @@ class DummyDataset(PoseDataset):
         return super().__getitem__(0)
 
 class MultiSeqPoseDataset(PoseDataset):
-    def __init__(self, root, seqs, baseline, depth_scale=1.0, conf_thr=0.0, step=1, img_size=(512, 640)):
+    def __init__(self, root, seqs, baseline, depth_cutoff=300.0, conf_thr=0.0, step=1, img_size=(512, 640)):
         datasets = [glob(os.path.join(root, s, 'keyframe_*')) for s in seqs]
         datasets = [item for sublist in datasets for item in sublist]
         image_list1 = []
@@ -115,7 +115,7 @@ class MultiSeqPoseDataset(PoseDataset):
         depth_noise_list1 = []
         for d in datasets:
             if os.path.isfile(os.path.join(d, 'groundtruth.txt')):
-                super().__init__(d, baseline, depth_scale, conf_thr, step, img_size)
+                super().__init__(d, baseline, depth_cutoff, conf_thr, step, img_size)
                 image_list1 += self.image_list
                 disp_list1 += self.disp_list
                 rel_pose_list1 += self.rel_pose_list
