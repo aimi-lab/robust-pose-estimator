@@ -84,7 +84,7 @@ def seq_loss(loss_func, args, gamma=0.8):
 def geometric_2d_loss(flow_preds, se3_preds, intrinsics, trg_depth, trg_confidence, valid):
     n = flow_preds.shape[0]
     img_coordinates = create_img_coords_t(y=trg_depth.shape[-2], x=trg_depth.shape[-1]).to(flow_preds.device).double()
-    T_est = lie_se3_to_SE3_batch(se3_preds.double()/ 1000.0)  # invert transform to be consistent with other pose estimators
+    T_est = lie_se3_to_SE3_batch(-se3_preds.double())  # invert transform to be consistent with other pose estimators
     warped_pts = _warp_frame(trg_depth.double(), T_est, intrinsics.double(),img_coordinates)
     residuals = torch.linalg.norm(img_coordinates[None,:2] + flow_preds.view(n,2, -1).double() - warped_pts, ord=2, dim=1)
     mask = torch.isnan(flow_preds[:, 0]).view(n, -1) | torch.isnan(flow_preds[:, 1]).view(n,-1) | ~valid.view(n, -1)
@@ -98,7 +98,7 @@ def geometric_2d_loss(flow_preds, se3_preds, intrinsics, trg_depth, trg_confiden
 def geometric_3d_loss(flow_preds, se3_preds, intrinsics, trg_depth, src_depth, trg_confidence, src_confidence, valid):
     n,_,h,w = flow_preds.shape
     # reproject to 3D
-    T_est = lie_se3_to_SE3_batch(se3_preds.double()/ 1000.0)  #
+    T_est = lie_se3_to_SE3_batch(-se3_preds.double())  #
     img_coordinates = create_img_coords_t(y=trg_depth.shape[-2], x=trg_depth.shape[-1]).to(flow_preds.device)
     trg_opts = _reproject(trg_depth, intrinsics, img_coordinates)
     trg_opts = torch.bmm(T_est, trg_opts.double()) #SurfelMap(frame=trg_frame, kmat=intrinsics, ignore_mask=True, pmat=T_est)

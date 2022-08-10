@@ -7,50 +7,23 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, SubsetRandomSampler
-import torchvision.transforms.functional as F
+
 
 from alley_oop.photometry.raft.core.PoseN import RAFT, PoseN
 import alley_oop.photometry.raft.core.datasets as datasets
 from alley_oop.photometry.raft.losses import geometric_2d_loss, geometric_3d_loss, supervised_pose_loss, seq_loss, l1_loss
+from alley_oop.photometry.raft.utils.logger import Logger
+from alley_oop.photometry.raft.utils.plotting import plot_res
 
 import wandb
 from torch.cuda.amp import GradScaler
-from torchvision.utils import flow_to_image
-from alley_oop.geometry.lie_3d import lie_se3_to_SE3
+
+from alley_oop.geometry.lie_3d import lie_se3_to_SE3, lie_se3_to_SE3_batch
+
 
 # exclude extremly large displacements
 SUM_FREQ = 100
 VAL_FREQ = 1000
-
-
-def plot_res(img1_batch,img2_batch, flow_batch):
-    import matplotlib as mpl
-    mpl.use('Agg')
-    import matplotlib.pyplot as plt
-    def plot(imgs, **imshow_kwargs):
-        if not isinstance(imgs[0], list):
-            # Make a 2d grid even if there's just 1 row
-            imgs = [imgs]
-
-        num_rows = len(imgs)
-        num_cols = len(imgs[0])
-        fig, axs = plt.subplots(nrows=num_rows, ncols=num_cols, squeeze=False)
-        for row_idx, row in enumerate(imgs):
-            for col_idx, img in enumerate(row):
-                ax = axs[row_idx, col_idx]
-                img = F.to_pil_image(img.to("cpu"))
-                ax.imshow(np.asarray(img), **imshow_kwargs)
-                ax.set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
-
-        plt.tight_layout()
-        return fig, axs
-    flow_imgs = flow_to_image(flow_batch)
-    img1_batch = [img.to(torch.uint8) for img in img1_batch[:2]]
-    img2_batch = [img.to(torch.uint8) for img in img2_batch[:2]]
-
-    grid = [[img1, img2, flow_img] for (img1, img2, flow_img) in zip(img1_batch, img2_batch, flow_imgs[:2])]
-    return plot(grid)
-
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -66,83 +39,24 @@ def fetch_optimizer(config, model):
     return optimizer, scheduler
     
 
-class Logger:
-    def __init__(self, model, scheduler, config, project_name, log):
-        self.model = model
-        self.scheduler = scheduler
-        self.total_steps = 0
-        self.running_loss = {}
-        self.log = log
-        if log:
-            wandb.init(project=project_name, config=config)
-        self.header = False
-
-    def _print_header(self):
-        metrics_data = [k for k in sorted(self.running_loss.keys())]
-        training_str = "[steps, lr] ".format(self.total_steps + 1, self.scheduler.get_last_lr()[0])
-        metrics_str = ("{:<15}, " * len(metrics_data)).format(*metrics_data)
-
-        # print the training status
-        print(training_str + metrics_str)
-
-    def _print_training_status(self):
-        if not self.header:
-            self.header = True
-            self._print_header()
-        metrics_data = [self.running_loss[k] for k in sorted(self.running_loss.keys())]
-        training_str = "[{:6d}, {:10.7f}] ".format(self.total_steps+1, self.scheduler.get_last_lr()[0])
-        metrics_str = ("{:10.4f}, "*len(metrics_data)).format(*metrics_data)
-        
-        # print the training status
-        print(training_str + metrics_str)
-
-        for k in self.running_loss:
-            self.running_loss[k] = 0.0
-
-    def push(self, metrics, freq):
-        self.total_steps += 1
-
-        for key in metrics:
-            if key not in self.running_loss:
-                self.running_loss[key] = 0.0
-
-            self.running_loss[key] += metrics[key]/freq
-
-    def write_dict(self, results):
-        wandb.log(results)
-
-    def flush(self):
-        if self.log:
-            self.write_dict(self.running_loss)
-        self._print_training_status()
-        self.running_loss = {}
-
-    def close(self):
-        wandb.finish()
-
-    def save_model(self, path):
-        if self.log:
-            wandb.save(path)
-
-    def log_plot(self, fig):
-        if self.log:
-            wandb.log({"optical flow": fig})
-
-
 def val(model, dataloader, device, loss_weights, intrinsics, logger):
     model.eval()
     with torch.no_grad():
         for i_batch, data_blob in enumerate(dataloader):
             ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, pose = [x.to(device) for x in data_blob]
-            flow_predictions, pose_predictions = model(ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf,
+            flow_predictions, pose_predictions = model(trg_img, ref_img, trg_depth/config['depth_scale'], ref_depth/config['depth_scale'], trg_conf, ref_conf,
                                                        iters=config['model']['iters'])
+
+            # pose predictions should be scaled with the depth_scale to be invariant to scale changes
+            for i in range(len(pose_predictions)):
+                pose_predictions[i][:, 3:] *= config['depth_scale']
+
             ref_depth, trg_depth, ref_conf, trg_conf = [dataloader.dataset.resize_lowres(d) for d in
                                                         [ref_depth, trg_depth, ref_conf, trg_conf]]
-            loss2d = seq_loss(geometric_2d_loss,
-                              (flow_predictions, pose_predictions, intrinsics, trg_depth, trg_conf, valid,))
-            loss3d = seq_loss(geometric_3d_loss,
-                              (flow_predictions, pose_predictions, intrinsics, trg_depth, ref_depth, trg_conf, ref_conf,
-                               valid,))
+            loss2d = geometric_2d_loss(flow_predictions[-1], pose_predictions[-1], intrinsics, trg_depth, trg_conf,
+                                       valid)
+            loss3d = geometric_3d_loss(flow_predictions[-1], pose_predictions[-1], intrinsics, trg_depth, ref_depth,
+                                       trg_conf, ref_conf, valid)
             loss_pose = seq_loss(supervised_pose_loss, (pose_predictions, pose))
             loss = loss_weights['pose'] * loss_pose + loss_weights['2d'] * loss2d + loss_weights['3d'] * loss3d
 
@@ -152,7 +66,7 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger):
                        "val/loss_total": loss.detach().mean().cpu().item()}
             logger.push(metrics, len(dataloader))
         logger.flush()
-        logger.log_plot(plot_res(ref_img, trg_img, flow_predictions[-1])[0])
+        logger.log_plot(plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth, lie_se3_to_SE3_batch(-pose), intrinsics)[0])
     model.train()
     return loss.detach().mean().cpu().item()
 
@@ -186,7 +100,7 @@ def main(args, config, force_cpu):
                                              config['image_shape'], step=config['data']['val']['step'])
     print(f"train: {len(data_train)} samples, val: {len(data_val)} samples")
     intrinsics = intrinsics.to(device)
-    train_loader = DataLoader(data_train, num_workers=4, pin_memory=True, batch_size=config['train']['batch_size'], shuffle=True)
+    train_loader = DataLoader(data_train, num_workers=0, pin_memory=True, batch_size=config['train']['batch_size'], shuffle=True)
     val_loader = DataLoader(data_val, num_workers=4, pin_memory=True, batch_size=config['val']['batch_size'], sampler=SubsetRandomSampler(torch.from_numpy(np.random.choice(len(data_val), size=(400,), replace=False))))
     optimizer, scheduler = fetch_optimizer(config['train'], model)
 
@@ -207,27 +121,38 @@ def main(args, config, force_cpu):
                 model.module.freeze_flow(False) if parallel else model.freeze_flow(False)
             optimizer.zero_grad()
             ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, pose = [x.to(device)for x in data_blob]
-            pose_scaled = pose * 1000.0
             if config['train']['add_noise']:
                 stdv = np.random.uniform(0.0, 5.0)
                 ref_img = (ref_img + stdv * torch.randn(*ref_img.shape).to(device)).clamp(0.0, 255.0)
                 trg_img = (trg_img + stdv * torch.randn(*trg_img.shape).to(device)).clamp(0.0, 255.0)
 
-            flow_predictions, pose_predictions = model(ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf,
+            # forward pass
+            flow_predictions, pose_predictions = model(trg_img, ref_img, trg_depth/config['depth_scale'],
+                                                       ref_depth/config['depth_scale'], trg_conf, ref_conf,
                                                        iters=config['model']['iters'])
+
+            # pose predictions should be scaled with the depth_scale to be invariant to scale changes
+            for i in range(len(pose_predictions)):
+                pose_predictions[i][:, 3:] *= config['depth_scale']
+
+            # prepare data for loss computaitons
             ref_depth, trg_depth, ref_conf, trg_conf = [train_loader.dataset.resize_lowres(d) for d in
                                                         [ref_depth, trg_depth, ref_conf, trg_conf]]
 
             with torch.inference_mode():
-                ref_flow = ref_model(ref_img, trg_img, iters=config['model']['iters'])
+                ref_flow = ref_model(trg_img, ref_img, iters=config['model']['iters'])
             print("gt-pose ",lie_se3_to_SE3(pose[0]), "estimated_pose ", lie_se3_to_SE3(pose_predictions[-1][0]/1000.0))
+
+            # loss computations
             loss_flow = seq_loss(l1_loss, (flow_predictions, ref_flow,))
             loss2d = geometric_2d_loss(flow_predictions[-1], pose_predictions[-1], intrinsics, trg_depth, trg_conf,
                                        valid)
             loss3d = geometric_3d_loss(flow_predictions[-1], pose_predictions[-1], intrinsics, trg_depth, ref_depth,
                                        trg_conf, ref_conf, valid)
-            loss_pose = seq_loss(supervised_pose_loss, (pose_predictions, pose_scaled))
+            loss_pose = seq_loss(supervised_pose_loss, (pose_predictions, pose))
             loss = loss_weights['pose']*loss_pose+loss_weights['2d']*loss2d+loss_weights['3d']*loss3d + loss_weights['flow']*loss_flow
+
+            # update params
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)                
             torch.nn.utils.clip_grad_norm_(model.parameters(), config['train']['grad_clip'])

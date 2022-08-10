@@ -44,3 +44,4 @@ val:
 image_shape:
   - 512
   - 640
+depth_scale: 250
