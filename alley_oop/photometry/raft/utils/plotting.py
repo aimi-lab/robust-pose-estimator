@@ -11,10 +11,10 @@ from alley_oop.photometry.raft.losses import _warp_frame, create_img_coords_t
 
 def warp_frame(src_frame, depth, T, intrinsics):
     img_coordinates = create_img_coords_t(y=depth.shape[-2], x=depth.shape[-1])
-    warpfield = _warp_frame(depth.unsqueeze(0), T.unsqueeze(0), intrinsics, img_coordinates).squeeze().reshape(2, depth.shape[-2], depth.shape[-1])
+    warpfield = _warp_frame(depth.unsqueeze(0).detach().cpu(), T.unsqueeze(0).detach().cpu(), intrinsics.detach().cpu(), img_coordinates.detach().cpu()).squeeze().reshape(2, depth.shape[-2], depth.shape[-1])
 
-    u = warpfield.detach().cpu().numpy()[0].squeeze()
-    v = warpfield.detach().cpu().numpy()[1].squeeze()
+    u = warpfield.numpy()[0].squeeze()
+    v = warpfield.numpy()[1].squeeze()
     # get frame2 approximation by warping frame1 with the previous optical field
     src_img_warped = src_frame.float().detach().cpu().numpy()
     for ch in range(src_img_warped.shape[0]):
