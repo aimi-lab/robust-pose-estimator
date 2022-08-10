@@ -36,6 +36,7 @@ class PoseN(RAFT):
             self.fnet = RGBDEncoder(output_dim=256, norm_fn='instance', dropout=config['dropout'])
             self.cnet = RGBDEncoder(output_dim=self.hidden_dim + self.context_dim, norm_fn='batch',
                                     dropout=config['dropout'])
+        self.pose_scale = config['pose_scale']
 
     def forward(self, image1, image2, depth1, depth2, conf1, conf2, iters=12, flow_init=None, pose_init=None):
         """ Estimate optical flow and rigid pose between pair of frames """
@@ -96,7 +97,7 @@ class PoseN(RAFT):
             flow_predictions.append(flow_up.float())
 
             pose_se3 = pose_se3 + delta_pose
-            pose_se3_predictions.append(pose_se3.float())
+            pose_se3_predictions.append(pose_se3.float()/self.pose_scale)
         return flow_predictions, pose_se3_predictions
 
     def init_from_raft(self, raft_ckp):

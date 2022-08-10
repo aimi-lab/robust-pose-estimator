@@ -14,7 +14,7 @@ from torch.utils.data import Dataset
 from dataset.rectification import StereoRectifier
 
 
-def get_data(input_path: str, sequences: str, img_size: Tuple, depth_scale: float=250.0, step: int=1):
+def get_data(input_path: str, sequences: str, img_size: Tuple, step: int=1):
 
     # check the format of the calibration file
     img_size = tuple(img_size)
@@ -32,7 +32,7 @@ def get_data(input_path: str, sequences: str, img_size: Tuple, depth_scale: floa
 
     rect = StereoRectifier(calib_file, img_size_new=(img_size[1], img_size[0]), mode='conventional')
     calib = rect.get_rectified_calib()
-    dataset = MultiSeqPoseDataset(root=input_path, seqs=sequences, baseline=calib['bf_orig'], depth_scale=depth_scale, conf_thr=0.0, step=step, img_size=img_size)
+    dataset = MultiSeqPoseDataset(root=input_path, seqs=sequences, baseline=calib['bf_orig'], conf_thr=0.0, step=step, img_size=img_size)
 
     intrinsics_lowres = torch.tensor(calib['intrinsics']['left']).float()
     intrinsics_lowres[:2,:3] /= 8
@@ -40,7 +40,7 @@ def get_data(input_path: str, sequences: str, img_size: Tuple, depth_scale: floa
 
 
 class PoseDataset(Dataset):
-    def __init__(self, root, baseline, depth_scale=1.0, conf_thr=0.0, step=1, img_size=(512, 640)):
+    def __init__(self, root, baseline, depth_cutoff=300.0,conf_thr=0.0, step=1, img_size=(512, 640)):
         super(PoseDataset, self).__init__()
         images = sorted(glob(os.path.join(root, 'video_frames', '*l.png')))
         disparities = sorted(glob(os.path.join(root, 'disparity_frames', '*l.pfm')))
@@ -50,8 +50,8 @@ class PoseDataset(Dataset):
         assert len(images) == len(disparities)
         assert len(images) == len(depth_noise)
         self.baseline = baseline
-        self.depth_scale = depth_scale
         self.conf_thr = conf_thr
+        self.depth_cutoff = depth_cutoff
         self.image_list = []
         self.disp_list = []
         self.rel_pose_list = []
@@ -71,25 +71,23 @@ class PoseDataset(Dataset):
         disp1 = self._read_disp(self.disp_list[index][0])
         disp2 = self._read_disp(self.disp_list[index][1])
 
-        pose = torch.from_numpy(self.rel_pose_list[index])
-        pose[:3,3] /= self.depth_scale
+        pose = torch.from_numpy(self.rel_pose_list[index]).clone()
         pose_se3 = lie_SE3_to_se3(pose)
-        depth1 = self.baseline / disp1/self.depth_scale
-        depth2 = self.baseline / disp2/self.depth_scale
+        depth1 = self.baseline / disp1
+        depth2 = self.baseline / disp2
 
         # generate mask
         # depth confidence threshold
-        depth_conf1 = torch.special.erf(5e-3*self.depth_scale/torch.sqrt(self._read_disp(self.depth_noise_list[index][0])))
-        depth_conf2 = torch.special.erf(5e-3*self.depth_scale/torch.sqrt(self._read_disp(self.depth_noise_list[index][1])))
+        depth_conf1 = torch.special.erf(5e-3*250/torch.sqrt(self._read_disp(self.depth_noise_list[index][0])))
+        depth_conf2 = torch.special.erf(5e-3*250/torch.sqrt(self._read_disp(self.depth_noise_list[index][1])))
         valid = depth_conf1 > self.conf_thr
         valid &= depth_conf2 > self.conf_thr
         # depth threshold
-        valid &= depth1 < 255.0
-        valid &= depth2 < 255.0
+        valid &= depth1 < self.depth_cutoff
+        valid &= depth2 < self.depth_cutoff
         valid &= depth1 > 1e-3
         valid &= depth2 > 1e-3
         # ToDo add tool mask!
-
         return img1, img2, depth1, depth2, depth_conf1, depth_conf2, self.resize_lowres_msk(valid), pose_se3.float()
 
     def _read_img(self, path):
@@ -103,6 +101,9 @@ class PoseDataset(Dataset):
     def __len__(self):
         return len(self.image_list)
 
+class DummyDataset(PoseDataset):
+    def __getitem__(self, index):
+        return super().__getitem__(0)
 
 class MultiSeqPoseDataset(PoseDataset):
     def __init__(self, root, seqs, baseline, depth_scale=1.0, conf_thr=0.0, step=1, img_size=(512, 640)):
