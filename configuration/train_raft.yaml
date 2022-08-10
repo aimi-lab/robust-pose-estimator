@@ -36,7 +36,7 @@ train:
     3d: 0.0
     flow: 0.0
   add_noise: False
-  freeze_flow_steps: 30
+  freeze_flow_steps: 10000
 
 val:
   batch_size: 16
