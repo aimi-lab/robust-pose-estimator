@@ -133,7 +133,6 @@ def main(args, config, force_cpu):
 
             with torch.inference_mode():
                 ref_flow = ref_model(trg_img, ref_img, iters=config['model']['iters'])
-            print("gt-pose ",lie_se3_to_SE3(pose[0]), "estimated_pose ", lie_se3_to_SE3(pose_predictions[-1][0]))
 
             # loss computations
             loss_flow = seq_loss(l1_loss, (flow_predictions, ref_flow,))
