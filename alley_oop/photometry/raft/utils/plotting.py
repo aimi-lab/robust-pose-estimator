@@ -54,7 +54,6 @@ def plot_res(img1_batch,img2_batch, flow_batch, depth2_batch, pose_batch, intrin
                 ax.set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
 
         plt.tight_layout()
-        plt.show()
         return fig, axs
     flow_imgs = flow_to_image(flow_batch)
     img1_batch = [img.to(torch.uint8) for img in img1_batch[:2]]
