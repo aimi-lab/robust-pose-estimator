@@ -222,10 +222,10 @@ def main(args, config, force_cpu):
 
             loss_flow = seq_loss(l1_loss,
                               (flow_predictions, ref_flow,))
-            loss2d = seq_loss(geometric_2d_loss,
-                              (flow_predictions, pose_predictions, intrinsics, trg_depth, trg_conf, valid,))
-            loss3d = seq_loss(geometric_3d_loss,
-                              (flow_predictions, pose_predictions, intrinsics, trg_depth, ref_depth,trg_conf, ref_conf, valid,))
+            loss2d = geometric_2d_loss(flow_predictions[-1], pose_predictions[-1], intrinsics, trg_depth, trg_conf,
+                                       valid)
+            loss3d = geometric_3d_loss(flow_predictions[-1], pose_predictions[-1], intrinsics, trg_depth, ref_depth,
+                                       trg_conf, ref_conf, valid)
             loss_pose = seq_loss(supervised_pose_loss, (pose_predictions, pose_scaled))
             loss = loss_weights['pose']*loss_pose+loss_weights['2d']*loss2d+loss_weights['3d']*loss3d + loss_weights['flow']*loss_flow
             scaler.scale(loss).backward()
