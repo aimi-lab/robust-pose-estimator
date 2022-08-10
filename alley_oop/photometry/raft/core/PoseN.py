@@ -109,7 +109,7 @@ class PoseN(RAFT):
         raft.load_state_dict(new_state_dict)
         # self.fnet.conv1 = copy.deepcopy(raft.fnet.conv1)
         # self.cnet.conv1 = copy.deepcopy(raft.cnet.conv1)
-        # self.load_state_dict(new_state_dict, strict=False)
+        self.load_state_dict(new_state_dict, strict=False)
         # # replace first conv layer for RGB + D
         # # compute average weights over RGB channels and use that to initialize the depth channel
         # # technique from Temporal Segment Network, L. Wang 2016
