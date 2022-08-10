@@ -3,6 +3,7 @@ model:
   iters: 12
   dropout: 0.0
   small: False
+  rgbd: False
 
 data:
   train:
@@ -23,17 +24,17 @@ data:
 
 train:
   batch_size: 10
-  learning_rate: 1.0e-5
+  learning_rate: 1.0e-3
   weight_decay: 5.0e-5
   epsilon: 1.0e-8
   epochs: 100000
   gamma: 0.8
   grad_clip: 1.0
   loss_weights:
-    pose: 1.0
-    2d: 0.001
-    3d: 1.0
-    flow: 1.0
+    pose: 0.1
+    2d: 0.0
+    3d: 0.0
+    flow: 0.0
   add_noise: False
   freeze_flow_steps: 30
 
