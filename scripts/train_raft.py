@@ -43,8 +43,20 @@ class Logger:
         self.log = log
         if log:
             wandb.init(project=project_name, config=config)
+        self.header = False
+
+    def _print_header(self):
+        metrics_data = [k for k in sorted(self.running_loss.keys())]
+        training_str = "[steps, lr] ".format(self.total_steps + 1, self.scheduler.get_last_lr()[0])
+        metrics_str = ("{:<15f}, " * len(metrics_data)).format(*metrics_data)
+
+        # print the training status
+        print(training_str + metrics_str)
 
     def _print_training_status(self):
+        if not self.header:
+            self.header = True
+            self._print_header()
         metrics_data = [self.running_loss[k] for k in sorted(self.running_loss.keys())]
         training_str = "[{:6d}, {:10.7f}] ".format(self.total_steps+1, self.scheduler.get_last_lr()[0])
         metrics_str = ("{:10.4f}, "*len(metrics_data)).format(*metrics_data)
