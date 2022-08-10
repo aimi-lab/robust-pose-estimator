@@ -45,10 +45,10 @@ def plot_res(img1_batch,img2_batch, flow_batch):
         plt.tight_layout()
         return fig, axs
     flow_imgs = flow_to_image(flow_batch)
-    img1_batch = [img.to(torch.uint8) for img in img1_batch]
-    img2_batch = [img.to(torch.uint8) for img in img2_batch]
+    img1_batch = [img.to(torch.uint8) for img in img1_batch[:2]]
+    img2_batch = [img.to(torch.uint8) for img in img2_batch[:2]]
 
-    grid = [[img1, img2, flow_img] for (img1, img2, flow_img) in zip(img1_batch, img2_batch, flow_imgs)]
+    grid = [[img1, img2, flow_img] for (img1, img2, flow_img) in zip(img1_batch, img2_batch, flow_imgs[:2])]
     return plot(grid)
 
 
