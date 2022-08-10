@@ -16,6 +16,7 @@ from alley_oop.photometry.raft.losses import geometric_2d_loss, geometric_3d_los
 import wandb
 from torch.cuda.amp import GradScaler
 from torchvision.utils import flow_to_image
+from alley_oop.geometry.lie_3d import lie_se3_to_SE3
 
 # exclude extremly large displacements
 SUM_FREQ = 100
@@ -219,9 +220,8 @@ def main(args, config, force_cpu):
 
             with torch.inference_mode():
                 ref_flow = ref_model(ref_img, trg_img, iters=config['model']['iters'])
-
-            loss_flow = seq_loss(l1_loss,
-                              (flow_predictions, ref_flow,))
+            print("gt-pose ",lie_se3_to_SE3(pose), "estimated_pose ", lie_se3_to_SE3(pose_predictions[-1]/1000.0))
+            loss_flow = seq_loss(l1_loss, (flow_predictions, ref_flow,))
             loss2d = geometric_2d_loss(flow_predictions[-1], pose_predictions[-1], intrinsics, trg_depth, trg_conf,
                                        valid)
             loss3d = geometric_3d_loss(flow_predictions[-1], pose_predictions[-1], intrinsics, trg_depth, ref_depth,
