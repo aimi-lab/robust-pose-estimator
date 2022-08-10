@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, SubsetRandomSampler
+import torchvision.transforms.functional as F
 
 from alley_oop.photometry.raft.core.PoseN import RAFT, PoseN
 import alley_oop.photometry.raft.core.datasets as datasets
@@ -14,10 +15,40 @@ from alley_oop.photometry.raft.losses import geometric_2d_loss, geometric_3d_los
 
 import wandb
 from torch.cuda.amp import GradScaler
+from torchvision.utils import flow_to_image
 
 # exclude extremly large displacements
 SUM_FREQ = 100
 VAL_FREQ = 1000
+
+
+def plot_res(img1_batch,img2_batch, flow_batch):
+    import matplotlib as mpl
+    mpl.use('Agg')
+    import matplotlib.pyplot as plt
+    def plot(imgs, **imshow_kwargs):
+        if not isinstance(imgs[0], list):
+            # Make a 2d grid even if there's just 1 row
+            imgs = [imgs]
+
+        num_rows = len(imgs)
+        num_cols = len(imgs[0])
+        fig, axs = plt.subplots(nrows=num_rows, ncols=num_cols, squeeze=False)
+        for row_idx, row in enumerate(imgs):
+            for col_idx, img in enumerate(row):
+                ax = axs[row_idx, col_idx]
+                img = F.to_pil_image(img.to("cpu"))
+                ax.imshow(np.asarray(img), **imshow_kwargs)
+                ax.set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
+
+        plt.tight_layout()
+        return fig, axs
+    flow_imgs = flow_to_image(flow_batch)
+    img1_batch = [img.to(torch.uint8) for img in img1_batch]
+    img2_batch = [img.to(torch.uint8) for img in img2_batch]
+
+    grid = [[img1, img2, flow_img] for (img1, img2, flow_img) in zip(img1_batch, img2_batch, flow_imgs)]
+    return plot(grid)
 
 
 def count_parameters(model):
@@ -92,6 +123,10 @@ class Logger:
         if self.log:
             wandb.save(path)
 
+    def log_plot(self, fig):
+        if self.log:
+            wandb.log({"optical flow": fig})
+
 
 def val(model, dataloader, device, loss_weights, intrinsics, logger):
     model.eval()
@@ -116,6 +151,7 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger):
                        "val/loss_total": loss.detach().mean().cpu().item()}
             logger.push(metrics, len(dataloader))
         logger.flush()
+        logger.log_plot(plot_res(ref_img, trg_img, flow_predictions[-1])[0])
     model.train()
     return loss.detach().mean().cpu().item()
 
