@@ -47,10 +47,6 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger):
             flow_predictions, pose_predictions = model(trg_img, ref_img, trg_depth/config['depth_scale'], ref_depth/config['depth_scale'], trg_conf, ref_conf,
                                                        iters=config['model']['iters'])
 
-            # pose predictions should be scaled with the depth_scale to be invariant to scale changes
-            for i in range(len(pose_predictions)):
-                pose_predictions[i][:, 3:] *= config['depth_scale']
-
             ref_depth, trg_depth, ref_conf, trg_conf = [dataloader.dataset.resize_lowres(d) for d in
                                                         [ref_depth, trg_depth, ref_conf, trg_conf]]
             loss2d = geometric_2d_loss(flow_predictions[-1], pose_predictions[-1], intrinsics, trg_depth, trg_conf,
@@ -130,10 +126,6 @@ def main(args, config, force_cpu):
             flow_predictions, pose_predictions = model(trg_img, ref_img, trg_depth/config['depth_scale'],
                                                        ref_depth/config['depth_scale'], trg_conf, ref_conf,
                                                        iters=config['model']['iters'])
-
-            # pose predictions should be scaled with the depth_scale to be invariant to scale changes
-            for i in range(len(pose_predictions)):
-                pose_predictions[i][:, 3:] *= config['depth_scale']
 
             # prepare data for loss computaitons
             ref_depth, trg_depth, ref_conf, trg_conf = [train_loader.dataset.resize_lowres(d) for d in
