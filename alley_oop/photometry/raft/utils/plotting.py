@@ -16,7 +16,7 @@ def warp_frame(src_frame, depth, T, intrinsics):
     u = warpfield.detach().cpu().numpy()[0].squeeze()
     v = warpfield.detach().cpu().numpy()[1].squeeze()
     # get frame2 approximation by warping frame1 with the previous optical field
-    src_img_warped = src_frame.float().detach().numpy()
+    src_img_warped = src_frame.float().detach().cpu().numpy()
     for ch in range(src_img_warped.shape[0]):
         src_img_warped[ch] = warp(src_img_warped[ch], np.array([v, u]), mode='edge')
     return torch.tensor(src_img_warped).to(torch.uint8)
@@ -30,7 +30,7 @@ def warp_frame_flow(src_frame, flow):
     from skimage.transform import warp
     row_coords, col_coords = np.meshgrid(np.arange(nr), np.arange(nc), indexing='ij')
     # get frame2 approximation by warping frame1 with the previous optical field
-    src_img_warped = src_frame.float().detach().numpy()
+    src_img_warped = src_frame.float().detach().cpu().numpy()
     for ch in range(src_img_warped.shape[0]):
         src_img_warped[ch] = warp(src_img_warped[ch], np.array([row_coords + v, col_coords + u]), mode='edge')
     return torch.tensor(src_img_warped).to(torch.uint8)
