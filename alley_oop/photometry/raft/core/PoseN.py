@@ -31,18 +31,21 @@ class PoseN(RAFT):
         H, W = config["image_shape"]
         self.pose_head = PoseHead((H*W) // 64)
         # replace by 4-channel input conv (RGB + D)
-        self.fnet = RGBDEncoder(output_dim=256, norm_fn='instance', dropout=config['dropout'])
-        self.cnet = RGBDEncoder(output_dim=self.hidden_dim + self.context_dim, norm_fn='batch',
-                                dropout=config['dropout'])
+        # self.fnet = RGBDEncoder(output_dim=256, norm_fn='instance', dropout=config['dropout'])
+        # self.cnet = RGBDEncoder(output_dim=self.hidden_dim + self.context_dim, norm_fn='batch',
+        #                         dropout=config['dropout'])
 
     def forward(self, image1, image2, depth1, depth2, conf1, conf2, iters=12, flow_init=None, pose_init=None):
         """ Estimate optical flow and rigid pose between pair of frames """
+        # rescale to +/- 1.0
         image1 = 2 * (image1 / 255.0) - 1.0
         image2 = 2 * (image2 / 255.0) - 1.0
+        depth1 = 2 * depth1 - 1.0
+        depth2 = 2 * depth2 - 1.0
 
         # stack images, depth and conf
-        image1 = torch.cat((image1, depth1, conf1), dim=1)
-        image2 = torch.cat((image2, depth2, conf2), dim=1)
+        #image1 = torch.cat((image1, depth1, conf1), dim=1)
+        #image2 = torch.cat((image2, depth2, conf2), dim=1)
 
         n = image1.shape[0]
         image1 = image1.contiguous()
@@ -104,23 +107,23 @@ class PoseN(RAFT):
             name = k.replace('module.','')  # remove `module.`
             new_state_dict[name] = v
         raft.load_state_dict(new_state_dict)
-        self.fnet.conv1 = copy.deepcopy(raft.fnet.conv1)
-        self.cnet.conv1 = copy.deepcopy(raft.cnet.conv1)
-        self.load_state_dict(new_state_dict, strict=False)
-        # replace first conv layer for RGB + D
-        # compute average weights over RGB channels and use that to initialize the depth channel
-        # technique from Temporal Segment Network, L. Wang 2016
-        self.fnet.conv1 = nn.Conv2d(5, 64, kernel_size=7, stride=2, padding=3)
-        self.cnet.conv1 = nn.Conv2d(5, 64, kernel_size=7, stride=2, padding=3)
-        tmp_conv_weights = raft.fnet.conv1.weight.data.clone()
-        self.fnet.conv1.weight.data[:, :3, :, :] = tmp_conv_weights.clone()
-        mean_weights = torch.mean(tmp_conv_weights[:, :3, :, :], dim=1, keepdim=True)
-        self.fnet.conv1.weight.data[:, 3:5, :, :] = mean_weights
-
-        tmp_conv_weights = raft.cnet.conv1.weight.data.clone()
-        self.cnet.conv1.weight.data[:, :3, :, :] = tmp_conv_weights.clone()
-        mean_weights = torch.mean(tmp_conv_weights[:, :3, :, :], dim=1, keepdim=True)
-        self.cnet.conv1.weight.data[:, 3:5, :, :] = mean_weights
+        # self.fnet.conv1 = copy.deepcopy(raft.fnet.conv1)
+        # self.cnet.conv1 = copy.deepcopy(raft.cnet.conv1)
+        # self.load_state_dict(new_state_dict, strict=False)
+        # # replace first conv layer for RGB + D
+        # # compute average weights over RGB channels and use that to initialize the depth channel
+        # # technique from Temporal Segment Network, L. Wang 2016
+        # self.fnet.conv1 = nn.Conv2d(5, 64, kernel_size=7, stride=2, padding=3)
+        # self.cnet.conv1 = nn.Conv2d(5, 64, kernel_size=7, stride=2, padding=3)
+        # tmp_conv_weights = raft.fnet.conv1.weight.data.clone()
+        # self.fnet.conv1.weight.data[:, :3, :, :] = tmp_conv_weights.clone()
+        # mean_weights = torch.mean(tmp_conv_weights[:, :3, :, :], dim=1, keepdim=True)
+        # self.fnet.conv1.weight.data[:, 3:5, :, :] = mean_weights
+        #
+        # tmp_conv_weights = raft.cnet.conv1.weight.data.clone()
+        # self.cnet.conv1.weight.data[:, :3, :, :] = tmp_conv_weights.clone()
+        # mean_weights = torch.mean(tmp_conv_weights[:, :3, :, :], dim=1, keepdim=True)
+        # self.cnet.conv1.weight.data[:, 3:5, :, :] = mean_weights
         return self, raft
 
     def freeze_flow(self, freeze=True):
