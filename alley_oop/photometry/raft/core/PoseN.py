@@ -82,15 +82,15 @@ class PoseN(RAFT):
             flow = coords1 - coords0
             with torch.cuda.amp.autocast():
                 net, up_mask, delta_flow = self.update_block(net, inp, corr, flow)
-                pose_se3 = self.pose_head(net, flow)
+            pose_se3 = self.pose_head(net, flow)
 
             # F(t+1) = F(t) + \Delta(t)
             coords1 = coords1 + delta_flow
             flow_up = coords1 - coords0
-            flow_predictions.append(flow_up)
+            flow_predictions.append(flow_up.float())
 
             #pose_se3 = pose_se3 + delta_pose
-            pose_se3_predictions.append(pose_se3)
+            pose_se3_predictions.append(pose_se3.float())
         return flow_predictions, pose_se3_predictions
 
     def init_from_raft(self, raft_ckp):
