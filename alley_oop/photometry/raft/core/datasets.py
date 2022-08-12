@@ -110,7 +110,7 @@ class DummyDataset(PoseDataset):
 
 class MultiSeqPoseDataset(PoseDataset):
     def __init__(self, root, seqs, baseline, depth_cutoff=300.0, conf_thr=0.0, step=1, img_size=(512, 640)):
-        datasets = [glob(os.path.join(root, s, 'keyframe_*')) for s in seqs]
+        datasets = [sorted(glob(os.path.join(root, s, 'keyframe_*'))) for s in seqs]
         datasets = [item for sublist in datasets for item in sublist]
         image_list1 = []
         disp_list1 = []
