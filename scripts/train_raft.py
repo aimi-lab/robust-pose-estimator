@@ -97,7 +97,8 @@ def main(args, config, force_cpu):
     print(f"train: {len(data_train)} samples, val: {len(data_val)} samples")
     intrinsics = intrinsics.to(device)
     train_loader = DataLoader(data_train, num_workers=4, pin_memory=True, batch_size=config['train']['batch_size'], shuffle=True)
-    val_loader = DataLoader(data_val, num_workers=4, pin_memory=True, batch_size=config['val']['batch_size'], sampler=SubsetRandomSampler(torch.from_numpy(np.random.choice(len(data_val), size=(400,), replace=False))))
+    val_loader = DataLoader(data_val, num_workers=4, pin_memory=True, batch_size=config['val']['batch_size'],
+                            sampler=SubsetRandomSampler(torch.from_numpy(np.random.choice(len(data_val), size=(400,), replace=False))))
     optimizer, scheduler = fetch_optimizer(config['train'], model)
 
     total_steps = 0

@@ -14,7 +14,9 @@ data:
       - dataset_2
       - dataset_3
       - dataset_6
-    step: 10
+    step:
+      - 1
+      - 20
   val:
     basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/01_stereo/01_intuitive_scared
     sequences:
@@ -24,7 +26,7 @@ data:
     step: 10
 
 train:
-  batch_size: 10
+  batch_size: 32
   learning_rate: 1.0e-4
   weight_decay: 5.0e-5
   epsilon: 1.0e-8
@@ -40,7 +42,7 @@ train:
   freeze_flow_steps: 10000
 
 val:
-  batch_size: 16
+  batch_size: 32
 
 image_shape:
   - 512

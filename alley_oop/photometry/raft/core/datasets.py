@@ -40,7 +40,7 @@ def get_data(input_path: str, sequences: str, img_size: Tuple, step: int=1):
 
 
 class PoseDataset(Dataset):
-    def __init__(self, root, baseline, depth_cutoff=300.0,conf_thr=0.0, step=1, img_size=(512, 640)):
+    def __init__(self, root, baseline, depth_cutoff=300.0,conf_thr=0.0, step=(1,10), img_size=(512, 640)):
         super(PoseDataset, self).__init__()
         images = sorted(glob(os.path.join(root, 'video_frames', '*l.png')))
         disparities = sorted(glob(os.path.join(root, 'disparity_frames', '*l.pfm')))
@@ -56,11 +56,14 @@ class PoseDataset(Dataset):
         self.disp_list = []
         self.rel_pose_list = []
         self.depth_noise_list = []
-        for i in range(len(images)-step):
-            self.image_list.append([images[i], images[i+step]])
-            self.disp_list.append([disparities[i], disparities[i+step]])
-            self.rel_pose_list.append(np.linalg.inv(poses[i+step].astype(np.float64)) @ poses[i].astype(np.float64))
-            self.depth_noise_list.append([depth_noise[i], depth_noise[i+step]])
+        if isinstance(step, int):
+            step = (step, step)
+        for i in range(len(images)-step[1]):
+            s = np.random.randint(*step) if step[0] < step[1] else step[0]  # select a random step in given range
+            self.image_list.append([images[i], images[i+s]])
+            self.disp_list.append([disparities[i], disparities[i+s]])
+            self.rel_pose_list.append(np.linalg.inv(poses[i+s].astype(np.float64)) @ poses[i].astype(np.float64))
+            self.depth_noise_list.append([depth_noise[i], depth_noise[i+s]])
         self.resize = Resize(img_size)
         self.resize_lowres = Resize((img_size[0]//8, img_size[1]//8))
         self.resize_lowres_msk = Resize((img_size[0] // 8, img_size[1] // 8), interpolation=InterpolationMode.NEAREST)
