@@ -144,7 +144,7 @@ def main(args, config, force_cpu):
             loss = loss_weights['pose']*loss_pose+loss_weights['2d']*loss2d+loss_weights['3d']*loss3d + loss_weights['flow']*loss_flow
 
             # debug
-            if args.dbg & (i_batch%10 == 0):
+            if args.dbg & (i_batch%SUM_FREQ == 0):
                 print("\n se3 pose")
                 print(f"gt_pose: {pose[0].detach().cpu().numpy()}\npred_pose: {pose_predictions[-1][0].detach().cpu().numpy()}")
                 print(" SE3 pose")
@@ -153,10 +153,11 @@ def main(args, config, force_cpu):
                 print(" 2d loss: ", loss2d.detach().mean().cpu().item())
                 print(" 3d loss: ", loss3d.detach().mean().cpu().item())
                 print(" flow loss: ", loss_flow.detach().mean().cpu().item())
-                fig, ax = plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth, lie_se3_to_SE3_batch(-pose), intrinsics)
-                import matplotlib.pyplot as plt
-                plt.show()
-                plot_3d(ref_img, trg_img, ref_depth, trg_depth, lie_se3_to_SE3_batch(pose), intrinsics)
+                if device == torch.device('cpu'):
+                    fig, ax = plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth, lie_se3_to_SE3_batch(-pose), intrinsics)
+                    import matplotlib.pyplot as plt
+                    plt.show()
+                    plot_3d(ref_img, trg_img, ref_depth, trg_depth, lie_se3_to_SE3_batch(pose), intrinsics)
             # update params
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)                
