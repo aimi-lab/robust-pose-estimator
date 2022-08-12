@@ -95,26 +95,29 @@ def geometric_2d_loss(flow_preds, se3_preds, intrinsics, trg_depth, trg_confiden
     return loss
 
 
-def geometric_3d_loss(flow_preds, se3_preds, intrinsics, trg_depth, src_depth, trg_confidence, src_confidence, valid):
+def geometric_3d_loss(flow_preds, se3_preds, intrinsics, trg_depth, ref_depth, trg_confidence, ref_confidence, valid):
     n,_,h,w = flow_preds.shape
     # reproject to 3D
-    T_est = lie_se3_to_SE3_batch(-se3_preds.double())  #
+    T_est = lie_se3_to_SE3_batch(-se3_preds)  #
     img_coordinates = create_img_coords_t(y=trg_depth.shape[-2], x=trg_depth.shape[-1]).to(flow_preds.device)
     trg_opts = _reproject(trg_depth, intrinsics, img_coordinates)
-    trg_opts = torch.bmm(T_est, trg_opts.double()) #SurfelMap(frame=trg_frame, kmat=intrinsics, ignore_mask=True, pmat=T_est)
-    ref_opts = _reproject(src_depth.double(), intrinsics.double(), img_coordinates.double())
+    trg_opts = torch.bmm(T_est, trg_opts).reshape(n,4,h,w) #SurfelMap(frame=trg_frame, kmat=intrinsics, ignore_mask=True, pmat=T_est)
+    ref_opts = _reproject(ref_depth, intrinsics, img_coordinates).reshape(n, 4, h, w)
 
     # get optical flow correspondences
-    offset = torch.arange(h*w).reshape(1,1,h,w).to(flow_preds.device)
-    flow_off = (flow_preds[:,1]*w).unsqueeze(1)
-    flow_unravel = (offset+flow_off + flow_preds[:,0].unsqueeze(1)).view(n,1,-1).round().long().repeat(1,4,1)
-    flow_unravel = flow_unravel.clamp(0,h*w-1)
+    row_coords, col_coords = torch.meshgrid(torch.arange(h), torch.arange(w), indexing='ij')
+    flow_off = torch.empty_like(flow_preds)
+    flow_off[:, 1] = 2*(flow_preds[:, 1] + row_coords)/(h-1)-1
+    flow_off[:, 0] = 2*(flow_preds[:, 0] + col_coords)/(w-1)-1
+    mask = valid & ((flow_off <= 1.0) & (flow_off >= -1.0)).any(dim=1)
+    ref_opts = torch.nn.functional.grid_sample(ref_opts, flow_off.permute(0, 2, 3, 1), mode='nearest', padding_mode='border')
+    ref_conf = torch.nn.functional.grid_sample(ref_confidence, flow_off.permute(0, 2, 3, 1), mode='nearest', padding_mode='border')
 
     # compute residuals
-    residuals = torch.linalg.norm(torch.gather(trg_opts, 2,flow_unravel)-ref_opts, ord=2, dim=1)
-    mask = torch.isnan(flow_preds[:, 0]).view(n, -1) | torch.isnan(flow_preds[:, 1]).view(n, -1) | ~valid.view(n, -1)
+    residuals = torch.linalg.norm(trg_opts-ref_opts, ord=2, dim=1)
+    mask = torch.isnan(flow_preds[:, 0]) | torch.isnan(flow_preds[:, 1]) | ~mask
     # weight residuals by confidences
-    residuals = torch.sqrt(trg_confidence.view(n, -1)*torch.gather(src_confidence.view(n, -1), 1,flow_unravel[:,0])).double() * residuals
+    residuals = torch.sqrt(trg_confidence*ref_conf) * residuals
     residuals[mask] = 0.0
-    loss = torch.mean(residuals).float()
+    loss = torch.mean(residuals)
     return loss
