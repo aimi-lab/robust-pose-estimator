@@ -7,6 +7,7 @@ import torchvision.transforms.functional as F
 from torchvision.utils import flow_to_image
 from skimage.transform import warp
 from alley_oop.photometry.raft.losses import _warp_frame, create_img_coords_t
+from alley_oop.fusion.surfel_map import SurfelMap, FrameClass
 
 
 def warp_frame(src_frame, depth, T, intrinsics):
@@ -36,7 +37,7 @@ def warp_frame_flow(src_frame, flow):
     return torch.tensor(src_img_warped).to(torch.uint8)
 
 
-def plot_res(img1_batch,img2_batch, flow_batch, depth2_batch, pose_batch, intrinsics):
+def plot_res(img1_batch,img2_batch, flow_batch, depth2_batch, pose_batch, intrinsics, n=2):
 
     def plot(imgs, **imshow_kwargs):
         if not isinstance(imgs[0], list):
@@ -56,9 +57,19 @@ def plot_res(img1_batch,img2_batch, flow_batch, depth2_batch, pose_batch, intrin
         plt.tight_layout()
         return fig, axs
     flow_imgs = flow_to_image(flow_batch)
-    img1_batch = [img.to(torch.uint8) for img in img1_batch[:2]]
-    img2_batch = [img.to(torch.uint8) for img in img2_batch[:2]]
+    img1_batch = [img.to(torch.uint8) for img in img1_batch[:n]]
+    img2_batch = [img.to(torch.uint8) for img in img2_batch[:n]]
     img1_w_flow_batch = [warp_frame_flow(img[:, ::8,::8], flow)for img, flow in zip(img1_batch[:2], flow_batch)]
-    img1_w_pose_batch = [warp_frame(img[:, ::8,::8], depth, pose, intrinsics) for img, depth, pose in zip(img1_batch[:2], depth2_batch, pose_batch)]
-    grid = [[img1, img2, img_w, img_w2, flow_img] for (img1, img2, img_w, img_w2, flow_img) in zip(img1_batch, img2_batch, img1_w_flow_batch, img1_w_pose_batch, flow_imgs[:2])]
+    img1_w_pose_batch = [warp_frame(img[:, ::8,::8], depth, pose, intrinsics) for img, depth, pose in zip(img1_batch, depth2_batch, pose_batch)]
+    grid = [[img1, img2, img_w, img_w2, flow_img] for (img1, img2, img_w, img_w2, flow_img) in zip(img1_batch, img2_batch, img1_w_flow_batch, img1_w_pose_batch, flow_imgs[:n])]
     return plot(grid)
+
+
+def plot_3d(img1_batch,img2_batch, depth1_batch, depth2_batch, pose_batch, intrinsics, n=0):
+    from viewer.viewer3d import Viewer3D
+    viewer = Viewer3D((500,500), blocking=True)
+    img1_pcl = SurfelMap(frame=FrameClass(img1_batch[None,n][..., ::8,::8]/255.0, depth1_batch[None,n], intrinsics=intrinsics), kmat=intrinsics).transform_cpy(pose_batch[n]).pcl2open3d(stable=False)
+    img2_pcl = SurfelMap(frame=FrameClass(img2_batch[None,n][..., ::8,::8]/255.0, depth2_batch[None,n], intrinsics=intrinsics), kmat=intrinsics).pcl2open3d(stable=False)
+    dists = np.asarray(img1_pcl.compute_point_cloud_distance(img2_pcl))
+    print("mean pcl distance: ", dists.mean())
+    viewer(pose=torch.eye(4), pcd=img1_pcl, add_pcd=img2_pcl)
