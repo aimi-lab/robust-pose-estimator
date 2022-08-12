@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from collections import OrderedDict
 import copy
 
+from alley_oop.geometry.pinhole_transforms import create_img_coords_t
 from alley_oop.photometry.raft.core.corr import CorrBlock, AlternateCorrBlock
 from alley_oop.photometry.raft.core.raft import RAFT
 from alley_oop.photometry.raft.core.extractor import RGBDEncoder
@@ -26,7 +27,7 @@ class PoseHead(nn.Module):
 
 
 class PoseN(RAFT):
-    def __init__(self, config):
+    def __init__(self, config, intrinsics):
         super(PoseN, self).__init__(config)
         H, W = config["image_shape"]
         self.pose_head = PoseHead((H*W) // 64)
@@ -38,6 +39,14 @@ class PoseN(RAFT):
                                     dropout=config['dropout'])
         self.pose_scale = config['pose_scale']
 
+        img_coords = create_img_coords_t(y=H, x=W)
+        self.repr = nn.Parameter(torch.linalg.inv(intrinsics.cpu())@ img_coords.view(3, -1), requires_grad=False)
+
+    def proj(self, depth):
+        n = depth.shape[0]
+        opts = depth.view(n, 1, -1) * self.repr.unsqueeze(0)
+        return opts.view(n,3,*depth.shape[-2:])
+
     def forward(self, image1, image2, depth1, depth2, conf1, conf2, iters=12, flow_init=None, pose_init=None):
         """ Estimate optical flow and rigid pose between pair of frames """
         # rescale to +/- 1.0
@@ -46,10 +55,11 @@ class PoseN(RAFT):
         depth1 = 2 * depth1 - 1.0
         depth2 = 2 * depth2 - 1.0
 
+
         # stack images, depth and conf
         if self.rgbd:
-            image1 = torch.cat((image1, depth1, conf1), dim=1)
-            image2 = torch.cat((image2, depth2, conf2), dim=1)
+            image1 = torch.cat((image1, self.proj(depth1), conf1), dim=1)
+            image2 = torch.cat((image2, self.proj(depth2), conf2), dim=1)
 
         n = image1.shape[0]
         image1 = image1.contiguous()
@@ -119,17 +129,17 @@ class PoseN(RAFT):
             # replace first conv layer for RGB + D
             # compute average weights over RGB channels and use that to initialize the depth channel
             # technique from Temporal Segment Network, L. Wang 2016
-            self.fnet.conv1 = nn.Conv2d(5, 64, kernel_size=7, stride=2, padding=3)
-            self.cnet.conv1 = nn.Conv2d(5, 64, kernel_size=7, stride=2, padding=3)
+            self.fnet.conv1 = nn.Conv2d(7, 64, kernel_size=7, stride=2, padding=3)
+            self.cnet.conv1 = nn.Conv2d(7, 64, kernel_size=7, stride=2, padding=3)
             tmp_conv_weights = raft.fnet.conv1.weight.data.clone()
             self.fnet.conv1.weight.data[:, :3, :, :] = tmp_conv_weights.clone()
             mean_weights = torch.mean(tmp_conv_weights[:, :3, :, :], dim=1, keepdim=True)
-            self.fnet.conv1.weight.data[:, 3:5, :, :] = mean_weights
+            self.fnet.conv1.weight.data[:, 3:7, :, :] = mean_weights
 
             tmp_conv_weights = raft.cnet.conv1.weight.data.clone()
             self.cnet.conv1.weight.data[:, :3, :, :] = tmp_conv_weights.clone()
             mean_weights = torch.mean(tmp_conv_weights[:, :3, :, :], dim=1, keepdim=True)
-            self.cnet.conv1.weight.data[:, 3:5, :, :] = mean_weights
+            self.cnet.conv1.weight.data[:, 3:7, :, :] = mean_weights
         return self, raft
 
     def freeze_flow(self, freeze=True):
@@ -137,4 +147,5 @@ class PoseN(RAFT):
             param.requires_grad = not freeze
         for param in self.pose_head.parameters():
             param.requires_grad = True
+        self.repr.requires_grad = False
         return self
