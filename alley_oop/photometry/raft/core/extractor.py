@@ -195,7 +195,7 @@ class BasicEncoder(nn.Module):
 class RGBDEncoder(BasicEncoder):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.conv1 = nn.Conv2d(7, 64, kernel_size=7, stride=2, padding=3)
+        self.conv1 = nn.Conv2d(5, 64, kernel_size=7, stride=2, padding=3)
 
 
 class SmallEncoder(nn.Module):
