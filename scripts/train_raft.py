@@ -78,7 +78,7 @@ def main(args, config, force_cpu):
     model, ref_model = model.init_from_raft(config['model']['pretrained'])
     ref_model = ref_model.to(device)
     if args.restore_ckpt is not None:
-        model.load_state_dict(torch.load(args.restore_ckpt), strict=False)
+        model.load_state_dict(torch.load(args.restore_ckpt)['state_dict'], strict=False)
 
     model.train()
     model = model.to(device)
