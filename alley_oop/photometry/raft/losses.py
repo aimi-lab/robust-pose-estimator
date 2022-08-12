@@ -107,8 +107,8 @@ def geometric_3d_loss(flow_preds, se3_preds, intrinsics, trg_depth, ref_depth, t
     # get optical flow correspondences
     row_coords, col_coords = torch.meshgrid(torch.arange(h), torch.arange(w), indexing='ij')
     flow_off = torch.empty_like(flow_preds)
-    flow_off[:, 1] = 2*(flow_preds[:, 1] + row_coords)/(h-1)-1
-    flow_off[:, 0] = 2*(flow_preds[:, 0] + col_coords)/(w-1)-1
+    flow_off[:, 1] = 2*(flow_preds[:, 1] + row_coords.to(flow_preds.device))/(h-1)-1
+    flow_off[:, 0] = 2*(flow_preds[:, 0] + col_coords.to(flow_preds.device))/(w-1)-1
     mask = valid & ((flow_off <= 1.0) & (flow_off >= -1.0)).any(dim=1)
     ref_opts = torch.nn.functional.grid_sample(ref_opts, flow_off.permute(0, 2, 3, 1), mode='nearest', padding_mode='border')
     ref_conf = torch.nn.functional.grid_sample(ref_confidence, flow_off.permute(0, 2, 3, 1), mode='nearest', padding_mode='border')
