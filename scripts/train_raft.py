@@ -155,10 +155,10 @@ def main(args, config, force_cpu):
                 print(" 3d loss: ", loss3d.detach().mean().cpu().item())
                 print(" flow loss: ", loss_flow.detach().mean().cpu().item())
                 if device == torch.device('cpu'):
-                    fig, ax = plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth, lie_se3_to_SE3_batch(-pose), intrinsics)
+                    fig, ax = plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth, lie_se3_to_SE3_batch(-pose_predictions[-1]), intrinsics)
                     import matplotlib.pyplot as plt
                     plt.show()
-                    plot_3d(ref_img, trg_img, ref_depth, trg_depth, lie_se3_to_SE3_batch(pose), intrinsics)
+                    plot_3d(ref_img, trg_img, ref_depth, trg_depth, lie_se3_to_SE3_batch(pose_predictions[-1]).detach(), intrinsics)
             # update params
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)                

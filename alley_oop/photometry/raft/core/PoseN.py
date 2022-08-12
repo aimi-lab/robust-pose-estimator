@@ -17,13 +17,13 @@ class PoseHead(nn.Module):
         self.convs = nn.Sequential(
             nn.Conv2d(in_channels=136, out_channels=32, kernel_size=(3, 3), padding='same'),
             nn.Conv2d(in_channels=32, out_channels=1, kernel_size=(3, 3), padding='same'))
-        self.mlp = nn.Sequential(nn.Linear(in_features=input_dims,out_features=64),
+        self.mlp = nn.Sequential(nn.Linear(in_features=input_dims+6,out_features=64),
                                     nn.ReLU(),
                                     nn.Linear(in_features=64, out_features=6))
-    def forward(self, net, flow, pcl1, pcl2):
+    def forward(self, net, flow, pcl1, pcl2, pose):
         pcl2 = self.remap(pcl2, flow)
         out = self.convs(torch.cat((net, flow, pcl1, pcl2), dim=1)).view(net.shape[0], -1)
-        return self.mlp(out)
+        return self.mlp(torch.cat((out, pose), dim=1))
 
     def remap(self, x, flow):
         # get optical flow correspondences
@@ -110,14 +110,14 @@ class PoseN(RAFT):
             flow = coords1 - coords0
             with torch.cuda.amp.autocast():
                 net, up_mask, delta_flow = self.update_block(net, inp, corr, flow)
-            pose_se3 = self.pose_head(net, flow, pcl1, pcl2)
+            delta_pose = self.pose_head(net, flow, pcl1, pcl2, pose_se3)
 
             # F(t+1) = F(t) + \Delta(t)
             coords1 = coords1 + delta_flow
             flow_up = coords1 - coords0
             flow_predictions.append(flow_up.float())
 
-            #pose_se3 = pose_se3 + delta_pose
+            pose_se3 = pose_se3 + delta_pose
             pose_se3_predictions.append(pose_se3.float()/self.pose_scale)
         return flow_predictions, pose_se3_predictions
 
