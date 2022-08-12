@@ -13,7 +13,7 @@ from alley_oop.photometry.raft.core.PoseN import RAFT, PoseN
 import alley_oop.photometry.raft.core.datasets as datasets
 from alley_oop.photometry.raft.losses import geometric_2d_loss, geometric_3d_loss, supervised_pose_loss, seq_loss, l1_loss
 from alley_oop.photometry.raft.utils.logger import Logger
-from alley_oop.photometry.raft.utils.plotting import plot_res
+from alley_oop.photometry.raft.utils.plotting import plot_res, plot_3d
 
 import wandb
 from torch.cuda.amp import GradScaler
@@ -127,7 +127,6 @@ def main(args, config, force_cpu):
             flow_predictions, pose_predictions = model(trg_img, ref_img, trg_depth/config['depth_scale'],
                                                        ref_depth/config['depth_scale'], trg_conf, ref_conf,
                                                        iters=config['model']['iters'])
-
             # prepare data for loss computaitons
             ref_depth, trg_depth, ref_conf, trg_conf = [train_loader.dataset.resize_lowres(d) for d in
                                                         [ref_depth, trg_depth, ref_conf, trg_conf]]
@@ -144,6 +143,20 @@ def main(args, config, force_cpu):
             loss_pose = seq_loss(supervised_pose_loss, (pose_predictions, pose))
             loss = loss_weights['pose']*loss_pose+loss_weights['2d']*loss2d+loss_weights['3d']*loss3d + loss_weights['flow']*loss_flow
 
+            # debug
+            if args.dbg & (i_batch%10 == 0):
+                print("\n se3 pose")
+                print(f"gt_pose: {pose[0].detach().cpu().numpy()}\npred_pose: {pose_predictions[-1][0].detach().cpu().numpy()}")
+                print(" SE3 pose")
+                print(f"gt_pose: {lie_se3_to_SE3(pose[0]).detach().cpu().numpy()}\npred_pose: {lie_se3_to_SE3(pose_predictions[-1][0]).detach().cpu().numpy()}")
+                print(" pose loss: ", loss_pose.detach().mean().cpu().item())
+                print(" 2d loss: ", loss2d.detach().mean().cpu().item())
+                print(" 3d loss: ", loss3d.detach().mean().cpu().item())
+                print(" flow loss: ", loss_flow.detach().mean().cpu().item())
+                fig, ax = plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth, lie_se3_to_SE3_batch(-pose), intrinsics)
+                import matplotlib.pyplot as plt
+                plt.show()
+                plot_3d(ref_img, trg_img, ref_depth, trg_depth, lie_se3_to_SE3_batch(pose), intrinsics)
             # update params
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)                
@@ -153,7 +166,7 @@ def main(args, config, force_cpu):
                       "train/loss_pose": loss_pose.detach().mean().cpu().item(),
                       "train/loss_flow": loss_flow.detach().mean().cpu().item(),
                       "train/loss_total": loss.detach().mean().cpu().item()}
-            
+
             scaler.step(optimizer)
             scaler.update()
             scheduler.step()
@@ -187,6 +200,7 @@ if __name__ == '__main__':
     parser.add_argument('--restore_ckpt', help="restore checkpoint")
     parser.add_argument('--config', help="yaml config file", default='../configuration/train_raft.yaml')
     parser.add_argument('--force_cpu', action="store_true")
+    parser.add_argument('--dbg', action="store_true")
     args = parser.parse_args()
 
     torch.manual_seed(1234)
