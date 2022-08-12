@@ -73,8 +73,19 @@ def main(args, config, force_cpu):
     config['model']['image_shape'] = config['image_shape']
     device = torch.device('cuda') if (torch.cuda.is_available() & (not force_cpu)) else torch.device('cpu')
 
+    # get data
+    data_train, intrinsics = datasets.get_data(config['data']['train']['basepath'],config['data']['train']['sequences'],
+                                               config['image_shape'], step=config['data']['train']['step'])
+    data_val, intrinsics = datasets.get_data(config['data']['val']['basepath'],config['data']['val']['sequences'],
+                                             config['image_shape'], step=config['data']['val']['step'])
+    print(f"train: {len(data_train)} samples, val: {len(data_val)} samples")
+    intrinsics = intrinsics.to(device)
+    train_loader = DataLoader(data_train, num_workers=4, pin_memory=True, batch_size=config['train']['batch_size'], shuffle=True)
+    val_loader = DataLoader(data_val, num_workers=4, pin_memory=True, batch_size=config['val']['batch_size'],
+                            sampler=SubsetRandomSampler(torch.from_numpy(np.random.choice(len(data_val), size=(400,), replace=False))))
+
     # get model
-    model = PoseN(config['model'])
+    model = PoseN(config['model'], intrinsics)
     model, ref_model = model.init_from_raft(config['model']['pretrained'])
     ref_model = ref_model.to(device)
     if args.restore_ckpt is not None:
@@ -87,20 +98,10 @@ def main(args, config, force_cpu):
     parallel = False
     if (device != torch.device('cpu')) & (torch.cuda.device_count() > 1):
         parallel = True
-        model =nn.DataParallel(model).to(device)
-
-    # get data
-    data_train, intrinsics = datasets.get_data(config['data']['train']['basepath'],config['data']['train']['sequences'],
-                                               config['image_shape'], step=config['data']['train']['step'])
-    data_val, intrinsics = datasets.get_data(config['data']['val']['basepath'],config['data']['val']['sequences'],
-                                             config['image_shape'], step=config['data']['val']['step'])
-    print(f"train: {len(data_train)} samples, val: {len(data_val)} samples")
-    intrinsics = intrinsics.to(device)
-    train_loader = DataLoader(data_train, num_workers=4, pin_memory=True, batch_size=config['train']['batch_size'], shuffle=True)
-    val_loader = DataLoader(data_val, num_workers=4, pin_memory=True, batch_size=config['val']['batch_size'],
-                            sampler=SubsetRandomSampler(torch.from_numpy(np.random.choice(len(data_val), size=(400,), replace=False))))
+        model = nn.DataParallel(model).to(device)
     optimizer, scheduler = fetch_optimizer(config['train'], model)
 
+    # training loop
     total_steps = 0
     scaler = GradScaler()
     logger = Logger(model, scheduler, config, args.name, args.log)
