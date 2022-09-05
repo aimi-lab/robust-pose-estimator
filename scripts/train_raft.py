@@ -54,11 +54,13 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger):
             loss3d = geometric_3d_loss(flow_predictions[-1], pose_predictions[-1], intrinsics, trg_depth, ref_depth,
                                        trg_conf, ref_conf, valid)
             loss_pose = seq_loss(supervised_pose_loss, (pose_predictions, pose))
-            loss = loss_weights['pose'] * loss_pose + loss_weights['2d'] * loss2d + loss_weights['3d'] * loss3d
+            loss_pose_direct = seq_loss(supervised_pose_loss, (pose_predictions_direct, pose))
+            loss = loss_weights['pose'] * loss_pose + loss_weights['2d'] * loss2d + loss_weights['3d'] * loss3d+loss_weights['pose_direct']*loss_pose_direct
 
             metrics = {"val/loss2d": loss2d.detach().mean().cpu().item(),
                        "val/loss3d": loss3d.detach().mean().cpu().item(),
                        "val/loss_pose": loss_pose.detach().mean().cpu().item(),
+                       "val/loss_pose_direct": loss_pose_direct.detach().mean().cpu().item(),
                        "val/loss_total": loss.detach().mean().cpu().item()}
             logger.push(metrics, len(dataloader))
         logger.flush()
@@ -142,7 +144,8 @@ def main(args, config, force_cpu):
             loss3d = geometric_3d_loss(flow_predictions[-1], pose_predictions[-1], intrinsics, trg_depth, ref_depth,
                                        trg_conf, ref_conf, valid)
             loss_pose = seq_loss(supervised_pose_loss, (pose_predictions, pose))
-            loss = loss_weights['pose']*loss_pose+loss_weights['2d']*loss2d+loss_weights['3d']*loss3d + loss_weights['flow']*loss_flow
+            loss_pose_direct = seq_loss(supervised_pose_loss, (pose_predictions_direct, pose))
+            loss = loss_weights['pose']*loss_pose+loss_weights['2d']*loss2d+loss_weights['3d']*loss3d + loss_weights['flow']*loss_flow+loss_weights['pose_direct']*loss_pose_direct
 
             # debug
             if args.dbg & (i_batch%SUM_FREQ == 0):
@@ -151,6 +154,7 @@ def main(args, config, force_cpu):
                 print(" SE3 pose")
                 print(f"gt_pose: {lie_se3_to_SE3(pose[0]).detach().cpu().numpy()}\npred_pose: {lie_se3_to_SE3(pose_predictions[-1][0]).detach().cpu().numpy()}")
                 print(" pose loss: ", loss_pose.detach().mean().cpu().item())
+                print(" pose loss direct: ", loss_pose_direct.detach().mean().cpu().item())
                 print(" 2d loss: ", loss2d.detach().mean().cpu().item())
                 print(" 3d loss: ", loss3d.detach().mean().cpu().item())
                 print(" flow loss: ", loss_flow.detach().mean().cpu().item())
@@ -166,6 +170,7 @@ def main(args, config, force_cpu):
             metrics = {"train/loss2d": loss2d.detach().mean().cpu().item(),
                       "train/loss3d": loss3d.detach().mean().cpu().item(),
                       "train/loss_pose": loss_pose.detach().mean().cpu().item(),
+                      "train/loss_pose_direct": loss_pose_direct.detach().mean().cpu().item(),
                       "train/loss_flow": loss_flow.detach().mean().cpu().item(),
                       "train/loss_total": loss.detach().mean().cpu().item()}
 
