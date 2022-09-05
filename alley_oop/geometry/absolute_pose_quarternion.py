@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from alley_oop.geometry.lie_3d import lie_SE3_to_se3
+from alley_oop.geometry.lie_3d import lie_SE3_to_se3, lie_se3_to_SE3_batch
 
 
 def align(reference, query, estimate_scale=False, ret_homogenous=False):
@@ -89,4 +89,5 @@ def align_torch(reference, query):
         T[:3,:3] = rot[b]
         T[:3,3] = trans[b].squeeze()
         se3[b] = lie_SE3_to_se3(T)
+    se3[torch.isnan(se3)] = 0.0  # handle degenerate cases like identity transform
     return se3, rot, trans
