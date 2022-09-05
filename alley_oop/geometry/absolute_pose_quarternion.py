@@ -1,4 +1,6 @@
 import numpy as np
+import torch
+from alley_oop.geometry.lie_3d import lie_SE3_to_se3
 
 
 def align(reference, query, estimate_scale=False, ret_homogenous=False):
@@ -52,3 +54,39 @@ def align(reference, query, estimate_scale=False, ret_homogenous=False):
         pose[:3,:3] = rot
         pose[:3,3] = trans.squeeze()
         return pose, residuals, scale, alignment_error
+
+
+def align_torch(reference, query):
+    """Align two trajectories using the method of Horn (closed-form).
+    B. K. P. Horn, “Closed-form solution of absolute orientation using unit quaternions,”
+    Journal of the Optical Society of America A , vol. 4, no. 4, pp. 629–642, 1987
+
+    Input:
+    model -- first trajectory (batchx3xn)
+    data -- second trajectory (batchx3xn)
+
+    Output:
+    se(3) alignment (batchx6)
+
+    """
+    ref_mean = reference.mean(-1)[...,None]
+    query_mean = query.mean(-1)[...,None]
+    model_zerocentered = reference - ref_mean
+    data_zerocentered = query - query_mean
+    N = reference.shape[0]
+    outer = torch.bmm(model_zerocentered.permute(0,2,1).reshape(-1, 3).unsqueeze(2), data_zerocentered.permute(0,2,1).reshape(-1, 3).unsqueeze(1))
+    W = outer.reshape(N, -1, 3, 3).sum(dim=1)
+    U, d, Vh = torch.linalg.svd(W.transpose(1,2))
+    S = torch.eye(3, device=reference.device).reshape((1, 3, 3)).repeat(N, 1, 1)
+    det = torch.linalg.det(U) * torch.linalg.det(Vh)
+    S[:, 2, 2] = torch.sign(det)
+    rot = U @ S @ Vh
+
+    trans = query_mean - rot @ ref_mean
+    se3 = torch.zeros((N,6), device=reference.device)
+    for b in range(N):
+        T = torch.eye(4, device=reference.device)
+        T[:3,:3] = rot[b]
+        T[:3,3] = trans[b].squeeze()
+        se3[b] = lie_SE3_to_se3(T)
+    return se3, rot, trans
