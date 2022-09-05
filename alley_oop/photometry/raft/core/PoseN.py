@@ -25,7 +25,8 @@ class PoseHead(nn.Module):
     def forward(self, net, flow, pcl1, pcl2, pose):
         pcl_aligned = self.remap(pcl2, flow)
         out = self.convs(torch.cat((net, flow, pcl1, pcl_aligned), dim=1)).view(net.shape[0], -1)
-        return self.mlp(torch.cat((out, pose), dim=1)), align_torch(pcl1.view(*pcl1.shape[:2], -1), pcl_aligned.view(*pcl1.shape[:2], -1))
+        direct_se3 = align_torch(250*pcl_aligned.view(*pcl1.shape[:2], -1), 250*pcl1.view(*pcl1.shape[:2], -1))[0] #ToDo remove scale
+        return self.mlp(torch.cat((out, pose), dim=1)), direct_se3
 
     def remap(self, x, flow):
         # get optical flow correspondences

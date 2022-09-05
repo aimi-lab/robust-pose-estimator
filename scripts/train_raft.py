@@ -44,7 +44,7 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger):
     with torch.no_grad():
         for i_batch, data_blob in enumerate(dataloader):
             ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, pose = [x.to(device) for x in data_blob]
-            flow_predictions, pose_predictions = model(trg_img, ref_img, trg_depth/config['depth_scale'], ref_depth/config['depth_scale'], trg_conf, ref_conf,
+            flow_predictions, pose_predictions, pose_predictions_direct = model(trg_img, ref_img, trg_depth/config['depth_scale'], ref_depth/config['depth_scale'], trg_conf, ref_conf,
                                                        iters=config['model']['iters'])
 
             ref_depth, trg_depth, ref_conf, trg_conf = [dataloader.dataset.resize_lowres(d) for d in
@@ -125,7 +125,7 @@ def main(args, config, force_cpu):
                 trg_img = (trg_img + stdv * torch.randn(*trg_img.shape).to(device)).clamp(0.0, 255.0)
 
             # forward pass
-            flow_predictions, pose_predictions = model(trg_img, ref_img, trg_depth/config['depth_scale'],
+            flow_predictions, pose_predictions, pose_predictions_direct = model(trg_img, ref_img, trg_depth/config['depth_scale'],
                                                        ref_depth/config['depth_scale'], trg_conf, ref_conf,
                                                        iters=config['model']['iters'])
             # prepare data for loss computaitons
@@ -147,7 +147,7 @@ def main(args, config, force_cpu):
             # debug
             if args.dbg & (i_batch%SUM_FREQ == 0):
                 print("\n se3 pose")
-                print(f"gt_pose: {pose[0].detach().cpu().numpy()}\npred_pose: {pose_predictions[-1][0].detach().cpu().numpy()}")
+                print(f"gt_pose: {pose[0].detach().cpu().numpy()}\npred_pose: {pose_predictions[-1][0].detach().cpu().numpy()}\npred_pose_direct: {pose_predictions_direct[-1][0].detach().cpu().numpy()}")
                 print(" SE3 pose")
                 print(f"gt_pose: {lie_se3_to_SE3(pose[0]).detach().cpu().numpy()}\npred_pose: {lie_se3_to_SE3(pose_predictions[-1][0]).detach().cpu().numpy()}")
                 print(" pose loss: ", loss_pose.detach().mean().cpu().item())
