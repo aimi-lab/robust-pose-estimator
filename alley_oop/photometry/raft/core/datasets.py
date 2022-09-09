@@ -139,30 +139,34 @@ class TUMDataset(Dataset):
         images = sorted(glob(os.path.join(root, 'rgb', '*.png')))
         depth = sorted(glob(os.path.join(root, 'depth', '*.png')))
         gt_file = os.path.join(root, 'groundtruth.txt')
-        poses = read_freiburg(gt_file)
+        poses, pose_lookup = read_freiburg(gt_file, ret_stamps=True)
         assert len(images) == len(depth)
         self.depth_cutoff = depth_cutoff
         self.image_list = []
         self.depth_list = []
         self.rel_pose_list = []
+        # generate look-up table for synchronization
+        depth_lookup = [os.path.basename(l).split('.png')[0] for l in depth]
+        depth_lookup = np.asarray([int(l.split('.')[0] + l.split('.')[1]) for l in depth_lookup])
         if isinstance(step, int):
             step = (step, step)
         for i in range(len(images)-step[1]):
             s = np.random.randint(*step) if step[0] < step[1] else step[0]  # select a random step in given range
             self.image_list.append([images[i], images[i+s]])
-            self.depth_list.append([depth[i], depth[i+s]])
-            self.rel_pose_list.append(np.linalg.inv(poses[i+s].astype(np.float64)) @ poses[i].astype(np.float64))
+            self.depth_list.append([depth[self._find_closest_timestamp(images[i], depth_lookup)],
+                                    depth[self._find_closest_timestamp(images[i+s], depth_lookup)]])
+            pose_cur = poses[self._find_closest_timestamp(images[i], pose_lookup)].astype(np.float64)
+            pose_next = poses[self._find_closest_timestamp(images[i+s], pose_lookup)].astype(np.float64)
+            self.rel_pose_list.append(np.linalg.inv(pose_next) @ pose_cur)
         self.resize = Resize(img_size)
         self.resize_lowres = Resize((img_size[0]//8, img_size[1]//8))
         self.resize_lowres_msk = Resize((img_size[0] // 8, img_size[1] // 8), interpolation=InterpolationMode.NEAREST)
-        # generate look-up table for synchronization
-        self.depth_lookup = [os.path.basename(l[0]).split('.png')[0] for l in self.depth_list]
-        self.depth_lookup = np.asarray([int(l.split('.')[0] + l.split('.')[1]) for l in self.depth_lookup])
 
-    def _find_closest_timestamp(self, item):
-        query = os.path.basename(self.image_list[item][0]).split('.png')[0]
+
+    def _find_closest_timestamp(self, path, lookup):
+        query = os.path.basename(path).split('.png')[0]
         query = int(query.split('.')[0] + query.split('.')[1])
-        return np.argmin((self.depth_lookup - query) ** 2)
+        return np.argmin((lookup - query) ** 2)
 
     def __getitem__(self, index):
         img1, depth1 = self._read_img(index,0)
@@ -183,7 +187,7 @@ class TUMDataset(Dataset):
     def _read_img(self, item, i):
         path = self.image_list[item][i]
         # find depth map that has closed time index as depth and rgb are not synchronized
-        depth = cv2.imread(self.depth_list[self._find_closest_timestamp(item)][i], cv2.IMREAD_ANYDEPTH)
+        depth = cv2.imread(self.depth_list[item][i], cv2.IMREAD_ANYDEPTH)
         depth = torch.from_numpy(depth.astype(np.float32) / 5.0).unsqueeze(0)
         img = torch.from_numpy(cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)).permute(2, 0, 1).float()
         return self.resize(img), self.resize(depth)
