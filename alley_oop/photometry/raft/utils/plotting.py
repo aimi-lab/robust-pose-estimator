@@ -36,6 +36,13 @@ def warp_frame_flow(src_frame, flow):
         src_img_warped[ch] = warp(src_img_warped[ch], np.array([row_coords + v, col_coords + u]), mode='edge')
     return torch.tensor(src_img_warped).to(torch.uint8)
 
+def warp_frame_flow2(src_frame, flow):
+    h, w = flow.shape[-2:]
+    row_coords, col_coords = torch.meshgrid(torch.arange(h), torch.arange(w), indexing='ij')
+    flow_off = torch.empty_like(flow)
+    flow_off[1] = 2 * (flow[1] + row_coords.to(flow.device)) / (h - 1) - 1
+    flow_off[0] = 2 * (flow[0] + col_coords.to(flow.device)) / (w - 1) - 1
+    return torch.nn.functional.grid_sample(src_frame.unsqueeze(0).float(), flow_off.permute(1, 2, 0).unsqueeze(0), padding_mode='border', mode='nearest').squeeze().to(torch.uint8)
 
 def plot_res(img1_batch,img2_batch, flow_batch, depth2_batch, pose_batch, intrinsics, n=2):
 
@@ -59,7 +66,7 @@ def plot_res(img1_batch,img2_batch, flow_batch, depth2_batch, pose_batch, intrin
     flow_imgs = flow_to_image(flow_batch)
     img1_batch = [img.to(torch.uint8) for img in img1_batch[:n]]
     img2_batch = [img.to(torch.uint8) for img in img2_batch[:n]]
-    img1_w_flow_batch = [warp_frame_flow(img[:, ::8,::8], flow)for img, flow in zip(img1_batch[:2], flow_batch)]
+    img1_w_flow_batch = [warp_frame_flow2(img[:, ::8,::8], flow)for img, flow in zip(img1_batch[:2], flow_batch)]
     img1_w_pose_batch = [warp_frame(img[:, ::8,::8], depth, pose, intrinsics) for img, depth, pose in zip(img1_batch, depth2_batch, pose_batch)]
     grid = [[img1, img2, img_w, img_w2, flow_img] for (img1, img2, img_w, img_w2, flow_img) in zip(img1_batch, img2_batch, img1_w_flow_batch, img1_w_pose_batch, flow_imgs[:n])]
     return plot(grid)
