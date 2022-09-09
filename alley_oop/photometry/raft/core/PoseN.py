@@ -56,7 +56,12 @@ class PoseN(RAFT):
     def __init__(self, config, intrinsics):
         super(PoseN, self).__init__(config)
         H, W = config["image_shape"]
-        self.pose_head = HornPoseHead()#PoseHead((H*W) // 64)
+        if config['mode'] == 'mlp':
+            self.pose_head = PoseHead((H*W) // 64)
+        elif config['mode'] == 'mlp':
+            self.pose_head = HornPoseHead()
+        else:
+            raise NotImplementedError
         # replace by 4-channel input conv (RGB + D)
         self.rgbd = config['RGBD']
         if self.rgbd:
