@@ -23,27 +23,40 @@ class PoseHead(nn.Module):
                                     nn.Linear(in_features=64, out_features=6))
 
     def forward(self, net, flow, pcl1, pcl2, pose):
-        pcl_aligned = self.remap(pcl2, flow)
+        pcl_aligned, valid = self.remap(pcl2, flow) #ToDo how to use mask?
         out = self.convs(torch.cat((net, flow, pcl1, pcl_aligned), dim=1)).view(net.shape[0], -1)
-        direct_se3 = align_torch(250*pcl_aligned.view(*pcl1.shape[:2], -1), 250*pcl1.view(*pcl1.shape[:2], -1))[0] #ToDo remove scale
-        return self.mlp(torch.cat((out, pose), dim=1)), direct_se3
+        return self.mlp(torch.cat((out, pose), dim=1))
 
     def remap(self, x, flow):
         # get optical flow correspondences
-        h, w = flow.shape[-2:]
+        n,_,h, w = flow.shape
         row_coords, col_coords = torch.meshgrid(torch.arange(h), torch.arange(w), indexing='ij')
         flow_off = torch.empty_like(flow)
         flow_off[:, 1] = 2 * (flow[:, 1] + row_coords.to(flow.device)) / (h - 1) - 1
         flow_off[:, 0] = 2 * (flow[:, 0] + col_coords.to(flow.device)) / (w - 1) - 1
-        x = torch.nn.functional.grid_sample(x, flow_off.permute(0, 2, 3, 1), padding_mode='border')
-        return x
+        x = torch.nn.functional.grid_sample(x, flow_off.permute(0, 2, 3, 1), padding_mode='zeros')
+        valid = (x > 0).any(dim=1).view(n,1,-1).repeat(1,3,1)
+        return x, valid
+
+
+class HornPoseHead(PoseHead):
+    def __init__(self):
+        super(HornPoseHead, self).__init__(1)
+
+    def forward(self, net, flow, pcl1, pcl2, pose):
+        n = pcl1.shape[0]
+        pcl_aligned, valid = self.remap(pcl2, flow)
+        pcl_aligned_v = pcl_aligned.view(n,3, -1)[valid].view(n,3,-1)
+        pcl1_v = pcl1.view(n, 3, -1)[valid].view(n, 3, -1)
+        direct_se3 = align_torch(pcl_aligned_v, pcl1_v)[0]
+        return direct_se3
 
 
 class PoseN(RAFT):
     def __init__(self, config, intrinsics):
         super(PoseN, self).__init__(config)
         H, W = config["image_shape"]
-        self.pose_head = PoseHead((H*W) // 64)
+        self.pose_head = HornPoseHead()#PoseHead((H*W) // 64)
         # replace by 4-channel input conv (RGB + D)
         self.rgbd = config['RGBD']
         if self.rgbd:
@@ -65,13 +78,13 @@ class PoseN(RAFT):
         # rescale to +/- 1.0
         image1 = 2 * (image1 / 255.0) - 1.0
         image2 = 2 * (image2 / 255.0) - 1.0
-        depth1 = 2 * depth1 - 1.0
-        depth2 = 2 * depth2 - 1.0
         pcl1 = self.proj(torch.nn.functional.interpolate(depth1, scale_factor=1/8))
         pcl2 = self.proj(torch.nn.functional.interpolate(depth2, scale_factor=1/8))
 
         # stack images, depth and conf
         if self.rgbd:
+            depth1 = 2 * depth1 - 1.0
+            depth2 = 2 * depth2 - 1.0
             image1 = torch.cat((image1, depth1, conf1), dim=1)
             image2 = torch.cat((image2, depth2, conf2), dim=1)
 
@@ -106,7 +119,6 @@ class PoseN(RAFT):
 
         flow_predictions = []
         pose_se3_predictions = []
-        pose_se3_direct = []
         for itr in range(iters):
             coords1 = coords1.detach()
             corr = corr_fn(coords1)  # index correlation volume
@@ -114,16 +126,14 @@ class PoseN(RAFT):
             flow = coords1 - coords0
             with torch.cuda.amp.autocast():
                 net, up_mask, delta_flow = self.update_block(net, inp, corr, flow)
-            delta_pose, pose_direct = self.pose_head(net, flow, pcl1, pcl2, pose_se3)
-            pose_se3_direct.append(pose_direct)
+            pose_se3 = self.pose_head(net, flow, pcl1, pcl2, pose_se3)
             # F(t+1) = F(t) + \Delta(t)
             coords1 = coords1 + delta_flow
             flow_up = coords1 - coords0
             flow_predictions.append(flow_up.float())
 
-            pose_se3 = pose_se3 + delta_pose
             pose_se3_predictions.append(pose_se3.float()/self.pose_scale)
-        return flow_predictions, pose_se3_predictions, pose_se3_direct
+        return flow_predictions, pose_se3_predictions
 
     def init_from_raft(self, raft_ckp):
         raft = RAFT(self.config)
