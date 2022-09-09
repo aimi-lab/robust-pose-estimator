@@ -28,8 +28,12 @@ def get_data(input_path: str, sequences: str, img_size: Tuple, step: int=1):
     elif os.path.isfile(os.path.join(calib_path, 'endoscope_calibration.yaml')):
         calib_file = os.path.join(calib_path, 'endoscope_calibration.yaml')
     else:
-        raise RuntimeError('no calibration file found')
-
+        # no calibration file found as we use TUM dataset
+        print('TUM Dataset detected')
+        dataset = TUMDataset(root=input_path, step=step, img_size=img_size)
+        intrinsics_lowres = torch.tensor([[525.0, 0, 319.5], [0, 525.0, 239.5], [0.0, 0.0, 1.0]]).float()
+        intrinsics_lowres[:2, :3] /= 8
+        return dataset, intrinsics_lowres
     rect = StereoRectifier(calib_file, img_size_new=(img_size[1], img_size[0]), mode='conventional')
     calib = rect.get_rectified_calib()
     dataset = MultiSeqPoseDataset(root=input_path, seqs=sequences, baseline=calib['bf_orig'], conf_thr=0.0, step=step, img_size=img_size)
@@ -127,3 +131,62 @@ class MultiSeqPoseDataset(PoseDataset):
         self.disp_list = disp_list1
         self.rel_pose_list = rel_pose_list1
         self.depth_noise_list = depth_noise_list1
+
+
+class TUMDataset(Dataset):
+    def __init__(self, root, depth_cutoff=8000.0,step=(1,10), img_size=(512, 640)):
+        super(TUMDataset, self).__init__()
+        images = sorted(glob(os.path.join(root, 'rgb', '*.png')))
+        depth = sorted(glob(os.path.join(root, 'depth', '*.png')))
+        gt_file = os.path.join(root, 'groundtruth.txt')
+        poses = read_freiburg(gt_file)
+        assert len(images) == len(depth)
+        self.depth_cutoff = depth_cutoff
+        self.image_list = []
+        self.depth_list = []
+        self.rel_pose_list = []
+        if isinstance(step, int):
+            step = (step, step)
+        for i in range(len(images)-step[1]):
+            s = np.random.randint(*step) if step[0] < step[1] else step[0]  # select a random step in given range
+            self.image_list.append([images[i], images[i+s]])
+            self.depth_list.append([depth[i], depth[i+s]])
+            self.rel_pose_list.append(np.linalg.inv(poses[i+s].astype(np.float64)) @ poses[i].astype(np.float64))
+        self.resize = Resize(img_size)
+        self.resize_lowres = Resize((img_size[0]//8, img_size[1]//8))
+        self.resize_lowres_msk = Resize((img_size[0] // 8, img_size[1] // 8), interpolation=InterpolationMode.NEAREST)
+        # generate look-up table for synchronization
+        self.depth_lookup = [os.path.basename(l[0]).split('.png')[0] for l in self.depth_list]
+        self.depth_lookup = np.asarray([int(l.split('.')[0] + l.split('.')[1]) for l in self.depth_lookup])
+
+    def _find_closest_timestamp(self, item):
+        query = os.path.basename(self.image_list[item][0]).split('.png')[0]
+        query = int(query.split('.')[0] + query.split('.')[1])
+        return np.argmin((self.depth_lookup - query) ** 2)
+
+    def __getitem__(self, index):
+        img1, depth1 = self._read_img(index,0)
+        img2, depth2 = self._read_img(index,1)
+
+        pose = torch.from_numpy(self.rel_pose_list[index]).clone()
+        pose_se3 = lie_SE3_to_se3(pose)
+        depth_conf1 = torch.ones_like(depth1)
+        depth_conf2 = torch.ones_like(depth2)
+        # generate mask
+        # depth threshold
+        valid = depth1 < self.depth_cutoff
+        valid &= depth2 < self.depth_cutoff
+        valid &= depth1 > 1e-3
+        valid &= depth2 > 1e-3
+        return img1, img2, depth1, depth2, depth_conf1, depth_conf2, self.resize_lowres_msk(valid), pose_se3.float()
+
+    def _read_img(self, item, i):
+        path = self.image_list[item][i]
+        # find depth map that has closed time index as depth and rgb are not synchronized
+        depth = cv2.imread(self.depth_list[self._find_closest_timestamp(item)][i], cv2.IMREAD_ANYDEPTH)
+        depth = torch.from_numpy(depth.astype(np.float32) / 5.0).unsqueeze(0)
+        img = torch.from_numpy(cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)).permute(2, 0, 1).float()
+        return self.resize(img), self.resize(depth)
+
+    def __len__(self):
+        return len(self.image_list)
