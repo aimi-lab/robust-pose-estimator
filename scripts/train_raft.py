@@ -14,7 +14,6 @@ import alley_oop.photometry.raft.core.datasets as datasets
 from alley_oop.photometry.raft.losses import geometric_2d_loss, geometric_3d_loss, supervised_pose_loss, seq_loss, l1_loss
 from alley_oop.photometry.raft.utils.logger import Logger
 from alley_oop.photometry.raft.utils.plotting import plot_res, plot_3d
-
 import wandb
 from torch.cuda.amp import GradScaler
 
@@ -27,7 +26,6 @@ VAL_FREQ = 1000
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
-
 
 def fetch_optimizer(config, model):
     """ Create the optimizer and learning rate scheduler """
@@ -44,7 +42,7 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger):
     with torch.no_grad():
         for i_batch, data_blob in enumerate(dataloader):
             ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, pose = [x.to(device) for x in data_blob]
-            flow_predictions, pose_predictions, pose_predictions_direct = model(trg_img, ref_img, trg_depth/config['depth_scale'], ref_depth/config['depth_scale'], trg_conf, ref_conf,
+            flow_predictions, pose_predictions = model(trg_img, ref_img, trg_depth/config['depth_scale'], ref_depth/config['depth_scale'], trg_conf, ref_conf,
                                                        iters=config['model']['iters'])
 
             ref_depth, trg_depth, ref_conf, trg_conf = [dataloader.dataset.resize_lowres(d) for d in
@@ -54,13 +52,11 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger):
             loss3d = geometric_3d_loss(flow_predictions[-1], pose_predictions[-1], intrinsics, trg_depth, ref_depth,
                                        trg_conf, ref_conf, valid)
             loss_pose = seq_loss(supervised_pose_loss, (pose_predictions, pose))
-            loss_pose_direct = seq_loss(supervised_pose_loss, (pose_predictions_direct, pose))
-            loss = loss_weights['pose'] * loss_pose + loss_weights['2d'] * loss2d + loss_weights['3d'] * loss3d+loss_weights['pose_direct']*loss_pose_direct
+            loss = loss_weights['pose'] * loss_pose + loss_weights['2d'] * loss2d + loss_weights['3d'] * loss3d
 
             metrics = {"val/loss2d": loss2d.detach().mean().cpu().item(),
                        "val/loss3d": loss3d.detach().mean().cpu().item(),
                        "val/loss_pose": loss_pose.detach().mean().cpu().item(),
-                       "val/loss_pose_direct": loss_pose_direct.detach().mean().cpu().item(),
                        "val/loss_total": loss.detach().mean().cpu().item()}
             logger.push(metrics, len(dataloader))
         logger.flush()
@@ -127,9 +123,15 @@ def main(args, config, force_cpu):
                 trg_img = (trg_img + stdv * torch.randn(*trg_img.shape).to(device)).clamp(0.0, 255.0)
 
             # forward pass
-            flow_predictions, pose_predictions, pose_predictions_direct = model(trg_img, ref_img, trg_depth/config['depth_scale'],
+            flow_predictions, pose_predictions = model(trg_img, ref_img, trg_depth/config['depth_scale'],
                                                        ref_depth/config['depth_scale'], trg_conf, ref_conf,
                                                        iters=config['model']['iters'])
+
+            # de-normalize pose
+            scaler = torch.ones_like(pose_predictions[0])
+            scaler[:, -3:] *= config['depth_scale']
+            pose_predictions = [p * scaler for p in pose_predictions]
+
             # prepare data for loss computaitons
             ref_depth, trg_depth, ref_conf, trg_conf = [train_loader.dataset.resize_lowres(d) for d in
                                                         [ref_depth, trg_depth, ref_conf, trg_conf]]
@@ -139,22 +141,21 @@ def main(args, config, force_cpu):
 
             # loss computations
             loss_flow = seq_loss(l1_loss, (flow_predictions, ref_flow,))
-            loss2d = geometric_2d_loss(flow_predictions[-1], pose_predictions[-1], intrinsics, trg_depth, trg_conf,
+            loss2d, theoretical_flow = geometric_2d_loss(flow_predictions[-1], pose_predictions[-1], intrinsics, trg_depth, trg_conf,
                                        valid)
+
             loss3d = geometric_3d_loss(flow_predictions[-1], pose_predictions[-1], intrinsics, trg_depth, ref_depth,
                                        trg_conf, ref_conf, valid)
             loss_pose = seq_loss(supervised_pose_loss, (pose_predictions, pose))
-            loss_pose_direct = seq_loss(supervised_pose_loss, (pose_predictions_direct, pose))
-            loss = loss_weights['pose']*loss_pose+loss_weights['2d']*loss2d+loss_weights['3d']*loss3d + loss_weights['flow']*loss_flow+loss_weights['pose_direct']*loss_pose_direct
+            loss = loss_weights['pose']*loss_pose+loss_weights['2d']*loss2d+loss_weights['3d']*loss3d + loss_weights['flow']*loss_flow
 
             # debug
             if args.dbg & (i_batch%SUM_FREQ == 0):
                 print("\n se3 pose")
-                print(f"gt_pose: {pose[0].detach().cpu().numpy()}\npred_pose: {pose_predictions[-1][0].detach().cpu().numpy()}\npred_pose_direct: {pose_predictions_direct[-1][0].detach().cpu().numpy()}")
+                print(f"gt_pose: {pose[0].detach().cpu().numpy()}\npred_pose: {pose_predictions[-1][0].detach().cpu().numpy()}")
                 print(" SE3 pose")
-                print(f"gt_pose: {lie_se3_to_SE3(pose[0]).detach().cpu().numpy()}\npred_pose: {lie_se3_to_SE3(pose_predictions[-1][0]).detach().cpu().numpy()}")
+                print(f"gt_pose: {lie_se3_to_SE3(pose[0]).detach().cpu().numpy()}\npred_pose: {lie_se3_to_SE3(pose_predictions[-1][0]).detach().cpu().numpy()}\n")
                 print(" pose loss: ", loss_pose.detach().mean().cpu().item())
-                print(" pose loss direct: ", loss_pose_direct.detach().mean().cpu().item())
                 print(" 2d loss: ", loss2d.detach().mean().cpu().item())
                 print(" 3d loss: ", loss3d.detach().mean().cpu().item())
                 print(" flow loss: ", loss_flow.detach().mean().cpu().item())
@@ -170,7 +171,6 @@ def main(args, config, force_cpu):
             metrics = {"train/loss2d": loss2d.detach().mean().cpu().item(),
                       "train/loss3d": loss3d.detach().mean().cpu().item(),
                       "train/loss_pose": loss_pose.detach().mean().cpu().item(),
-                      "train/loss_pose_direct": loss_pose_direct.detach().mean().cpu().item(),
                       "train/loss_flow": loss_flow.detach().mean().cpu().item(),
                       "train/loss_total": loss.detach().mean().cpu().item()}
 
