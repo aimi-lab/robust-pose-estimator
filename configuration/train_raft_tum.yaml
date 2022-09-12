@@ -1,0 +1,49 @@
+model:
+  pretrained: ../alley_oop/photometry/raft/pretrained/raft-things.pth
+  iters: 12
+  dropout: 0.0
+  small: False
+  RGBD: False
+  pose_scale: 1.0
+  mode: horn # mlp
+
+data:
+  train:
+    basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/tum_rgbd/rgbd_dataset_freiburg1_xyz
+    sequences:
+      - ""
+    step:
+      - 1
+      - 20
+
+  val:
+    basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/tum_rgbd/rgbd_dataset_freiburg1_xyz
+    sequences:
+      - ""
+    step: 1
+
+
+train:
+  batch_size: 32
+  learning_rate: 2.0e-5
+  weight_decay: 5.0e-5
+  epsilon: 1.0e-8
+  epochs: 100000
+  gamma: 0.8
+  grad_clip: 1.0
+  loss_weights:
+    pose: 1.0
+    2d: 0.1
+    3d: 0.1
+    flow: 0.0
+  add_noise: False
+  freeze_flow_steps: 0
+
+val:
+  batch_size: 32
+
+image_shape:
+  - 512
+  - 640
+
+depth_scale: 5000

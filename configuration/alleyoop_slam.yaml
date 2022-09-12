@@ -4,7 +4,7 @@ slam:
   dist_thr: 0.05 # relative distance threshold for data association
   depth_clipping:
     - 1
-    - 300 # in mm
+    - 250 # in mm
   debug: False
   mask_specularities: True
   conf_weighing: True
