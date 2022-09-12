@@ -48,7 +48,7 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger):
             ref_depth, trg_depth, ref_conf, trg_conf = [dataloader.dataset.resize_lowres(d) for d in
                                                         [ref_depth, trg_depth, ref_conf, trg_conf]]
             loss2d = geometric_2d_loss(flow_predictions[-1], pose_predictions[-1], intrinsics, trg_depth, trg_conf,
-                                       valid)
+                                       valid)[0]
             loss3d = geometric_3d_loss(flow_predictions[-1], pose_predictions[-1], intrinsics, trg_depth, ref_depth,
                                        trg_conf, ref_conf, valid)
             loss_pose = seq_loss(supervised_pose_loss, (pose_predictions, pose))
