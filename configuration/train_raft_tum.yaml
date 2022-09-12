@@ -5,7 +5,7 @@ model:
   small: False
   RGBD: False
   pose_scale: 1.0
-  mode: horn # mlp
+  mode: mlp # horn
 
 data:
   train:

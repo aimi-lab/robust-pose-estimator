@@ -13,7 +13,7 @@ from alley_oop.geometry.absolute_pose_quarternion import align_torch
 
 
 class PoseHead(nn.Module):
-    def __init__(self, input_dims):
+    def __init__(self, input_dims, apply_mask=False):
         super(PoseHead, self).__init__()
         self.convs = nn.Sequential(
             nn.Conv2d(in_channels=136, out_channels=32, kernel_size=(3, 3), padding='same'),
@@ -21,9 +21,14 @@ class PoseHead(nn.Module):
         self.mlp = nn.Sequential(nn.Linear(in_features=input_dims+6,out_features=64),
                                     nn.ReLU(),
                                     nn.Linear(in_features=64, out_features=6))
+        self.apply_mask = apply_mask
 
     def forward(self, net, flow, pcl1, pcl2, pose):
-        pcl_aligned, valid = self.remap(pcl2, flow) #ToDo how to use mask?
+        n, _, h, w = flow.shape
+        pcl_aligned, valid = self.remap(pcl2, flow)
+        if self.apply_mask:
+            pcl_aligned.view(n, 3, -1)[~valid] = 0.0
+            pcl1.view(n, 3, -1)[~valid] = 0.0
         out = self.convs(torch.cat((net, flow, pcl1, pcl_aligned), dim=1)).view(net.shape[0], -1)
         return self.mlp(torch.cat((out, pose), dim=1))
 
@@ -34,7 +39,7 @@ class PoseHead(nn.Module):
         flow_off = torch.empty_like(flow)
         flow_off[:, 1] = 2 * (flow[:, 1] + row_coords.to(flow.device)) / (h - 1) - 1
         flow_off[:, 0] = 2 * (flow[:, 0] + col_coords.to(flow.device)) / (w - 1) - 1
-        x = torch.nn.functional.grid_sample(x, flow_off.permute(0, 2, 3, 1), padding_mode='zeros')
+        x = torch.nn.functional.grid_sample(x, flow_off.permute(0, 2, 3, 1), padding_mode='zeros', align_corners=True)
         valid = (x > 0).any(dim=1).view(n,1,-1).repeat(1,3,1)
         return x, valid
 
