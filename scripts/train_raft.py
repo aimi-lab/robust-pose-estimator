@@ -128,9 +128,9 @@ def main(args, config, force_cpu):
                                                        iters=config['model']['iters'])
 
             # de-normalize pose
-            scaler = torch.ones_like(pose_predictions[0])
-            scaler[:, -3:] *= config['depth_scale']
-            pose_predictions = [p * scaler for p in pose_predictions]
+            pose_scaler = torch.ones_like(pose_predictions[0])
+            pose_scaler[:, -3:] *= config['depth_scale']
+            pose_predictions = [p * pose_scaler for p in pose_predictions]
 
             # prepare data for loss computaitons
             ref_depth, trg_depth, ref_conf, trg_conf = [train_loader.dataset.resize_lowres(d) for d in
