@@ -86,13 +86,13 @@ def geometric_2d_loss(flow_preds, se3_preds, intrinsics, trg_depth, trg_confiden
     img_coordinates = create_img_coords_t(y=trg_depth.shape[-2], x=trg_depth.shape[-1]).to(flow_preds.device)
     T_est = lie_se3_to_SE3_batch(-se3_preds)  # invert transform to be consistent with other pose estimators
     warped_pts = _warp_frame(trg_depth, T_est, intrinsics,img_coordinates)
-    residuals = torch.linalg.norm(img_coordinates[None,:2] + flow_preds.view(n,2, -1).double() - warped_pts, ord=2, dim=1)
+    residuals = torch.linalg.norm(img_coordinates[None,:2] + flow_preds.view(n,2, -1) - warped_pts, ord=2, dim=1)
     theoretical_flow = (warped_pts - img_coordinates[None,:2]).reshape(n, 2, trg_depth.shape[-2], trg_depth.shape[-1])
     mask = torch.isnan(flow_preds[:, 0]).view(n, -1) | torch.isnan(flow_preds[:, 1]).view(n,-1) | ~valid.view(n, -1)
     # weight residuals by confidences
     residuals = torch.sqrt(trg_confidence.view(n, -1)) * residuals
     residuals[mask] = 0.0
-    loss = torch.mean(residuals)
+    loss = torch.nanmean(residuals)
     return loss, theoretical_flow
 
 
@@ -120,5 +120,5 @@ def geometric_3d_loss(flow_preds, se3_preds, intrinsics, trg_depth, ref_depth, t
     # weight residuals by confidences
     residuals = torch.sqrt(trg_confidence*ref_conf) * residuals
     residuals[mask] = 0.0
-    loss = torch.mean(residuals)
+    loss = torch.nanmean(residuals)
     return loss
