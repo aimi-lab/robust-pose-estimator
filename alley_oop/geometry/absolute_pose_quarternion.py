@@ -69,13 +69,13 @@ def align_torch(reference, query):
     se(3) alignment (batchx6)
 
     """
-    ref_mean = reference.mean(-1)[...,None]
-    query_mean = query.mean(-1)[...,None]
+    ref_mean = reference.nanmean(-1)[...,None]
+    query_mean = query.nanmean(-1)[...,None]
     model_zerocentered = reference - ref_mean
     data_zerocentered = query - query_mean
     N = reference.shape[0]
     outer = torch.bmm(model_zerocentered.permute(0,2,1).reshape(-1, 3).unsqueeze(2), data_zerocentered.permute(0,2,1).reshape(-1, 3).unsqueeze(1))
-    W = outer.reshape(N, -1, 3, 3).sum(dim=1)
+    W = outer.reshape(N, -1, 3, 3).nansum(dim=1)
     U, d, Vh = torch.linalg.svd(W.transpose(1,2))
     S = torch.eye(3, device=reference.device).reshape((1, 3, 3)).repeat(N, 1, 1)
     det = torch.linalg.det(U) * torch.linalg.det(Vh)

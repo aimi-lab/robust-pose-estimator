@@ -46,9 +46,10 @@ class HornPoseHead(PoseHead):
     def forward(self, net, flow, pcl1, pcl2, pose):
         n = pcl1.shape[0]
         pcl_aligned, valid = self.remap(pcl2, flow)
-        pcl_aligned_v = pcl_aligned.view(n,3, -1)[valid].view(n,3,-1)
-        pcl1_v = pcl1.view(n, 3, -1)[valid].view(n, 3, -1)
-        direct_se3 = align_torch(pcl_aligned_v, pcl1_v)[0]
+        # if we mask it here, each batch has a different size
+        pcl_aligned.view(n,3, -1)[~valid] = torch.nan
+        pcl1.view(n, 3, -1)[~valid] = torch.nan
+        direct_se3 = align_torch(pcl_aligned.view(n, 3, -1), pcl1.view(n,3,-1))[0]
         return direct_se3
 
 
