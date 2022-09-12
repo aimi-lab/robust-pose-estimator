@@ -58,10 +58,10 @@ class PoseN(RAFT):
         H, W = config["image_shape"]
         if config['mode'] == 'mlp':
             self.pose_head = PoseHead((H*W) // 64)
-        elif config['mode'] == 'mlp':
+        elif config['mode'] == 'horn':
             self.pose_head = HornPoseHead()
         else:
-            raise NotImplementedError
+            raise NotImplementedError(f'mode {config["mode"]} not supported')
         # replace by 4-channel input conv (RGB + D)
         self.rgbd = config['RGBD']
         if self.rgbd:
