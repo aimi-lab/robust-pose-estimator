@@ -56,7 +56,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
 
     def objective(self, net, flow, pcl1, pcl2, dummy, y):
         # 3D geometric L2 loss
-        n,_,h,w = pcl1.shape[0]
+        n,_,h,w = pcl1.shape
         # se(3) to SE(3)
         pose = lie_se3_to_SE3_batch(y)
         # transform point cloud given the pose
