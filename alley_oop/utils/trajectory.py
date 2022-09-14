@@ -41,7 +41,10 @@ def read_freiburg(path: str, ret_stamps=False):
         list = [[v.strip() for v in line.split(" ") if v.strip() != ""] for line in lines if
                 len(line) > 0 and line[0] != "#"]
     time_stamp = [l[0] for l in list if len(l) > 0]
-    time_stamp = np.asarray([int(l.split('.')[0] + l.split('.')[1]) for l in time_stamp])*100
+    try:
+        time_stamp = np.asarray([int(l.split('.')[0] + l.split('.')[1]) for l in time_stamp])*100
+    except IndexError:
+        time_stamp = np.asarray([int(l) for l in time_stamp])
     translation = [l[1:4] for l in list if len(l) > 0]
     quaternions = [l[4:] for l in list if len(l) > 0]
     pose_list = []

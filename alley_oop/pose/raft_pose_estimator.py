@@ -15,7 +15,7 @@ class RAFTPoseEstimator(torch.nn.Module):
         """
         super(RAFTPoseEstimator, self).__init__()
         checkp = torch.load(checkpoint)
-        model = PoseN(checkp['config']['model'])
+        model = PoseN(checkp['config']['model'], intrinsics)
         new_state_dict = OrderedDict()
         state_dict = checkp['state_dict']
         for k, v in state_dict.items():
