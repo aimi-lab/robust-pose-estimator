@@ -64,7 +64,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         # resample point clouds given the optical flow
         pcl_aligned, valid = remap_from_flow(pcl2_aligned, flow)
         # define objective loss function
-        residuals = torch.sum((pcl_aligned - pcl1).view(n,-1)**2, dim=-1)
+        residuals = torch.sum((pcl_aligned.view(n,3,-1) - pcl1.view(n,3,-1))**2, dim=1)
         residuals[~valid[:,0].squeeze()] = 0.0
         return torch.mean(residuals)
 
