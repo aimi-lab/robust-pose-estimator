@@ -56,7 +56,8 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger):
 
             metrics = {"val/loss2d": loss2d.detach().mean().cpu().item(),
                        "val/loss3d": loss3d.detach().mean().cpu().item(),
-                       "val/loss_pose": loss_pose.detach().mean().cpu().item(),
+                       "val/loss_trans": loss_pose[:, :3].detach().mean().cpu().item(),
+                       "val/loss_rot": loss_pose[:, 3:].detach().mean().cpu().item(),
                        "val/loss_total": loss.detach().mean().cpu().item()}
             logger.push(metrics, len(dataloader))
         logger.flush()
@@ -170,7 +171,8 @@ def main(args, config, force_cpu):
             torch.nn.utils.clip_grad_norm_(model.parameters(), config['train']['grad_clip'])
             metrics = {"train/loss2d": loss2d.detach().mean().cpu().item(),
                       "train/loss3d": loss3d.detach().mean().cpu().item(),
-                      "train/loss_pose": loss_pose.detach().mean().cpu().item(),
+                      "train/loss_trans": loss_pose[:,:3].detach().mean().cpu().item(),
+                      "train/loss_rot": loss_pose[:, 3:].detach().mean().cpu().item(),
                       "train/loss_flow": loss_flow.detach().mean().cpu().item(),
                       "train/loss_total": loss.detach().mean().cpu().item()}
 
