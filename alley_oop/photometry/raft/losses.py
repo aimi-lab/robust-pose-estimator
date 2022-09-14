@@ -58,7 +58,7 @@ def of_sequence_loss(flow_preds, flow_gt, valid, gamma=0.8, max_flow=400):
 
 
 def supervised_pose_loss(pose_pred, pose_gt):
-    return (pose_pred - pose_gt).abs().mean()
+    return (pose_pred - pose_gt).abs()
 
 
 def l1_loss(pred, gt):
