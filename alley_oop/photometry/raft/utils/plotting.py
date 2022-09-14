@@ -66,8 +66,8 @@ def plot_res(img1_batch,img2_batch, flow_batch, depth2_batch, pose_batch, intrin
     flow_imgs = flow_to_image(flow_batch)
     img1_batch = [img.to(torch.uint8) for img in img1_batch[:n]]
     img2_batch = [img.to(torch.uint8) for img in img2_batch[:n]]
-    img1_w_flow_batch = [warp_frame_flow2(img[:, ::8,::8], flow)for img, flow in zip(img1_batch[:2], flow_batch)]
-    img1_w_pose_batch = [warp_frame(img[:, ::8,::8], depth, pose, intrinsics) for img, depth, pose in zip(img1_batch, depth2_batch, pose_batch)]
+    img1_w_flow_batch = [warp_frame_flow2(img, flow)for img, flow in zip(img1_batch[:2], flow_batch)]
+    img1_w_pose_batch = [warp_frame(img, depth, pose, intrinsics) for img, depth, pose in zip(img1_batch, depth2_batch, pose_batch)]
     grid = [[img1, img2, img_w, img_w2, flow_img] for (img1, img2, img_w, img_w2, flow_img) in zip(img1_batch, img2_batch, img1_w_flow_batch, img1_w_pose_batch, flow_imgs[:n])]
     return plot(grid)
 
@@ -75,8 +75,8 @@ def plot_res(img1_batch,img2_batch, flow_batch, depth2_batch, pose_batch, intrin
 def plot_3d(img1_batch,img2_batch, depth1_batch, depth2_batch, pose_batch, intrinsics, n=0):
     from viewer.viewer3d import Viewer3D
     viewer = Viewer3D((500,500), blocking=True)
-    img1_pcl = SurfelMap(frame=FrameClass(img1_batch[None,n][..., ::8,::8]/255.0, depth1_batch[None,n], intrinsics=intrinsics), kmat=intrinsics).transform_cpy(pose_batch[n]).pcl2open3d(stable=False)
-    img2_pcl = SurfelMap(frame=FrameClass(img2_batch[None,n][..., ::8,::8]/255.0, depth2_batch[None,n], intrinsics=intrinsics), kmat=intrinsics).pcl2open3d(stable=False)
+    img1_pcl = SurfelMap(frame=FrameClass(img1_batch[None,n]/255.0, depth1_batch[None,n], intrinsics=intrinsics), kmat=intrinsics).transform_cpy(pose_batch[n]).pcl2open3d(stable=False)
+    img2_pcl = SurfelMap(frame=FrameClass(img2_batch[None,n]/255.0, depth2_batch[None,n], intrinsics=intrinsics), kmat=intrinsics).pcl2open3d(stable=False)
     dists = np.asarray(img1_pcl.compute_point_cloud_distance(img2_pcl))
     print("mean pcl distance: ", dists.mean())
     viewer(pose=torch.eye(4), pcd=img1_pcl, add_pcd=img2_pcl)

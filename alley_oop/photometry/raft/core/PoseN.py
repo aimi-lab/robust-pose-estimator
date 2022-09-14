@@ -54,7 +54,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
     def __init__(self):
         super(DeclarativePoseHead3DNode, self).__init__()
 
-    def objective(self, flow, pcl1, pcl2, y):
+    def objective(self, flow, pcl1, pcl2, weights1, weights2, y):
         # 3D geometric L2 loss
         n,_,h,w = pcl1.shape
         # se(3) to SE(3)
@@ -63,8 +63,11 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         pcl2_aligned = transform(homogenous(pcl2.view(n,3,-1)), pose).reshape(n, 4, h, w)[:,:3]
         # resample point clouds given the optical flow
         pcl2_aligned, valid = remap_from_flow(pcl2_aligned, flow)
+        weights2_aligned, valid = remap_from_flow(weights2, flow)
         # define objective loss function
         residuals = torch.sum((pcl2_aligned.view(n,3,-1) - pcl1.view(n,3,-1))**2, dim=1)
+        # reweighing residuals
+        #residuals *= torch.sqrt(weights2_aligned.view(n,-1)*weights1.view(n,-1)) * residuals
         residuals[~valid[:,0]] = 0.0
         return torch.mean(residuals, dim=-1)
 
@@ -82,7 +85,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         y = align_torch(pcl_aligned.view(n, 3, -1), pcl1.view(n, 3, -1))[0]
         return y.detach(), None
 
-    def solve(self, flow, pcl1, pcl2):
+    def solve(self, flow, pcl1, pcl2, weights1, weights2):
         # solve using method of Horn
         flow = flow.detach()
         pcl1 = pcl1.detach().clone()
@@ -94,7 +97,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
             optimizer = torch.optim.LBFGS([y], lr=1.0, max_iter=30, line_search_fn="strong_wolfe", )
             def fun():
                 optimizer.zero_grad()
-                loss = self.objective(flow, pcl1, pcl2, y).sum()
+                loss = self.objective(flow, pcl1, pcl2, weights1, weights2, y).sum()
                 loss.backward()
                 return loss
             optimizer.step(fun)
@@ -114,14 +117,9 @@ class PoseN(RAFT):
         else:
             raise NotImplementedError(f'mode {config["mode"]} not supported')
         # replace by 4-channel input conv (RGB + D)
-        self.rgbd = config['RGBD']
-        if self.rgbd:
-            self.fnet = RGBDEncoder(output_dim=256, norm_fn='instance', dropout=config['dropout'])
-            self.cnet = RGBDEncoder(output_dim=self.hidden_dim + self.context_dim, norm_fn='batch',
-                                    dropout=config['dropout'])
         self.pose_scale = config['pose_scale']
 
-        img_coords = create_img_coords_t(y=H//8, x=W//8)
+        img_coords = create_img_coords_t(y=H, x=W)
         self.repr = nn.Parameter(torch.linalg.inv(intrinsics.cpu())@ img_coords.view(3, -1), requires_grad=False)
 
     def proj(self, depth):
@@ -131,62 +129,11 @@ class PoseN(RAFT):
 
     def forward(self, image1, image2, depth1, depth2, conf1, conf2, iters=12, flow_init=None, pose_init=None):
         """ Estimate optical flow and rigid pose between pair of frames """
-        # rescale to +/- 1.0
-        image1 = 2 * (image1 / 255.0) - 1.0
-        image2 = 2 * (image2 / 255.0) - 1.0
-        pcl1 = self.proj(torch.nn.functional.interpolate(depth1, scale_factor=1/8))
-        pcl2 = self.proj(torch.nn.functional.interpolate(depth2, scale_factor=1/8))
+        pcl1 = self.proj(depth1)
+        pcl2 = self.proj(depth2)
 
-        # stack images, depth and conf
-        if self.rgbd:
-            depth1 = 2 * depth1 - 1.0
-            depth2 = 2 * depth2 - 1.0
-            image1 = torch.cat((image1, depth1, conf1), dim=1)
-            image2 = torch.cat((image2, depth2, conf2), dim=1)
-
-        n = image1.shape[0]
-        image1 = image1.contiguous()
-        image2 = image2.contiguous()
-
-        hdim = self.hidden_dim
-        cdim = self.context_dim
-
-        # run the feature network
-        with torch.cuda.amp.autocast():
-            fmap1, fmap2 = self.fnet([image1, image2])
-
-        fmap1 = fmap1.float()
-        fmap2 = fmap2.float()
-        corr_fn = CorrBlock(fmap1, fmap2, radius=self.config['corr_radius'])
-
-        # run the context network
-        with torch.cuda.amp.autocast():
-            cnet = self.cnet(image1)
-            net, inp = torch.split(cnet, [hdim, cdim], dim=1)
-            net = torch.tanh(net)
-            inp = torch.relu(inp)
-
-        coords0, coords1 = self.initialize_flow(image1)
-
-        if flow_init is not None:
-            coords1 = coords1 + flow_init
-
-        pose_se3 = pose_init if pose_init is not None else torch.zeros((n,6), device=image1.device)
-
-        flow_predictions = []
-        for itr in range(iters):
-            coords1 = coords1.detach()
-            corr = corr_fn(coords1)  # index correlation volume
-
-            flow = coords1 - coords0
-            with torch.cuda.amp.autocast():
-                net, up_mask, delta_flow = self.update_block(net, inp, corr, flow)
-            # F(t+1) = F(t) + \Delta(t)
-            coords1 = coords1 + delta_flow
-            flow_up = coords1 - coords0
-            flow_predictions.append(flow_up.float())
-
-        pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2)
+        flow_predictions = super().forward(image1, image2, iters, flow_init)
+        pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2, conf1, conf2)
         return flow_predictions, pose_se3.float()/self.pose_scale
 
     def init_from_raft(self, raft_ckp):
@@ -200,25 +147,7 @@ class PoseN(RAFT):
             name = k.replace('module.','')  # remove `module.`
             new_state_dict[name] = v
         raft.load_state_dict(new_state_dict)
-        if self.rgbd:
-            self.fnet.conv1 = copy.deepcopy(raft.fnet.conv1)
-            self.cnet.conv1 = copy.deepcopy(raft.cnet.conv1)
         self.load_state_dict(new_state_dict, strict=False)
-        if self.rgbd:
-            # replace first conv layer for RGB + D
-            # compute average weights over RGB channels and use that to initialize the depth channel
-            # technique from Temporal Segment Network, L. Wang 2016
-            self.fnet.conv1 = nn.Conv2d(5, 64, kernel_size=7, stride=2, padding=3)
-            self.cnet.conv1 = nn.Conv2d(5, 64, kernel_size=7, stride=2, padding=3)
-            tmp_conv_weights = raft.fnet.conv1.weight.data.clone()
-            self.fnet.conv1.weight.data[:, :3, :, :] = tmp_conv_weights.clone()
-            mean_weights = torch.mean(tmp_conv_weights[:, :3, :, :], dim=1, keepdim=True)
-            self.fnet.conv1.weight.data[:, 3:5, :, :] = mean_weights
-
-            tmp_conv_weights = raft.cnet.conv1.weight.data.clone()
-            self.cnet.conv1.weight.data[:, :3, :, :] = tmp_conv_weights.clone()
-            mean_weights = torch.mean(tmp_conv_weights[:, :3, :, :], dim=1, keepdim=True)
-            self.cnet.conv1.weight.data[:, 3:5, :, :] = mean_weights
         return self, raft
 
     def freeze_flow(self, freeze=True):

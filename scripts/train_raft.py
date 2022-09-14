@@ -45,8 +45,6 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger):
             flow_predictions, pose_predictions = model(trg_img, ref_img, trg_depth, ref_depth, trg_conf, ref_conf,
                                                        iters=config['model']['iters'])
 
-            ref_depth, trg_depth, ref_conf, trg_conf = [dataloader.dataset.resize_lowres(d) for d in
-                                                        [ref_depth, trg_depth, ref_conf, trg_conf]]
             loss2d = geometric_2d_loss(flow_predictions[-1], pose_predictions, intrinsics, trg_depth, trg_conf,
                                        valid)[0]
             loss3d = geometric_3d_loss(flow_predictions[-1], pose_predictions, intrinsics, trg_depth, ref_depth,
@@ -117,7 +115,8 @@ def main(args, config, force_cpu):
             if i_batch == config['train']['freeze_flow_steps']:
                 model.module.freeze_flow(False) if parallel else model.freeze_flow(False)
             optimizer.zero_grad()
-            ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, pose = [x.to(device)for x in data_blob]
+            ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, gt_pose = [x.to(device)for x in data_blob]
+
             if config['train']['add_noise']:
                 stdv = np.random.uniform(0.0, 5.0)
                 ref_img = (ref_img + stdv * torch.randn(*ref_img.shape).to(device)).clamp(0.0, 255.0)
@@ -127,10 +126,6 @@ def main(args, config, force_cpu):
             flow_predictions, pose_predictions = model(trg_img, ref_img, trg_depth,
                                                        ref_depth, trg_conf, ref_conf,
                                                        iters=config['model']['iters'])
-
-            # prepare data for loss computaitons
-            ref_depth, trg_depth, ref_conf, trg_conf = [train_loader.dataset.resize_lowres(d) for d in
-                                                        [ref_depth, trg_depth, ref_conf, trg_conf]]
 
             with torch.inference_mode():
                 ref_flow = ref_model(trg_img, ref_img, iters=config['model']['iters'])
@@ -142,24 +137,26 @@ def main(args, config, force_cpu):
 
             loss3d = geometric_3d_loss(flow_predictions[-1], pose_predictions, intrinsics, trg_depth, ref_depth,
                                        trg_conf, ref_conf, valid)
-            loss_pose = supervised_pose_loss(pose_predictions, pose)
+            loss_pose = supervised_pose_loss(pose_predictions, gt_pose)
             loss = loss_weights['pose']*loss_pose.mean()+loss_weights['2d']*loss2d+loss_weights['3d']*loss3d + loss_weights['flow']*loss_flow
 
             # debug
             if args.dbg & (i_batch%SUM_FREQ == 0):
                 print("\n se3 pose")
-                print(f"gt_pose: {pose[0].detach().cpu().numpy()}\npred_pose: {pose_predictions[0].detach().cpu().numpy()}")
+                print(f"gt_pose: {gt_pose[0].detach().cpu().numpy()}\npred_pose: {pose_predictions[0].detach().cpu().numpy()}")
                 print(" SE3 pose")
-                print(f"gt_pose: {lie_se3_to_SE3(pose[0]).detach().cpu().numpy()}\npred_pose: {lie_se3_to_SE3(pose_predictions[0]).detach().cpu().numpy()}\n")
+                print(f"gt_pose: {lie_se3_to_SE3(gt_pose[0]).detach().cpu().numpy()}\npred_pose: {lie_se3_to_SE3(pose_predictions[0]).detach().cpu().numpy()}\n")
                 print(" pose loss: ", loss_pose.detach().mean().cpu().item())
                 print(" 2d loss: ", loss2d.detach().mean().cpu().item())
                 print(" 3d loss: ", loss3d.detach().mean().cpu().item())
                 print(" flow loss: ", loss_flow.detach().mean().cpu().item())
                 if device == torch.device('cpu'):
-                    fig, ax = plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth, lie_se3_to_SE3_batch(-pose_predictions), intrinsics)
+                    pose = pose_predictions.clone()
+                    pose[:,3:] *= config['depth_scale']
+                    fig, ax = plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth*config['depth_scale'], lie_se3_to_SE3_batch(-pose), intrinsics)
                     import matplotlib.pyplot as plt
                     plt.show()
-                    plot_3d(ref_img, trg_img, ref_depth, trg_depth, lie_se3_to_SE3_batch(pose_predictions).detach(), intrinsics)
+                    plot_3d(ref_img, trg_img, ref_depth*config['depth_scale'], trg_depth*config['depth_scale'], lie_se3_to_SE3_batch(pose).detach(), intrinsics)
             # update params
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)                

@@ -31,16 +31,14 @@ def get_data(input_path: str, sequences: str, img_size: Tuple, step: int=1):
         # no calibration file found as we use TUM dataset
         print('TUM Dataset detected')
         dataset = TUMDataset(root=input_path, step=step, img_size=img_size)
-        intrinsics_lowres = torch.tensor([[525.0, 0, 319.5], [0, 525.0, 239.5], [0.0, 0.0, 1.0]]).float()
-        intrinsics_lowres[:2, :3] /= 8
-        return dataset, intrinsics_lowres
+        intrinsics = torch.tensor([[525.0, 0, 319.5], [0, 525.0, 239.5], [0.0, 0.0, 1.0]]).float()
+        return dataset, intrinsics
     rect = StereoRectifier(calib_file, img_size_new=(img_size[1], img_size[0]), mode='conventional')
     calib = rect.get_rectified_calib()
     dataset = MultiSeqPoseDataset(root=input_path, seqs=sequences, baseline=calib['bf_orig'], conf_thr=0.0, step=step, img_size=img_size)
 
-    intrinsics_lowres = torch.tensor(calib['intrinsics']['left']).float()
-    intrinsics_lowres[:2,:3] /= 8
-    return dataset, intrinsics_lowres
+    intrinsics = torch.tensor(calib['intrinsics']['left']).float()
+    return dataset, intrinsics
 
 
 class PoseDataset(Dataset):
@@ -69,8 +67,6 @@ class PoseDataset(Dataset):
             self.rel_pose_list.append(np.linalg.inv(poses[i+s].astype(np.float64)) @ poses[i].astype(np.float64))
             self.depth_noise_list.append([depth_noise[i], depth_noise[i+s]])
         self.resize = Resize(img_size)
-        self.resize_lowres = Resize((img_size[0]//8, img_size[1]//8))
-        self.resize_lowres_msk = Resize((img_size[0] // 8, img_size[1] // 8), interpolation=InterpolationMode.NEAREST)
 
     def __getitem__(self, index):
         img1 = self._read_img(self.image_list[index][0])
@@ -96,7 +92,7 @@ class PoseDataset(Dataset):
         valid &= depth1 > 1e-3
         valid &= depth2 > 1e-3
         # ToDo add tool mask!
-        return img1, img2, depth1, depth2, depth_conf1, depth_conf2, self.resize_lowres_msk(valid), pose_se3.float()
+        return img1, img2, depth1, depth2, depth_conf1, depth_conf2, valid, pose_se3.float()
 
     def _read_img(self, path):
         img = torch.from_numpy(cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)).permute(2, 0, 1).float()
@@ -160,9 +156,6 @@ class TUMDataset(Dataset):
             pose_next = poses[self._find_closest_timestamp(images[i+s], pose_lookup)].astype(np.float64)
             self.rel_pose_list.append(np.linalg.inv(pose_next) @ pose_cur)
         self.resize = Resize(img_size)
-        self.resize_lowres = Resize((img_size[0]//8, img_size[1]//8))
-        self.resize_lowres_msk = Resize((img_size[0] // 8, img_size[1] // 8), interpolation=InterpolationMode.NEAREST)
-
 
     def _find_closest_timestamp(self, path, lookup):
         query = os.path.basename(path).split('.png')[0]
@@ -180,15 +173,15 @@ class TUMDataset(Dataset):
         pose = torch.from_numpy(self.rel_pose_list[index]).clone()
         pose[:3, 3] /= self.depth_cutoff  # normalize translation
         pose_se3 = lie_SE3_to_se3(pose)
-        depth_conf1 = torch.ones_like(depth1)
-        depth_conf2 = torch.ones_like(depth2)
+        depth_conf1 = torch.ones_like(depth1)#torch.exp(-.5 * depth1 ** 2*10 )
+        depth_conf2 = torch.ones_like(depth2)#torch.exp(-.5 * depth2 ** 2*10 )
         # generate mask
         # depth threshold
         valid = depth1 < 1.0
         valid &= depth2 < 1.0
         valid &= depth1 > 1e-3
         valid &= depth2 > 1e-3
-        return img1, img2, depth1, depth2, depth_conf1, depth_conf2, self.resize_lowres_msk(valid), pose_se3.float()
+        return img1, img2, depth1, depth2, depth_conf1, depth_conf2, valid, pose_se3.float()
 
     def _read_img(self, item, i):
         path = self.image_list[item][i]
