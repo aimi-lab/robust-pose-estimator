@@ -5,13 +5,14 @@ import torch.nn.functional as F
 from collections import OrderedDict
 import copy
 
-from alley_oop.geometry.pinhole_transforms import create_img_coords_t
+from alley_oop.geometry.pinhole_transforms import create_img_coords_t, transform, homogenous
 from alley_oop.photometry.raft.core.corr import CorrBlock, AlternateCorrBlock
 from alley_oop.photometry.raft.core.raft import RAFT
 from alley_oop.photometry.raft.core.extractor import RGBDEncoder
 from alley_oop.geometry.absolute_pose_quarternion import align_torch
-from alley_oop.ddn.ddn.pytorch.node import AbstractDeclarativeNode
+from alley_oop.ddn.ddn.pytorch.node import AbstractDeclarativeNode, DeclarativeLayer
 from alley_oop.photometry.raft.core.utils.flow_utils import remap_from_flow
+from alley_oop.geometry.lie_3d import lie_se3_to_SE3_batch
 
 
 class PoseHead(nn.Module):
@@ -49,6 +50,40 @@ class HornPoseHead(PoseHead):
         return direct_se3
 
 
+class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
+    def __init__(self):
+        super(DeclarativePoseHead3DNode, self).__init__()
+
+    def objective(self, net, flow, pcl1, pcl2, dummy, se3_pose):
+        # 3D geometric L2 loss
+        n,_,h,w = pcl1.shape[0]
+        # se(3) to SE(3)
+        pose = lie_se3_to_SE3_batch(se3_pose)
+        # transform point cloud given the pose
+        pcl2_aligned = transform(homogenous(pcl2), pose).reshape(n, 4, h, w)
+        # resample point clouds given the optical flow
+        pcl_aligned, valid = remap_from_flow(pcl2_aligned, flow)
+        # define objective loss function
+        residuals = torch.sum((pcl_aligned - pcl1).view(n,-1)**2, dim=-1)
+        residuals[~valid] = 0.0
+        return torch.mean(residuals)
+
+    def solve(self, net, flow, pcl1, pcl2, dummy):
+        # solve using method of Horn
+        flow = flow.detach()
+        pcl1 = pcl1.detach()
+        pcl2 = pcl2.detach()
+
+        n = pcl1.shape[0]
+        pcl_aligned, valid = remap_from_flow(pcl2, flow)
+        # if we mask it here, each batch has a different size
+        pcl_aligned.view(n, 3, -1)[~valid] = torch.nan
+        pcl1.view(n, 3, -1)[~valid] = torch.nan
+        se3_pose = align_torch(pcl_aligned.view(n, 3, -1), pcl1.view(n, 3, -1))[0]
+        return se3_pose.detach(), None
+
+
+
 class PoseN(RAFT):
     def __init__(self, config, intrinsics):
         super(PoseN, self).__init__(config)
@@ -57,6 +92,8 @@ class PoseN(RAFT):
             self.pose_head = PoseHead((H*W) // 64)
         elif config['mode'] == 'horn':
             self.pose_head = HornPoseHead()
+        elif config['mode'] == 'declarative':
+            self.pose_head = DeclarativeLayer(DeclarativePoseHead3DNode())
         else:
             raise NotImplementedError(f'mode {config["mode"]} not supported')
         # replace by 4-channel input conv (RGB + D)
@@ -172,7 +209,10 @@ class PoseN(RAFT):
     def freeze_flow(self, freeze=True):
         for param in self.parameters():
             param.requires_grad = not freeze
-        for param in self.pose_head.parameters():
-            param.requires_grad = True
+        try:
+            for param in self.pose_head.parameters():
+                param.requires_grad = True
+        except AttributeError:
+            pass
         self.repr.requires_grad = False
         return self
