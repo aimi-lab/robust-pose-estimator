@@ -79,9 +79,10 @@ class PoseDataset(Dataset):
         disp2 = self._read_disp(self.disp_list[index][1])
 
         pose = torch.from_numpy(self.rel_pose_list[index]).clone()
+        pose[:3,3] /= self.depth_cutoff  # normalize translation
         pose_se3 = lie_SE3_to_se3(pose)
-        depth1 = self.baseline / disp1
-        depth2 = self.baseline / disp2
+        depth1 = self.baseline / disp1 / self.depth_cutoff  # normalize depth
+        depth2 = self.baseline / disp2 / self.depth_cutoff  # normalize depth
 
         # generate mask
         # depth confidence threshold
@@ -90,8 +91,8 @@ class PoseDataset(Dataset):
         valid = depth_conf1 > self.conf_thr
         valid &= depth_conf2 > self.conf_thr
         # depth threshold
-        valid &= depth1 < self.depth_cutoff
-        valid &= depth2 < self.depth_cutoff
+        valid &= depth1 < 1.0
+        valid &= depth2 < 1.0
         valid &= depth1 > 1e-3
         valid &= depth2 > 1e-3
         # ToDo add tool mask!
@@ -172,14 +173,19 @@ class TUMDataset(Dataset):
         img1, depth1 = self._read_img(index,0)
         img2, depth2 = self._read_img(index,1)
 
+        # normalize depth
+        depth1 /= self.depth_cutoff
+        depth2 /= self.depth_cutoff
+
         pose = torch.from_numpy(self.rel_pose_list[index]).clone()
+        pose[:3, 3] /= self.depth_cutoff  # normalize translation
         pose_se3 = lie_SE3_to_se3(pose)
         depth_conf1 = torch.ones_like(depth1)
         depth_conf2 = torch.ones_like(depth2)
         # generate mask
         # depth threshold
-        valid = depth1 < self.depth_cutoff
-        valid &= depth2 < self.depth_cutoff
+        valid = depth1 < 1.0
+        valid &= depth2 < 1.0
         valid &= depth1 > 1e-3
         valid &= depth2 > 1e-3
         return img1, img2, depth1, depth2, depth_conf1, depth_conf2, self.resize_lowres_msk(valid), pose_se3.float()

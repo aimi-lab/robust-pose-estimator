@@ -42,7 +42,7 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger):
     with torch.no_grad():
         for i_batch, data_blob in enumerate(dataloader):
             ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, pose = [x.to(device) for x in data_blob]
-            flow_predictions, pose_predictions = model(trg_img, ref_img, trg_depth/config['depth_scale'], ref_depth/config['depth_scale'], trg_conf, ref_conf,
+            flow_predictions, pose_predictions = model(trg_img, ref_img, trg_depth, ref_depth, trg_conf, ref_conf,
                                                        iters=config['model']['iters'])
 
             ref_depth, trg_depth, ref_conf, trg_conf = [dataloader.dataset.resize_lowres(d) for d in
@@ -124,14 +124,9 @@ def main(args, config, force_cpu):
                 trg_img = (trg_img + stdv * torch.randn(*trg_img.shape).to(device)).clamp(0.0, 255.0)
 
             # forward pass
-            flow_predictions, pose_predictions = model(trg_img, ref_img, trg_depth/config['depth_scale'],
-                                                       ref_depth/config['depth_scale'], trg_conf, ref_conf,
+            flow_predictions, pose_predictions = model(trg_img, ref_img, trg_depth,
+                                                       ref_depth, trg_conf, ref_conf,
                                                        iters=config['model']['iters'])
-
-            # de-normalize pose
-            pose_scaler = torch.ones_like(pose_predictions[0])
-            pose_scaler[:, -3:] *= config['depth_scale']
-            pose_predictions = [p * pose_scaler for p in pose_predictions]
 
             # prepare data for loss computaitons
             ref_depth, trg_depth, ref_conf, trg_conf = [train_loader.dataset.resize_lowres(d) for d in
