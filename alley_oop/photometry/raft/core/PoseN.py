@@ -67,7 +67,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         # define objective loss function
         residuals = torch.sum((pcl2_aligned.view(n,3,-1) - pcl1.view(n,3,-1))**2, dim=1)
         # reweighing residuals
-        #residuals *= torch.sqrt(weights2_aligned.view(n,-1)*weights1.view(n,-1)) * residuals
+        residuals *= torch.sqrt(weights2_aligned.view(n,-1)*weights1.view(n,-1))
         residuals[~valid[:,0]] = 0.0
         return torch.mean(residuals, dim=-1)
 

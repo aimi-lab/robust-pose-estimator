@@ -173,8 +173,8 @@ class TUMDataset(Dataset):
         pose = torch.from_numpy(self.rel_pose_list[index]).clone()
         pose[:3, 3] /= self.depth_cutoff  # normalize translation
         pose_se3 = lie_SE3_to_se3(pose)
-        depth_conf1 = torch.ones_like(depth1)#torch.exp(-.5 * depth1 ** 2*10 )
-        depth_conf2 = torch.ones_like(depth2)#torch.exp(-.5 * depth2 ** 2*10 )
+        depth_conf1 = torch.exp(-.5 * depth1 ** 2*10 )
+        depth_conf2 = torch.exp(-.5 * depth2 ** 2*10 )
         # generate mask
         # depth threshold
         valid = depth1 < 1.0
