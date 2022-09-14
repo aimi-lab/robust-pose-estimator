@@ -157,7 +157,6 @@ class PoseN(RAFT):
         pose_se3 = pose_init if pose_init is not None else torch.zeros((n,6), device=image1.device)
 
         flow_predictions = []
-        pose_se3_predictions = []
         for itr in range(iters):
             coords1 = coords1.detach()
             corr = corr_fn(coords1)  # index correlation volume
@@ -165,14 +164,13 @@ class PoseN(RAFT):
             flow = coords1 - coords0
             with torch.cuda.amp.autocast():
                 net, up_mask, delta_flow = self.update_block(net, inp, corr, flow)
-            pose_se3 = self.pose_head(net, flow, pcl1, pcl2, pose_se3)
             # F(t+1) = F(t) + \Delta(t)
             coords1 = coords1 + delta_flow
             flow_up = coords1 - coords0
             flow_predictions.append(flow_up.float())
 
-            pose_se3_predictions.append(pose_se3.float()/self.pose_scale)
-        return flow_predictions, pose_se3_predictions
+        pose_se3 = self.pose_head(net, flow_predictions[-1], pcl1, pcl2, pose_se3)
+        return flow_predictions, pose_se3.float()/self.pose_scale
 
     def init_from_raft(self, raft_ckp):
         raft = RAFT(self.config)

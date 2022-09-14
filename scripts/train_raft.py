@@ -47,11 +47,11 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger):
 
             ref_depth, trg_depth, ref_conf, trg_conf = [dataloader.dataset.resize_lowres(d) for d in
                                                         [ref_depth, trg_depth, ref_conf, trg_conf]]
-            loss2d = geometric_2d_loss(flow_predictions[-1], pose_predictions[-1], intrinsics, trg_depth, trg_conf,
+            loss2d = geometric_2d_loss(flow_predictions[-1], pose_predictions, intrinsics, trg_depth, trg_conf,
                                        valid)[0]
-            loss3d = geometric_3d_loss(flow_predictions[-1], pose_predictions[-1], intrinsics, trg_depth, ref_depth,
+            loss3d = geometric_3d_loss(flow_predictions[-1], pose_predictions, intrinsics, trg_depth, ref_depth,
                                        trg_conf, ref_conf, valid)
-            loss_pose = seq_loss(supervised_pose_loss, (pose_predictions, pose))
+            loss_pose = supervised_pose_loss(pose_predictions, pose)
             loss = loss_weights['pose'] * loss_pose + loss_weights['2d'] * loss2d + loss_weights['3d'] * loss3d
 
             metrics = {"val/loss2d": loss2d.detach().mean().cpu().item(),
@@ -137,29 +137,29 @@ def main(args, config, force_cpu):
 
             # loss computations
             loss_flow = seq_loss(l1_loss, (flow_predictions, ref_flow,))
-            loss2d, theoretical_flow = geometric_2d_loss(flow_predictions[-1], pose_predictions[-1], intrinsics, trg_depth, trg_conf,
+            loss2d, theoretical_flow = geometric_2d_loss(flow_predictions[-1], pose_predictions, intrinsics, trg_depth, trg_conf,
                                        valid)
 
-            loss3d = geometric_3d_loss(flow_predictions[-1], pose_predictions[-1], intrinsics, trg_depth, ref_depth,
+            loss3d = geometric_3d_loss(flow_predictions[-1], pose_predictions, intrinsics, trg_depth, ref_depth,
                                        trg_conf, ref_conf, valid)
-            loss_pose = supervised_pose_loss(pose_predictions[-1], pose)
+            loss_pose = supervised_pose_loss(pose_predictions, pose)
             loss = loss_weights['pose']*loss_pose.mean()+loss_weights['2d']*loss2d+loss_weights['3d']*loss3d + loss_weights['flow']*loss_flow
 
             # debug
             if args.dbg & (i_batch%SUM_FREQ == 0):
                 print("\n se3 pose")
-                print(f"gt_pose: {pose[0].detach().cpu().numpy()}\npred_pose: {pose_predictions[-1][0].detach().cpu().numpy()}")
+                print(f"gt_pose: {pose[0].detach().cpu().numpy()}\npred_pose: {pose_predictions[0].detach().cpu().numpy()}")
                 print(" SE3 pose")
-                print(f"gt_pose: {lie_se3_to_SE3(pose[0]).detach().cpu().numpy()}\npred_pose: {lie_se3_to_SE3(pose_predictions[-1][0]).detach().cpu().numpy()}\n")
+                print(f"gt_pose: {lie_se3_to_SE3(pose[0]).detach().cpu().numpy()}\npred_pose: {lie_se3_to_SE3(pose_predictions[0]).detach().cpu().numpy()}\n")
                 print(" pose loss: ", loss_pose.detach().mean().cpu().item())
                 print(" 2d loss: ", loss2d.detach().mean().cpu().item())
                 print(" 3d loss: ", loss3d.detach().mean().cpu().item())
                 print(" flow loss: ", loss_flow.detach().mean().cpu().item())
                 if device == torch.device('cpu'):
-                    fig, ax = plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth, lie_se3_to_SE3_batch(-pose_predictions[-1]), intrinsics)
+                    fig, ax = plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth, lie_se3_to_SE3_batch(-pose_predictions), intrinsics)
                     import matplotlib.pyplot as plt
                     plt.show()
-                    plot_3d(ref_img, trg_img, ref_depth, trg_depth, lie_se3_to_SE3_batch(pose_predictions[-1]).detach(), intrinsics)
+                    plot_3d(ref_img, trg_img, ref_depth, trg_depth, lie_se3_to_SE3_batch(pose_predictions).detach(), intrinsics)
             # update params
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)                
