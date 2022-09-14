@@ -54,7 +54,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
     def __init__(self):
         super(DeclarativePoseHead3DNode, self).__init__()
 
-    def objective(self, net, flow, pcl1, pcl2, dummy, y):
+    def objective(self, flow, pcl1, pcl2, y):
         # 3D geometric L2 loss
         n,_,h,w = pcl1.shape
         # se(3) to SE(3)
@@ -66,13 +66,13 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         # define objective loss function
         residuals = torch.sum((pcl_aligned.view(n,3,-1) - pcl1.view(n,3,-1))**2, dim=1)
         residuals[~valid[:,0].squeeze()] = 0.0
-        return torch.mean(residuals)
+        return torch.mean(residuals, dim=-1)
 
-    def solve(self, net, flow, pcl1, pcl2, dummy):
+    def solve(self, flow, pcl1, pcl2):
         # solve using method of Horn
         flow = flow.detach()
-        pcl1 = pcl1.detach()
-        pcl2 = pcl2.detach()
+        pcl1 = pcl1.detach().clone()
+        pcl2 = pcl2.detach().clone()
 
         n = pcl1.shape[0]
         pcl_aligned, valid = remap_from_flow(pcl2, flow)
@@ -169,7 +169,7 @@ class PoseN(RAFT):
             flow_up = coords1 - coords0
             flow_predictions.append(flow_up.float())
 
-        pose_se3 = self.pose_head(net, flow_predictions[-1], pcl1, pcl2, pose_se3)
+        pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2)
         return flow_predictions, pose_se3.float()/self.pose_scale
 
     def init_from_raft(self, raft_ckp):
