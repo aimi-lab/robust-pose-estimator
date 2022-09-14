@@ -65,7 +65,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         pcl_aligned, valid = remap_from_flow(pcl2_aligned, flow)
         # define objective loss function
         residuals = torch.sum((pcl_aligned - pcl1).view(n,-1)**2, dim=-1)
-        residuals[~valid] = 0.0
+        residuals[~valid[:,0].squeeze()] = 0.0
         return torch.mean(residuals)
 
     def solve(self, net, flow, pcl1, pcl2, dummy):
