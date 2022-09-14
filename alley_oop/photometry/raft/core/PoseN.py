@@ -60,7 +60,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         # se(3) to SE(3)
         pose = lie_se3_to_SE3_batch(y)
         # transform point cloud given the pose
-        pcl2_aligned = transform(homogenous(pcl2), pose).reshape(n, 4, h, w)
+        pcl2_aligned = transform(homogenous(pcl2.view(n,3,-1)), pose).reshape(n, 4, h, w)[:,:3]
         # resample point clouds given the optical flow
         pcl_aligned, valid = remap_from_flow(pcl2_aligned, flow)
         # define objective loss function
