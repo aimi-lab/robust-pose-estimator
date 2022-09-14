@@ -59,16 +59,16 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         n,_,h,w = pcl1.shape
         # se(3) to SE(3)
         pose = lie_se3_to_SE3_batch(y)
-        # transform point cloud given the pose
+        # # transform point cloud given the pose
         pcl2_aligned = transform(homogenous(pcl2.view(n,3,-1)), pose).reshape(n, 4, h, w)[:,:3]
         # resample point clouds given the optical flow
-        pcl_aligned, valid = remap_from_flow(pcl2_aligned, flow)
+        pcl2_aligned, valid = remap_from_flow(pcl2_aligned, flow)
         # define objective loss function
-        residuals = torch.sum((pcl_aligned.view(n,3,-1) - pcl1.view(n,3,-1))**2, dim=1)
-        residuals[~valid[:,0].squeeze()] = 0.0
+        residuals = torch.sum((pcl2_aligned.view(n,3,-1) - pcl1.view(n,3,-1))**2, dim=1)
+        residuals[~valid[:,0]] = 0.0
         return torch.mean(residuals, dim=-1)
 
-    def solve(self, flow, pcl1, pcl2):
+    def solve_horn(self, flow, pcl1, pcl2):
         # solve using method of Horn
         flow = flow.detach()
         pcl1 = pcl1.detach().clone()
@@ -82,6 +82,23 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         y = align_torch(pcl_aligned.view(n, 3, -1), pcl1.view(n, 3, -1))[0]
         return y.detach(), None
 
+    def solve(self, flow, pcl1, pcl2):
+        # solve using method of Horn
+        flow = flow.detach()
+        pcl1 = pcl1.detach().clone()
+        pcl2 = pcl2.detach().clone()
+        with torch.enable_grad():
+            n = pcl1.shape[0]
+            # Solve using LBFGS optimizer:
+            y = torch.ones((n,6), device=flow.device, requires_grad=True)
+            optimizer = torch.optim.LBFGS([y], lr=1.0, max_iter=30, line_search_fn="strong_wolfe")
+            def fun():
+                optimizer.zero_grad()
+                loss = self.objective(flow, pcl1, pcl2, y)[0].mean()
+                loss.backward()
+                return loss
+            optimizer.step(fun)
+        return y.detach(), None
 
 
 class PoseN(RAFT):
