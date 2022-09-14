@@ -54,11 +54,11 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
     def __init__(self):
         super(DeclarativePoseHead3DNode, self).__init__()
 
-    def objective(self, net, flow, pcl1, pcl2, dummy, se3_pose):
+    def objective(self, net, flow, pcl1, pcl2, dummy, y):
         # 3D geometric L2 loss
         n,_,h,w = pcl1.shape[0]
         # se(3) to SE(3)
-        pose = lie_se3_to_SE3_batch(se3_pose)
+        pose = lie_se3_to_SE3_batch(y)
         # transform point cloud given the pose
         pcl2_aligned = transform(homogenous(pcl2), pose).reshape(n, 4, h, w)
         # resample point clouds given the optical flow
@@ -79,8 +79,8 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         # if we mask it here, each batch has a different size
         pcl_aligned.view(n, 3, -1)[~valid] = torch.nan
         pcl1.view(n, 3, -1)[~valid] = torch.nan
-        se3_pose = align_torch(pcl_aligned.view(n, 3, -1), pcl1.view(n, 3, -1))[0]
-        return se3_pose.detach(), None
+        y = align_torch(pcl_aligned.view(n, 3, -1), pcl1.view(n, 3, -1))[0]
+        return y.detach(), None
 
 
 
