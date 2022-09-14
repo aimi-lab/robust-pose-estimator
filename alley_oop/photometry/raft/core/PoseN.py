@@ -10,6 +10,8 @@ from alley_oop.photometry.raft.core.corr import CorrBlock, AlternateCorrBlock
 from alley_oop.photometry.raft.core.raft import RAFT
 from alley_oop.photometry.raft.core.extractor import RGBDEncoder
 from alley_oop.geometry.absolute_pose_quarternion import align_torch
+from alley_oop.ddn.ddn.pytorch.node import AbstractDeclarativeNode
+from alley_oop.photometry.raft.core.utils.flow_utils import remap_from_flow
 
 
 class PoseHead(nn.Module):
@@ -25,23 +27,12 @@ class PoseHead(nn.Module):
 
     def forward(self, net, flow, pcl1, pcl2, pose):
         n, _, h, w = flow.shape
-        pcl_aligned, valid = self.remap(pcl2, flow)
+        pcl_aligned, valid = remap_from_flow(pcl2, flow)
         if self.apply_mask:
             pcl_aligned.view(n, 3, -1)[~valid] = 0.0
             pcl1.view(n, 3, -1)[~valid] = 0.0
         out = self.convs(torch.cat((net, flow, pcl1, pcl_aligned), dim=1)).view(net.shape[0], -1)
         return self.mlp(torch.cat((out, pose), dim=1))
-
-    def remap(self, x, flow):
-        # get optical flow correspondences
-        n,_,h, w = flow.shape
-        row_coords, col_coords = torch.meshgrid(torch.arange(h), torch.arange(w), indexing='ij')
-        flow_off = torch.empty_like(flow)
-        flow_off[:, 1] = 2 * (flow[:, 1] + row_coords.to(flow.device)) / (h - 1) - 1
-        flow_off[:, 0] = 2 * (flow[:, 0] + col_coords.to(flow.device)) / (w - 1) - 1
-        x = torch.nn.functional.grid_sample(x, flow_off.permute(0, 2, 3, 1), padding_mode='zeros', align_corners=True)
-        valid = (x > 0).any(dim=1).view(n,1,-1).repeat(1,3,1)
-        return x, valid
 
 
 class HornPoseHead(PoseHead):
@@ -50,7 +41,7 @@ class HornPoseHead(PoseHead):
 
     def forward(self, net, flow, pcl1, pcl2, pose):
         n = pcl1.shape[0]
-        pcl_aligned, valid = self.remap(pcl2, flow)
+        pcl_aligned, valid = remap_from_flow(pcl2, flow)
         # if we mask it here, each batch has a different size
         pcl_aligned.view(n,3, -1)[~valid] = torch.nan
         pcl1.view(n, 3, -1)[~valid] = torch.nan

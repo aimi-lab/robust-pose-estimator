@@ -35,6 +35,7 @@ train:
   grad_clip: 1.0
   loss_weights:
     pose: 0.1
+    pose_direct: 0.1
     2d: 0.0
     3d: 0.0
     flow: 0.0

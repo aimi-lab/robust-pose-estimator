@@ -1,12 +1,13 @@
 import torch
 from alley_oop.geometry.lie_3d import lie_se3_to_SE3_batch
-from alley_oop.geometry.pinhole_transforms import create_img_coords_t
+from alley_oop.geometry.pinhole_transforms import create_img_coords_t, reproject, transform
+from alley_oop.photometry.raft.core.utils.flow_utils import remap_from_flow
 
 
 def _warp_frame(depth: torch.Tensor, T: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.Tensor):
     # transform and project using pinhole camera model
     # pinhole projection
-    opts = _reproject(depth, intrinsics, img_coords)
+    opts = reproject(depth, intrinsics, img_coords)
     # compose projection matrix
     pmat = intrinsics[None,...] @ T[:,:3]
 
@@ -16,17 +17,6 @@ def _warp_frame(depth: torch.Tensor, T: torch.Tensor, intrinsics: torch.Tensor, 
     # inhomogenization
     ipts = ipts[:, :3] / ipts[:,-1].unsqueeze(1)
     return ipts[:,:2]
-
-
-def _reproject(depth: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.Tensor):
-    # transform and project using pinhole camera model
-    # pinhole projection
-    n = depth.shape[0]
-    repr = torch.linalg.inv(intrinsics) @ img_coords.view(3, -1)
-    opts = depth.view(n, 1, -1) * repr.unsqueeze(0)
-
-    opts = torch.cat((opts, torch.ones((n, 1, opts.shape[-1]), device=opts.device, dtype=opts.dtype)), dim=1)
-    return opts
 
 
 def of_sequence_loss(flow_preds, flow_gt, valid, gamma=0.8, max_flow=400):
@@ -96,27 +86,23 @@ def geometric_2d_loss(flow_preds, se3_preds, intrinsics, trg_depth, trg_confiden
     return loss, theoretical_flow
 
 
-def geometric_3d_loss(flow_preds, se3_preds, intrinsics, trg_depth, ref_depth, trg_confidence, ref_confidence, valid):
+def geometric_3d_loss(flow_preds, se3_preds, intrinsics, trg_depth, ref_depth, trg_confidence, ref_conf, valid):
     n,_,h,w = flow_preds.shape
     # reproject to 3D
     T_est = lie_se3_to_SE3_batch(-se3_preds)  #
     img_coordinates = create_img_coords_t(y=trg_depth.shape[-2], x=trg_depth.shape[-1]).to(flow_preds.device)
-    trg_opts = _reproject(trg_depth, intrinsics, img_coordinates)
-    trg_opts = torch.bmm(T_est, trg_opts).reshape(n,4,h,w) #SurfelMap(frame=trg_frame, kmat=intrinsics, ignore_mask=True, pmat=T_est)
-    ref_opts = _reproject(ref_depth, intrinsics, img_coordinates).reshape(n, 4, h, w)
+    trg_opts = reproject(trg_depth, intrinsics, img_coordinates)
+    trg_opts = transform(trg_opts, T_est).reshape(n,4,h,w) #SurfelMap(frame=trg_frame, kmat=intrinsics, ignore_mask=True, pmat=T_est)
+    ref_opts = reproject(ref_depth, intrinsics, img_coordinates).reshape(n, 4, h, w)
 
     # get optical flow correspondences
-    row_coords, col_coords = torch.meshgrid(torch.arange(h), torch.arange(w), indexing='ij')
-    flow_off = torch.empty_like(flow_preds)
-    flow_off[:, 1] = 2*(flow_preds[:, 1] + row_coords.to(flow_preds.device))/(h-1)-1
-    flow_off[:, 0] = 2*(flow_preds[:, 0] + col_coords.to(flow_preds.device))/(w-1)-1
-    mask = valid & ((flow_off <= 1.0) & (flow_off >= -1.0)).any(dim=1)
-    ref_opts = torch.nn.functional.grid_sample(ref_opts, flow_off.permute(0, 2, 3, 1), padding_mode='zeros')
-    ref_conf = torch.nn.functional.grid_sample(ref_confidence, flow_off.permute(0, 2, 3, 1), padding_mode='zeros')
+    ref_opts, valid_flow = remap_from_flow(ref_opts, flow_preds)
+    ref_conf, valid_flow = remap_from_flow(ref_conf, flow_preds)
+    valid &= valid_flow[:,0].view(n,1,h,w)
 
     # compute residuals
     residuals = torch.linalg.norm(trg_opts-ref_opts, ord=2, dim=1)
-    mask = torch.isnan(flow_preds[:, 0]) | torch.isnan(flow_preds[:, 1]) | ~mask
+    mask = torch.isnan(flow_preds[:, 0]) | torch.isnan(flow_preds[:, 1]) | ~valid
     # weight residuals by confidences
     residuals = torch.sqrt(trg_confidence*ref_conf) * residuals
     residuals[mask] = 0.0

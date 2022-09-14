@@ -188,3 +188,24 @@ def inv_transform(mat:torch.Tensor):
     mat_inv[:3, :3] = mat[:3, :3].T
     mat_inv[:3, 3] = -mat[:3, :3].T @ mat[:3, 3]
     return mat_inv
+
+
+def homogenous(opts: torch.Tensor):
+    n = opts.shape[0]
+    opts = torch.cat((opts, torch.ones((n, 1, opts.shape[-1]), device=opts.device, dtype=opts.dtype)), dim=1)
+    return opts
+
+
+def transform(opts: torch.Tensor, T:torch.tensor):
+    return torch.bmm(T, opts)
+
+
+def reproject(depth: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.Tensor):
+    # transform and project using pinhole camera model
+    # pinhole projection
+    n = depth.shape[0]
+    repr = torch.linalg.inv(intrinsics) @ img_coords.view(3, -1)
+    opts = depth.view(n, 1, -1) * repr.unsqueeze(0)
+
+    opts = homogenous(opts)
+    return opts
