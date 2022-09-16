@@ -169,6 +169,33 @@ def lie_se3_to_SE3_batch(
     return pmat
 
 
+def lie_se3_to_SE3_batch_small(
+        pvec: Union[np.ndarray, torch.Tensor] = None,
+    ) -> Union[np.ndarray, torch.Tensor]:
+    """
+    create 4x4 projection matrix in SE(3) from Lie input vector for very small angles
+
+    :param pvec: concatenated Lie angle 3-vector and Lie translation 3-vector
+    :return: projection matrix in SE(3), translation vector R^3
+    """
+
+    if pvec.ndim == 1:
+        pvec = pvec.unsqueeze(0)
+    b = pvec.shape[0]
+    # define identity matrix in advance to account for torch device
+    eye_3 = beye((b, 3), dtype=pvec.dtype, device=pvec.device)
+
+    # construct hat-map which is so(3)
+    wmat = lie_hatmap_batch(pvec[:, :3])
+    rmat = eye_3 + wmat
+
+    pmat = beye((b, 4), dtype=pvec.dtype, device=pvec.device)
+    pmat[:, :3, :3] = rmat
+    pmat[:, :3, -1] = pvec[:, 3:]
+
+    return pmat
+
+
 def lie_SE3_to_se3(
         pmat: Union[np.ndarray, torch.Tensor] = None, 
         tol: float = 10e-12,
