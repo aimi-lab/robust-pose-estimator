@@ -111,7 +111,6 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
                 optimizer.zero_grad()
                 loss = self.objective(flow, pcl1, pcl2, weights1, weights2, y=y).sum()
                 loss.backward()
-                print(loss)
                 return loss
             optimizer.step(fun)
         return y.detach(), None
@@ -142,13 +141,14 @@ class PoseN(RAFT):
 
     def forward(self, image1, image2, depth1, depth2, conf1, conf2, iters=12, flow_init=None, pose_init=None):
         """ Estimate optical flow and rigid pose between pair of frames """
-        pcl1 = self.proj(depth1)
-        pcl2 = self.proj(depth2)
-        conf1[pcl1[:,2].unsqueeze(1) < 1e-6] = 0.0
-        conf2[pcl2[:,2].unsqueeze(1) < 1e-6] = 0.0
+        with torch.autograd.detect_anomaly():
+            pcl1 = self.proj(depth1)
+            pcl2 = self.proj(depth2)
+            conf1[pcl1[:,2].unsqueeze(1) < 1e-6] = 0.0
+            conf2[pcl2[:,2].unsqueeze(1) < 1e-6] = 0.0
 
-        flow_predictions = super().forward(image1, image2, iters, flow_init)
-        pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2, conf1, conf2)
+            flow_predictions = super().forward(image1, image2, iters, flow_init)
+            pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2, conf1, conf2)
         return flow_predictions, pose_se3.float()/self.pose_scale
 
     def init_from_raft(self, raft_ckp):
