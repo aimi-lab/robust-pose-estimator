@@ -4,10 +4,11 @@ model:
   dropout: 0.0
   small: False
   RGBD: False
-  pose_scale: 10.0
-
+  pose_scale: 1.0
+  mode: declarative #mlp # horn
 data:
   train:
+    type: Intuitive
     basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/01_stereo/01_intuitive_scared
     sequences:
       - dataset_1
@@ -18,15 +19,16 @@ data:
       - 1
       - 20
   val:
+    type: Intuitive
     basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/01_stereo/01_intuitive_scared
     sequences:
       - dataset_7
       - dataset_8
       - dataset_9
-    step: 10
+    step: 1
 
 train:
-  batch_size: 32
+  batch_size: 8
   learning_rate: 1.0e-4
   weight_decay: 5.0e-5
   epsilon: 1.0e-8
@@ -34,16 +36,15 @@ train:
   gamma: 0.8
   grad_clip: 1.0
   loss_weights:
-    pose: 0.1
-    pose_direct: 0.1
+    pose: 1.0
     2d: 0.0
     3d: 0.0
     flow: 0.0
   add_noise: False
-  freeze_flow_steps: 10000
+  freeze_flow_steps: 1000000000000000000
 
 val:
-  batch_size: 32
+  batch_size: 10
 
 image_shape:
   - 512

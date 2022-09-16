@@ -9,6 +9,7 @@ model:
 
 data:
   train:
+    type: TUM
     basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/tum_rgbd/rgbd_dataset_freiburg1_xyz
     sequences:
       - ""
@@ -17,6 +18,7 @@ data:
       - 20
 
   val:
+    type: TUM
     basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/tum_rgbd/rgbd_dataset_freiburg1_xyz
     sequences:
       - ""
@@ -24,7 +26,7 @@ data:
 
 
 train:
-  batch_size: 10
+  batch_size: 8
   learning_rate: 1.0e-4
   weight_decay: 5.0e-5
   epsilon: 1.0e-8
@@ -37,10 +39,10 @@ train:
     3d: 0.0
     flow: 0.0
   add_noise: False
-  freeze_flow_steps: 0
+  freeze_flow_steps: 10000000000000000000000000
 
 val:
-  batch_size: 32
+  batch_size: 10
 
 image_shape:
   - 512
