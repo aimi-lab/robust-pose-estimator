@@ -42,8 +42,7 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger):
     with torch.no_grad():
         for i_batch, data_blob in enumerate(dataloader):
             ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, pose = [x.to(device) for x in data_blob]
-            flow_predictions, pose_predictions = model(trg_img, ref_img, trg_depth, ref_depth, trg_conf, ref_conf,
-                                                       iters=config['model']['iters'])
+            flow_predictions, pose_predictions = model(trg_img, ref_img, trg_depth, ref_depth, iters=config['model']['iters'])
 
             loss2d = geometric_2d_loss(flow_predictions[-1], pose_predictions, intrinsics, trg_depth, trg_conf,
                                        valid)[0]
@@ -124,11 +123,10 @@ def main(args, config, force_cpu):
 
             # forward pass
             flow_predictions, pose_predictions = model(trg_img, ref_img, trg_depth,
-                                                       ref_depth, trg_conf, ref_conf,
-                                                       iters=config['model']['iters'])
+                                                       ref_depth, iters=config['model']['iters'])
 
             with torch.inference_mode():
-                ref_flow = ref_model(trg_img, ref_img, iters=config['model']['iters'])
+                ref_flow = ref_model(trg_img, ref_img, iters=config['model']['iters'])[0]
 
             # loss computations
             loss_flow = seq_loss(l1_loss, (flow_predictions, ref_flow,))

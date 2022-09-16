@@ -134,4 +134,4 @@ class RAFT(nn.Module):
         if test_mode:
             return coords1 - coords0, flow_up
             
-        return flow_predictions
+        return flow_predictions, net, inp

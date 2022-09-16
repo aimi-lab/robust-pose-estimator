@@ -24,6 +24,9 @@ class PoseN(RAFT):
         self.pose_scale = config['pose_scale']
 
         img_coords = create_img_coords_t(y=H, x=W)
+        self.conf_head = nn.Sequential(nn.Conv2d(128+128+3, out_channels=256, kernel_size=(3,3), padding="same"), nn.BatchNorm2d(256),
+                                       nn.Conv2d(256, out_channels=1, kernel_size=(3,3), padding="same"), nn.Sigmoid())
+        self.up = nn.UpsamplingBilinear2d((H,W))
         self.repr = nn.Parameter(torch.linalg.inv(intrinsics.cpu())@ img_coords.view(3, -1), requires_grad=False)
 
     def proj(self, depth):
@@ -31,16 +34,17 @@ class PoseN(RAFT):
         opts = depth.view(n, 1, -1) * self.repr.unsqueeze(0)
         return opts.view(n,3,*depth.shape[-2:])
 
-    def forward(self, image1, image2, depth1, depth2, conf1, conf2, iters=12, flow_init=None, pose_init=None):
+    def forward(self, image1, image2, depth1, depth2, iters=12, flow_init=None, pose_init=None):
         """ Estimate optical flow and rigid pose between pair of frames """
-        with torch.autograd.detect_anomaly():
-            pcl1 = self.proj(depth1)
-            pcl2 = self.proj(depth2)
-            conf1[pcl1[:,2].unsqueeze(1) < 1e-6] = 0.0
-            conf2[pcl2[:,2].unsqueeze(1) < 1e-6] = 0.0
+        pcl1 = self.proj(depth1)
+        pcl2 = self.proj(depth2)
 
-            flow_predictions = super().forward(image1, image2, iters, flow_init)
-            pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2, conf1, conf2)
+        flow_predictions, gru_hidden_state, context = super().forward(image1, image2, iters, flow_init)
+        context_up = self.up(torch.cat((gru_hidden_state, context), dim=1))
+        conf1 = self.conf_head(torch.cat((pcl1, context_up), dim=1))
+        conf2 = self.conf_head(torch.cat((pcl1, context_up), dim=1))
+
+        pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2, conf1, conf2)
         return flow_predictions, pose_se3.float()/self.pose_scale
 
     def init_from_raft(self, raft_ckp):
