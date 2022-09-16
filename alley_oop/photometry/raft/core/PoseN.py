@@ -5,14 +5,14 @@ import torch.nn.functional as F
 from collections import OrderedDict
 import copy
 
-from alley_oop.geometry.pinhole_transforms import create_img_coords_t, transform, homogenous
+from alley_oop.geometry.pinhole_transforms import create_img_coords_t, transform, homogenous, project
 from alley_oop.photometry.raft.core.corr import CorrBlock, AlternateCorrBlock
 from alley_oop.photometry.raft.core.raft import RAFT
 from alley_oop.photometry.raft.core.extractor import RGBDEncoder
 from alley_oop.geometry.absolute_pose_quarternion import align_torch
 from alley_oop.ddn.ddn.pytorch.node import AbstractDeclarativeNode, DeclarativeLayer
 from alley_oop.photometry.raft.core.utils.flow_utils import remap_from_flow
-from alley_oop.geometry.lie_3d import lie_se3_to_SE3_batch
+from alley_oop.geometry.lie_3d import lie_se3_to_SE3_batch, lie_se3_to_SE3_batch_small
 
 
 class PoseHead(nn.Module):
@@ -51,41 +51,53 @@ class HornPoseHead(PoseHead):
 
 
 class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
-    def __init__(self):
+    def __init__(self, intrinsics: torch.tensor, loss_weight_3d: float=10.0):
         super(DeclarativePoseHead3DNode, self).__init__()
+        self.intrinsics = intrinsics
+        self.loss_weight_3d = loss_weight_3d
 
-    def objective(self, flow, pcl1, pcl2, weights1, weights2, y):
+    def reprojection_objective(self, flow, pcl1, pcl2, weights2, y):
+        n, _, h, w = flow.shape
+        img_coordinates = create_img_coords_t(y=pcl1.shape[-2], x=pcl1.shape[-1]).to(pcl1.device)
+        pose = lie_se3_to_SE3_batch_small(-y)  # invert transform to be consistent with other pose estimators
+        # project to image plane
+        warped_pts = project(pcl2.view(n,3,-1), pose, self.intrinsics[None, ...])
+        flow_off = img_coordinates[None, :2] + flow.view(n, 2, -1)
+        residuals = torch.sum((flow_off - warped_pts) ** 2, dim=1)
+
+        valid = (flow_off[:, 0] > 0) & (flow_off[:, 1] > 0) & (flow_off[:, 0] < w) & (flow_off[:, 1] < h)
+        valid = torch.isnan(residuals) | ~valid.view(n,-1)
+        # weight residuals by confidences
+        residuals *= weights2.view(n, -1)
+        residuals[valid] = 0.0
+        loss = torch.mean(residuals, dim=1) / (h*w)  # normalize with width and height
+        return loss
+
+    def depth_objective(self, flow, pcl1, pcl2, weights1, weights2, y):
         # 3D geometric L2 loss
-        n,_,h,w = pcl1.shape
+        n, _, h, w = pcl1.shape
         # se(3) to SE(3)
-        pose = lie_se3_to_SE3_batch(y)
+        pose = lie_se3_to_SE3_batch_small(y)
         # # transform point cloud given the pose
-        pcl2_aligned = transform(homogenous(pcl2.view(n,3,-1)), pose).reshape(n, 4, h, w)[:,:3]
+        pcl2_aligned = transform(homogenous(pcl2.view(n, 3, -1)), pose).reshape(n, 4, h, w)[:, :3]
         # resample point clouds given the optical flow
-        pcl2_aligned, valid = remap_from_flow(pcl2_aligned, flow)
+        pcl2_aligned, _ = remap_from_flow(pcl2_aligned, flow)
         weights2_aligned, valid = remap_from_flow(weights2, flow)
         # define objective loss function
-        residuals = torch.sum((pcl2_aligned.view(n,3,-1) - pcl1.view(n,3,-1))**2, dim=1)
+        residuals = torch.sum((pcl2_aligned.view(n, 3, -1) - pcl1.view(n, 3, -1)) ** 2, dim=1)
         # reweighing residuals
-        residuals *= torch.sqrt(weights2_aligned.view(n,-1)*weights1.view(n,-1))
-        residuals[~valid[:,0]] = 0.0
+        residuals *= torch.sqrt(weights2_aligned.view(n,-1)*weights1.view(n,-1)) * residuals
+        residuals[~valid[:, 0]] = 0.0
         return torch.mean(residuals, dim=-1)
 
-    def solve_horn(self, flow, pcl1, pcl2):
-        # solve using method of Horn
-        flow = flow.detach()
-        pcl1 = pcl1.detach().clone()
-        pcl2 = pcl2.detach().clone()
+    def objective(self, *xs, y):
+        flow, pcl1, pcl2, weights1, weights2 = xs
+        loss3d = self.depth_objective(flow, pcl1, pcl2, weights1, weights2, y)
+        loss2d = self.reprojection_objective(flow, pcl1, pcl2, weights2, y)
+        return loss2d + self.loss_weight_3d*loss3d
 
-        n = pcl1.shape[0]
-        pcl_aligned, valid = remap_from_flow(pcl2, flow)
-        # if we mask it here, each batch has a different size
-        pcl_aligned.view(n, 3, -1)[~valid] = torch.nan
-        pcl1.view(n, 3, -1)[~valid] = torch.nan
-        y = align_torch(pcl_aligned.view(n, 3, -1), pcl1.view(n, 3, -1))[0]
-        return y.detach(), None
-
-    def solve(self, flow, pcl1, pcl2, weights1, weights2):
+    def solve(self, *xs):
+        flow, pcl1, pcl2, weights1, weights2 = xs
         # solve using method of Horn
         flow = flow.detach()
         pcl1 = pcl1.detach().clone()
@@ -93,12 +105,13 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         with torch.enable_grad():
             n = pcl1.shape[0]
             # Solve using LBFGS optimizer:
-            y = torch.ones((n,6), device=flow.device, requires_grad=True)
+            y = torch.zeros((n,6), device=flow.device, requires_grad=True)
             optimizer = torch.optim.LBFGS([y], lr=1.0, max_iter=30, line_search_fn="strong_wolfe", )
             def fun():
                 optimizer.zero_grad()
-                loss = self.objective(flow, pcl1, pcl2, weights1, weights2, y).sum()
+                loss = self.objective(flow, pcl1, pcl2, weights1, weights2, y=y).sum()
                 loss.backward()
+                print(loss)
                 return loss
             optimizer.step(fun)
         return y.detach(), None
@@ -113,7 +126,7 @@ class PoseN(RAFT):
         elif config['mode'] == 'horn':
             self.pose_head = HornPoseHead()
         elif config['mode'] == 'declarative':
-            self.pose_head = DeclarativeLayer(DeclarativePoseHead3DNode())
+            self.pose_head = DeclarativeLayer(DeclarativePoseHead3DNode(intrinsics))
         else:
             raise NotImplementedError(f'mode {config["mode"]} not supported')
         # replace by 4-channel input conv (RGB + D)
@@ -131,6 +144,8 @@ class PoseN(RAFT):
         """ Estimate optical flow and rigid pose between pair of frames """
         pcl1 = self.proj(depth1)
         pcl2 = self.proj(depth2)
+        conf1[pcl1[:,2].unsqueeze(0) < 1e-6] = 0.0
+        conf2[pcl2[:,2].unsqueeze(0) < 1e-6] = 0.0
 
         flow_predictions = super().forward(image1, image2, iters, flow_init)
         pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2, conf1, conf2)

@@ -209,3 +209,12 @@ def reproject(depth: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.T
 
     opts = homogenous(opts)
     return opts
+
+
+def project(opts: torch.Tensor, pmat:torch.tensor, kmat:torch.tensor):
+    p = kmat @ pmat[:, :3]
+    # pinhole projection
+    ipts = torch.bmm(p, homogenous(opts))
+    # inhomogenization
+    ipts = ipts[:, :3] / (ipts[:, -1].unsqueeze(1) + 1e-6)
+    return ipts[:, :2]
