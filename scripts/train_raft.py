@@ -70,10 +70,10 @@ def main(args, config, force_cpu):
     device = torch.device('cuda') if (torch.cuda.is_available() & (not force_cpu)) else torch.device('cpu')
 
     # get data
-    data_train, intrinsics = datasets.get_data(config['data']['train']['basepath'],config['data']['train']['sequences'],
-                                               config['image_shape'], step=config['data']['train']['step'])
-    data_val, intrinsics = datasets.get_data(config['data']['val']['basepath'],config['data']['val']['sequences'],
-                                             config['image_shape'], step=config['data']['val']['step'])
+    data_train, intrinsics = datasets.get_data(config['data']['train']['type'], config['data']['train']['basepath'],config['data']['train']['sequences'],
+                                               config['image_shape'], config['data']['train']['step'], config['depth_scale'])
+    data_val, intrinsics = datasets.get_data(config['data']['val']['type'], config['data']['val']['basepath'],config['data']['val']['sequences'],
+                                             config['image_shape'], config['data']['val']['step'], config['depth_scale'])
     print(f"train: {len(data_train)} samples, val: {len(data_val)} samples")
     intrinsics = intrinsics.to(device)
     train_loader = DataLoader(data_train, num_workers=4, pin_memory=True, batch_size=config['train']['batch_size'], shuffle=True)

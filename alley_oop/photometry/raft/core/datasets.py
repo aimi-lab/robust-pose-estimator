@@ -14,30 +14,37 @@ from torch.utils.data import Dataset
 from dataset.rectification import StereoRectifier
 
 
-def get_data(input_path: str, sequences: str, img_size: Tuple, step: int=1):
+def get_data(dataset_type: str, input_path: str, sequences: str, img_size: Tuple, step: int, depth_cutoff: float):
 
     # check the format of the calibration file
     img_size = tuple(img_size)
-    calib_path = os.path.join(input_path,sequences[0],'keyframe_1')
-    if os.path.isfile(os.path.join(calib_path, 'camcal.json')):
-        calib_file = os.path.join(calib_path, 'camcal.json')
-    elif os.path.isfile(os.path.join(calib_path, 'camera_calibration.json')):
-        calib_file = os.path.join(calib_path, 'camera_calibration.json')
-    elif os.path.isfile(os.path.join(calib_path, 'StereoCalibration.ini')):
-        calib_file = os.path.join(calib_path, 'StereoCalibration.ini')
-    elif os.path.isfile(os.path.join(calib_path, 'endoscope_calibration.yaml')):
-        calib_file = os.path.join(calib_path, 'endoscope_calibration.yaml')
-    else:
-        # no calibration file found as we use TUM dataset
-        print('TUM Dataset detected')
-        dataset = TUMDataset(root=input_path, step=step, img_size=img_size)
-        intrinsics = torch.tensor([[525.0, 0, 319.5], [0, 525.0, 239.5], [0.0, 0.0, 1.0]]).float()
-        return dataset, intrinsics
-    rect = StereoRectifier(calib_file, img_size_new=(img_size[1], img_size[0]), mode='conventional')
-    calib = rect.get_rectified_calib()
-    dataset = MultiSeqPoseDataset(root=input_path, seqs=sequences, baseline=calib['bf_orig'], conf_thr=0.0, step=step, img_size=img_size)
 
-    intrinsics = torch.tensor(calib['intrinsics']['left']).float()
+    if dataset_type == 'TUM':
+        dataset = TUMDataset(root=input_path, step=step, img_size=img_size, depth_cutoff=depth_cutoff)
+        intrinsics = torch.tensor([[525.0, 0, 319.5], [0, 525.0, 239.5], [0.0, 0.0, 1.0]]).float()
+    elif dataset_type == 'TartanAir':
+        dataset = TartainAir(root=input_path, seqs=sequences, step=step, img_size=img_size, depth_cutoff=depth_cutoff)
+    elif dataset_type == 'Intuitive':
+        calib_path = os.path.join(input_path, sequences[0], 'keyframe_1')
+        if os.path.isfile(os.path.join(calib_path, 'camcal.json')):
+            calib_file = os.path.join(calib_path, 'camcal.json')
+        elif os.path.isfile(os.path.join(calib_path, 'camera_calibration.json')):
+            calib_file = os.path.join(calib_path, 'camera_calibration.json')
+        elif os.path.isfile(os.path.join(calib_path, 'StereoCalibration.ini')):
+            calib_file = os.path.join(calib_path, 'StereoCalibration.ini')
+        elif os.path.isfile(os.path.join(calib_path, 'endoscope_calibration.yaml')):
+            calib_file = os.path.join(calib_path, 'endoscope_calibration.yaml')
+        else:
+            raise ValueError("no calibration file found")
+        rect = StereoRectifier(calib_file, img_size_new=(img_size[1], img_size[0]), mode='conventional')
+        calib = rect.get_rectified_calib()
+        dataset = MultiSeqPoseDataset(root=input_path, seqs=sequences, baseline=calib['bf_orig'], conf_thr=0.0, step=step,
+                                  img_size=img_size, depth_cutoff=depth_cutoff)
+
+        intrinsics = torch.tensor(calib['intrinsics']['left']).float()
+    else:
+        raise NotImplementedError
+
     return dataset, intrinsics
 
 
@@ -187,9 +194,82 @@ class TUMDataset(Dataset):
         path = self.image_list[item][i]
         # find depth map that has closed time index as depth and rgb are not synchronized
         depth = cv2.imread(self.depth_list[item][i], cv2.IMREAD_ANYDEPTH)
-        depth = torch.from_numpy(depth.astype(np.float32) / 5.0).unsqueeze(0)
+        depth = cv2.bilateralFilter(depth.astype(np.float32), d=-1, sigmaColor=0.01, sigmaSpace=10)
+        depth = torch.from_numpy(depth / 5.0).unsqueeze(0)
         img = torch.from_numpy(cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)).permute(2, 0, 1).float()
         return self.resize(img), self.resize(depth)
 
     def __len__(self):
         return len(self.image_list)
+
+
+class TartainAirSubset(Dataset):
+    def __init__(self, root, depth_cutoff,step, img_size):
+        super(TartainAirSubset, self).__init__()
+        images = sorted(glob(os.path.join(root, 'image_left', '*.png')))
+        depth = sorted(glob(os.path.join(root, 'depth_left', '*.png')))
+        gt_file = os.path.join(root, 'groundtruth.txt')
+        poses, pose_lookup = read_freiburg(gt_file, ret_stamps=True)
+        assert len(images) == len(depth)
+        self.depth_cutoff = depth_cutoff
+        self.image_list = []
+        self.depth_list = []
+        self.rel_pose_list = []
+
+        if isinstance(step, int):
+            step = (step, step)
+        for i in range(len(images)-step[1]):
+            s = np.random.randint(*step) if step[0] < step[1] else step[0]  # select a random step in given range
+            self.image_list.append([images[i], images[i+s]])
+            self.depth_list.append([depth[i], depth[i+s]])
+            self.rel_pose_list.append(np.linalg.inv(poses[i+s].astype(np.float64)) @ poses[i].astype(np.float64))
+        self.resize = Resize(img_size)
+
+    def __getitem__(self, index):
+        img1, depth1 = self._read_img(index,0)
+        img2, depth2 = self._read_img(index,1)
+
+        # normalize depth
+        depth1 /= self.depth_cutoff
+        depth2 /= self.depth_cutoff
+
+        pose = torch.from_numpy(self.rel_pose_list[index]).clone()
+        pose[:3, 3] /= self.depth_cutoff  # normalize translation
+        pose_se3 = lie_SE3_to_se3(pose)
+        depth_conf1 = torch.exp(-.5 * depth1 ** 2*10 )
+        depth_conf2 = torch.exp(-.5 * depth2 ** 2*10 )
+        # generate mask
+        # depth threshold
+        valid = depth1 < 1.0
+        valid &= depth2 < 1.0
+        valid &= depth1 > 1e-3
+        valid &= depth2 > 1e-3
+        return img1, img2, depth1, depth2, depth_conf1, depth_conf2, valid, pose_se3.float()
+
+    def _read_img(self, item, i):
+        path = self.image_list[item][i]
+        # find depth map that has closed time index as depth and rgb are not synchronized
+        depth = np.load(self.depth_list[item][i])
+        depth = torch.from_numpy(depth).unsqueeze(0)
+        img = torch.from_numpy(cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)).permute(2, 0, 1).float()
+        return self.resize(img), self.resize(depth)
+
+    def __len__(self):
+        return len(self.image_list)
+
+
+class TartainAir(TartainAirSubset):
+    def __init__(self, root, seqs, depth_cutoff, step, img_size):
+        datasets = [sorted(glob(os.path.join(root, s, 'P*'))) for s in seqs]
+        datasets = [item for sublist in datasets for item in sublist]
+        image_list1 = []
+        depth_list1 = []
+        rel_pose_list1 = []
+        for d in datasets:
+            super().__init__(d, depth_cutoff, step, img_size)
+            image_list1 += self.image_list
+            depth_list1 += self.depth_list
+            rel_pose_list1 += self.rel_pose_list
+        self.image_list = image_list1
+        self.depth_list = depth_list1
+        self.rel_pose_list = rel_pose_list1
