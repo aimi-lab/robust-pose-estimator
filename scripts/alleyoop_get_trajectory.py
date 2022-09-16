@@ -16,7 +16,6 @@ import warnings
 from torch.utils.data import DataLoader
 import wandb
 from evaluation.evaluate_ate_freiburg import main as evaluate
-from alley_oop.metrics.projected_photo_metrics import disparity_photo_loss
 
 
 def main(input_path, output_path, config, device_sel, stop, start, step, log, force_video, checkpoint):
@@ -52,7 +51,7 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fo
     gt_file = os.path.join(input_path, 'groundtruth.txt')
     gt_trajectory = read_freiburg(gt_file) if os.path.isfile(gt_file) else None
     slam.recorder.set_gt(gt_trajectory)
-    with torch.inference_mode():
+    with torch.no_grad():
         viewer = None
         if config['viewer']['enable']:
             from viewer.viewer3d import Viewer3D

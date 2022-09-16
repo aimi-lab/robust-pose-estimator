@@ -42,22 +42,23 @@ class SLAM(object):
         :param mask: input mask (to mask out tools)
         :param confidence: depth confidence value between 0 and 1
         """
-        with torch.inference_mode():
+        with torch.no_grad():
             self.frame = FrameClass(img, depth, intrinsics=self.intrinsics, mask=mask, confidence=confidence)
             if self.scene is None:
                 # initialize scene with first frame
                 self.scene = SurfelMap(frame=self.frame, kmat=self.intrinsics, upscale=1,
                                        d_thresh=self.config['dist_thr'], depth_scale=self.depth_scale).to(self.device)
             pose, self.rendered_frame = self.pose_estimator.estimate(self.frame, self.scene)
-
+            pose_scaled = pose.clone()
+            pose_scaled[:3, 3] /= self.depth_scale  # de-normalize depth scaling
             if self.cnt > 0:
                 self.scene.fuse(self.frame, pose)
                 if self.dbg_opt:
                     print(f"number of surfels: {self.scene.opts.shape[1]}, stable: {(self.scene.conf >= 1.0).sum().item()}")
-                self.recorder(self.scene, pose)
+                self.recorder(self.scene, pose_scaled)
             self.cnt += 1
 
-            return pose, self.scene, pose
+            return pose_scaled, self.scene, pose
 
     def to(self, device: torch.device):
         self.device = device
