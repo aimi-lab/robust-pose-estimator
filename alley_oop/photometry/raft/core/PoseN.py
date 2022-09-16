@@ -51,12 +51,13 @@ class HornPoseHead(PoseHead):
 
 
 class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
-    def __init__(self, intrinsics: torch.tensor, loss_weight_3d: float=10.0):
+    def __init__(self, intrinsics: torch.tensor, loss_weight: dict={"3d": 10.0, "2d": 1e-4}):
         super(DeclarativePoseHead3DNode, self).__init__()
         self.intrinsics = intrinsics
-        self.loss_weight_3d = loss_weight_3d
+        self.loss_weight= loss_weight
 
     def reprojection_objective(self, flow, pcl1, pcl2, weights2, y):
+        # this is generally better for rotation
         n, _, h, w = flow.shape
         img_coordinates = create_img_coords_t(y=pcl1.shape[-2], x=pcl1.shape[-1]).to(pcl1.device)
         pose = lie_se3_to_SE3_batch_small(-y)  # invert transform to be consistent with other pose estimators
@@ -74,6 +75,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         return loss
 
     def depth_objective(self, flow, pcl1, pcl2, weights1, weights2, y):
+        # this is generally better for translation (essentially in z-direction)
         # 3D geometric L2 loss
         n, _, h, w = pcl1.shape
         # se(3) to SE(3)
@@ -94,7 +96,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         flow, pcl1, pcl2, weights1, weights2 = xs
         loss3d = self.depth_objective(flow, pcl1, pcl2, weights1, weights2, y)
         loss2d = self.reprojection_objective(flow, pcl1, pcl2, weights2, y)
-        return loss2d + self.loss_weight_3d*loss3d
+        return self.loss_weight["2d"]*loss2d + self.loss_weight["3d"]*loss3d
 
     def solve(self, *xs):
         flow, pcl1, pcl2, weights1, weights2 = xs
