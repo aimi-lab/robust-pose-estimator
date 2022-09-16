@@ -62,10 +62,12 @@ class PoseN(RAFT):
         return self, raft
 
     def freeze_flow(self, freeze=True):
-        for param in self.parameters():
+        for param in super().parameters():
             param.requires_grad = not freeze
         try:
             for param in self.pose_head.parameters():
+                param.requires_grad = True
+            for param in self.conf_head.parameters():
                 param.requires_grad = True
         except AttributeError:
             pass
