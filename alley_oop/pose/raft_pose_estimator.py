@@ -34,7 +34,6 @@ class RAFTPoseEstimator(torch.nn.Module):
             if self.last_frame is not None:
                 rel_pose_se3 = self.model(self.last_frame.img, frame.img, self.last_frame.depth, frame.depth)[1].squeeze(0)
                 rel_pose = lie_se3_to_SE3(rel_pose_se3)
-                print(rel_pose)
                 ret_frame = self.last_frame
             else:
                 rel_pose = self.last_pose.data.clone()
