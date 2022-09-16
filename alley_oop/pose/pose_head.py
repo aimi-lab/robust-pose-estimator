@@ -44,7 +44,7 @@ class HornPoseHead(MLPPoseHead):
 
 
 class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
-    def __init__(self, intrinsics: torch.tensor, loss_weight: dict={"3d": 10.0, "2d": 1e-4}):
+    def __init__(self, intrinsics: torch.tensor, loss_weight: dict={"3d": 10.0, "2d": 1.0}):
         super(DeclarativePoseHead3DNode, self).__init__()
         self.intrinsics = intrinsics
         self.loss_weight= loss_weight
