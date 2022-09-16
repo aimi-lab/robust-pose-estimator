@@ -24,7 +24,7 @@ class PoseN(RAFT):
         self.pose_scale = config['pose_scale']
 
         img_coords = create_img_coords_t(y=H, x=W)
-        self.conf_head = nn.Sequential(nn.Conv2d(128+128+3, out_channels=32, kernel_size=(3,3), padding="same"), nn.BatchNorm2d(32),
+        self.conf_head = nn.Sequential(nn.Conv2d(128+128+3+3, out_channels=32, kernel_size=(5,5), padding="same"), nn.BatchNorm2d(32),
                                        nn.Conv2d(32, out_channels=1, kernel_size=(3,3), padding="same"), nn.Sigmoid())
         self.up = nn.UpsamplingBilinear2d((H,W))
         self.repr = nn.Parameter(torch.linalg.inv(intrinsics.cpu())@ img_coords.view(3, -1), requires_grad=False)
@@ -41,8 +41,8 @@ class PoseN(RAFT):
 
         flow_predictions, gru_hidden_state, context = super().forward(image1, image2, iters, flow_init)
         context_up = self.up(torch.cat((gru_hidden_state, context), dim=1))
-        conf1 = self.conf_head(torch.cat((pcl1, context_up), dim=1))
-        conf2 = self.conf_head(torch.cat((pcl1, context_up), dim=1))
+        conf1 = self.conf_head(torch.cat((image1, pcl1, context_up), dim=1))
+        conf2 = self.conf_head(torch.cat((image2, pcl2, context_up), dim=1))
 
         pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2, conf1, conf2)
         return flow_predictions, pose_se3.float()/self.pose_scale
