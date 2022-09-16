@@ -24,8 +24,8 @@ class PoseN(RAFT):
         self.pose_scale = config['pose_scale']
 
         img_coords = create_img_coords_t(y=H, x=W)
-        self.conf_head = nn.Sequential(nn.Conv2d(128+128+3, out_channels=256, kernel_size=(3,3), padding="same"), nn.BatchNorm2d(256),
-                                       nn.Conv2d(256, out_channels=1, kernel_size=(3,3), padding="same"), nn.Sigmoid())
+        self.conf_head = nn.Sequential(nn.Conv2d(128+128+3, out_channels=32, kernel_size=(3,3), padding="same"), nn.BatchNorm2d(32),
+                                       nn.Conv2d(32, out_channels=1, kernel_size=(3,3), padding="same"), nn.Sigmoid())
         self.up = nn.UpsamplingBilinear2d((H,W))
         self.repr = nn.Parameter(torch.linalg.inv(intrinsics.cpu())@ img_coords.view(3, -1), requires_grad=False)
 
