@@ -103,11 +103,12 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
             n = pcl1.shape[0]
             # Solve using LBFGS optimizer:
             y = torch.zeros((n,6), device=flow.device, requires_grad=True)
-            optimizer = torch.optim.LBFGS([y], lr=1.0, max_iter=30, line_search_fn="strong_wolfe", )
+            optimizer = torch.optim.LBFGS([y], lr=1.0, max_iter=100, line_search_fn="strong_wolfe", )
             def fun():
                 optimizer.zero_grad()
                 loss = self.objective(flow, pcl1, pcl2, weights1, weights2, y=y).sum()
                 loss.backward()
+                torch.nn.utils.clip_grad_norm_(y, 100)
                 return loss
             optimizer.step(fun)
         return y.detach(), None
