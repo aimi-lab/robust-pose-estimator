@@ -97,6 +97,8 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         flow = flow.detach()
         pcl1 = pcl1.detach().clone()
         pcl2 = pcl2.detach().clone()
+        weights1 = weights1.detach().clone()
+        weights2 = weights2.detach().clone()
         with torch.enable_grad():
             n = pcl1.shape[0]
             # Solve using LBFGS optimizer:
