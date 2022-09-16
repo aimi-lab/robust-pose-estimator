@@ -1,7 +1,6 @@
-from alley_oop.photometry.raft.core.PoseN import PoseN
+from alley_oop.pose.PoseN import PoseN
 from alley_oop.geometry.pinhole_transforms import inv_transform
 import torch
-from typing import Tuple
 from alley_oop.fusion.surfel_map import SurfelMap, FrameClass
 from alley_oop.geometry.lie_3d import lie_se3_to_SE3
 from collections import OrderedDict

@@ -9,7 +9,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, SubsetRandomSampler
 
 
-from alley_oop.photometry.raft.core.PoseN import RAFT, PoseN
+from alley_oop.pose.PoseN import PoseN
 import alley_oop.photometry.raft.core.datasets as datasets
 from alley_oop.photometry.raft.losses import geometric_2d_loss, geometric_3d_loss, supervised_pose_loss, seq_loss, l1_loss
 from alley_oop.photometry.raft.utils.logger import Logger
