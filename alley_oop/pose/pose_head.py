@@ -7,7 +7,7 @@ from alley_oop.ddn.ddn.pytorch.node import AbstractDeclarativeNode
 from alley_oop.photometry.raft.core.utils.flow_utils import remap_from_flow
 from alley_oop.geometry.lie_3d import lie_se3_to_SE3_batch, lie_se3_to_SE3_batch_small
 from alley_oop.utils.pytorch import batched_dot_product
-from torchimize.functions import lsq_gna_parallel
+from torchimize.functions import lsq_gna_parallel, lsq_lma_parallel
 from alley_oop.geometry.normals import normals_from_regular_grid
 
 
@@ -128,7 +128,7 @@ class DeclarativeRGBD(AbstractDeclarativeNode):
         # this is generally better for rotation
         n, _, h, w = flow.shape
         img_coordinates = create_img_coords_t(y=pcl1.shape[-2], x=pcl1.shape[-1]).to(pcl1.device)
-        pose = lie_se3_to_SE3_batch(-y)  # invert transform to be consistent with other pose estimators
+        pose = lie_se3_to_SE3_batch_small(-y)  # invert transform to be consistent with other pose estimators
         # project to image plane
         warped_pts = project(pcl2.view(n,3,-1), pose, self.intrinsics[None, ...])
         flow_off = img_coordinates[None, :2] + flow.view(n, 2, -1)
@@ -147,7 +147,7 @@ class DeclarativeRGBD(AbstractDeclarativeNode):
         # 3D geometric L2 loss
         n, _, h, w = pcl1.shape
         # se(3) to SE(3)
-        pose = lie_se3_to_SE3_batch(y)
+        pose = lie_se3_to_SE3_batch_small(y)
         # transform point cloud given the pose
         pcl2_aligned = transform(homogenous(pcl2.view(n, 3, -1)), pose).reshape(n, 4, h, w)[:, :3]
         # resample point clouds given the optical flow
@@ -171,31 +171,9 @@ class DeclarativeRGBD(AbstractDeclarativeNode):
 
     def objective(self, *xs, y):
         flow, pcl1, pcl2, weights1, weights2 = xs
-        loss3d = torch.mean(self.depth_residuals(flow, pcl1, pcl2, weights1, weights2, y)**2, dim=-1)
-        loss2d = torch.mean(self.reprojection_residuals(flow, pcl1, pcl2, weights2, y)**2, dim=-1)
+        loss3d = torch.mean(self.depth_residuals(flow, pcl1, pcl2, weights1, weights2, y=y)**2, dim=-1)
+        loss2d = torch.mean(self.reprojection_residuals(flow, pcl1, pcl2, weights1, weights2, y=y)**2, dim=-1)
         return self.wvec[1].float()*loss2d + self.wvec[0].float()*loss3d
-
-    def solve_old(self, *xs):
-        flow, pcl1, pcl2, weights1, weights2 = xs
-        # solve using method of Horn
-        flow = flow.detach()
-        pcl1 = pcl1.detach().clone()
-        pcl2 = pcl2.detach().clone()
-        weights1 = weights1.detach().clone()
-        weights2 = weights2.detach().clone()
-        with torch.enable_grad():
-            n = pcl1.shape[0]
-            # Solve using LBFGS optimizer:
-            y = torch.zeros((n,6), device=flow.device, requires_grad=True)
-            optimizer = torch.optim.LBFGS([y], lr=1.0, max_iter=100, line_search_fn="strong_wolfe", )
-            def fun():
-                optimizer.zero_grad()
-                loss = self.objective(flow, pcl1, pcl2, weights1, weights2, y=y).sum()
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(y, 100)
-                return loss
-            optimizer.step(fun)
-        return y.detach(), None
 
     def j_wt(self, pts):
         points3d = pts.permute(1, 0)
@@ -242,7 +220,7 @@ class DeclarativeRGBD(AbstractDeclarativeNode):
         flow, pcl1, pcl2, weights1, weights2 = xs
         n, _ ,h, w = flow.shape
         img_coordinates = create_img_coords_t(y=pcl1.shape[-2], x=pcl1.shape[-1]).to(pcl1.device)
-        pose = lie_se3_to_SE3_batch(y)  # invert transform to be consistent with other pose estimators
+        pose = lie_se3_to_SE3_batch_small(y)  # invert transform to be consistent with other pose estimators
         warped_pts = project(pcl2.view(n, 3, -1), pose, self.intrinsics[None, ...])
         flow_off = img_coordinates[None, :2] + flow.view(n, 2, -1)
         J = []
@@ -260,7 +238,7 @@ class DeclarativeRGBD(AbstractDeclarativeNode):
     def depth_jacobian(self, *xs, y):
         flow, pcl1, pcl2, weights1, weights2 = xs
         n, _, h, w = flow.shape
-        pose = lie_se3_to_SE3_batch(-y)
+        pose = lie_se3_to_SE3_batch_small(-y)
         pcl2_aligned = transform(homogenous(pcl2.view(n, 3, -1)), pose).reshape(n, 4, h, w)[:, :3] # are we sure we should transform pcl2?
         # resample point clouds given the optical flow
         pcl2_aligned, _ = remap_from_flow(pcl2_aligned, flow)
@@ -309,7 +287,7 @@ class DeclarativeRGBD(AbstractDeclarativeNode):
         n = pcl1.shape[0]
         y = torch.zeros((n,6), device=flow.device, requires_grad=True, dtype=torch.float64)
 
-        coeffs = lsq_gna_parallel(
+        coeffs = lsq_lma_parallel(
             p=y,
             function=multi_cost_fun_args,
             jac_function=multi_jaco_fun_args,
@@ -317,10 +295,31 @@ class DeclarativeRGBD(AbstractDeclarativeNode):
             ftol=1e-9,
             ptol=1e-9,
             gtol=1e-9,
-            l=1.,
             max_iter=10,
         )
 
-        best_idx = torch.argmin(torch.stack(self.losses), dim=0)
+        best_idx = torch.argmin(torch.stack(self.losses)[::2], dim=0)
         y = torch.stack([coeffs[best_idx[i]][i] for i in range(n)])
         return y.float().detach(), None
+
+    def solve_lbgfs(self, *xs):
+        flow, pcl1, pcl2, weights1, weights2 = xs
+        # solve using method of Horn
+        flow = flow.detach()
+        pcl1 = pcl1.detach().clone()
+        pcl2 = pcl2.detach().clone()
+        weights1 = weights1.detach().clone()
+        weights2 = weights2.detach().clone()
+        with torch.enable_grad():
+            n = pcl1.shape[0]
+            # Solve using LBFGS optimizer:
+            y = torch.zeros((n,6), device=flow.device, requires_grad=True)
+            optimizer = torch.optim.LBFGS([y], lr=1.0, max_iter=100, line_search_fn="strong_wolfe", )
+            def fun():
+                optimizer.zero_grad()
+                loss = self.objective(flow, pcl1, pcl2, weights1, weights2, y=y).sum()
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(y, 100)
+                return loss
+            optimizer.step(fun)
+        return y.detach(), None
