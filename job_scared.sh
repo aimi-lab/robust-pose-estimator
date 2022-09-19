@@ -7,7 +7,7 @@
 #SBATCH --partition=gpu
 #SBATCH --account=ws_00000
 #SBATCH --gres=gpu:1
-#SBATCH --array=1-35%4
+#SBATCH --array=16-27%5
 
 
 #### Your shell commands below this line ####
@@ -23,7 +23,7 @@ sequence=$(cat $param_store | awk -v var=$SLURM_ARRAY_TASK_ID 'NR==var {print $1
 
 cd scripts
 
-python -u alleyoop_get_trajectory.py ${sequence} --device gpu --outpath ${sequence}/data/endoslam --log scared_endoslam
+python -u alleyoop_get_trajectory.py ${sequence} --device gpu --outpath ${sequence}/data/endoslam --log scared_endoslam --checkpoint wandb/run-20220919_122709-1q24hw9n/files/RAFT-poseEstimator.pth
 
 
 

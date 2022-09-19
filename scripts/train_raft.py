@@ -42,8 +42,7 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger):
     with torch.no_grad():
         for i_batch, data_blob in enumerate(dataloader):
             ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, pose = [x.to(device) for x in data_blob]
-            flow_predictions, pose_predictions = model(trg_img, ref_img, trg_depth, ref_depth, iters=config['model']['iters'])
-
+            flow_predictions, pose_predictions, confmap1, confmap2 = model(trg_img, ref_img, trg_depth, ref_depth, iters=config['model']['iters'], ret_confmap=True)
             loss2d = geometric_2d_loss(flow_predictions[-1], pose_predictions, intrinsics, trg_depth, trg_conf,
                                        valid)[0]
             loss3d = geometric_3d_loss(flow_predictions[-1], pose_predictions, intrinsics, trg_depth, ref_depth,
@@ -58,7 +57,7 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger):
                        "val/loss_total": loss.detach().mean().cpu().item()}
             logger.push(metrics, len(dataloader))
         logger.flush()
-        logger.log_plot(plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth, lie_se3_to_SE3_batch(-pose), intrinsics)[0])
+        logger.log_plot(plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth, lie_se3_to_SE3_batch(-pose), confmap1, confmap2, intrinsics)[0])
     model.train()
     return loss.detach().mean().cpu().item()
 
@@ -121,8 +120,8 @@ def main(args, config, force_cpu):
                 trg_img = (trg_img + stdv * torch.randn(*trg_img.shape).to(device)).clamp(0.0, 255.0)
 
             # forward pass
-            flow_predictions, pose_predictions = model(trg_img, ref_img, trg_depth,
-                                                       ref_depth, iters=config['model']['iters']) #ToDo add mask if necessary
+            flow_predictions, pose_predictions, conf1, conf2 = model(trg_img, ref_img, trg_depth,
+                                                       ref_depth, iters=config['model']['iters'], ret_confmap=True) #ToDo add mask if necessary
 
             with torch.inference_mode():
                 ref_flow = ref_model(trg_img, ref_img, iters=config['model']['iters'])[0]
@@ -151,7 +150,7 @@ def main(args, config, force_cpu):
                 if device == torch.device('cpu'):
                     pose = pose_predictions.clone()
                     pose[:,3:] *= config['depth_scale']
-                    fig, ax = plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth*config['depth_scale'], lie_se3_to_SE3_batch(-pose), intrinsics)
+                    fig, ax = plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth*config['depth_scale'], lie_se3_to_SE3_batch(-pose), conf1, conf2, intrinsics)
                     import matplotlib.pyplot as plt
                     plt.show()
                     plot_3d(ref_img, trg_img, ref_depth*config['depth_scale'], trg_depth*config['depth_scale'], lie_se3_to_SE3_batch(pose).detach(), intrinsics)
