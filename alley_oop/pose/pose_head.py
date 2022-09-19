@@ -121,7 +121,7 @@ class DeclarativeRGBD(AbstractDeclarativeNode):
     def __init__(self, intrinsics: torch.tensor, loss_weight: dict={"3d": 10.0, "2d": 1.0}):
         super(DeclarativeRGBD, self).__init__()
         self.intrinsics = intrinsics
-        self.wvec = torch.nn.Parameter(torch.tensor([loss_weight["3d"], loss_weight["2d"]], dtype=torch.float64), requires_grad=False)
+        self.wvec = torch.nn.Parameter(torch.tensor([loss_weight["3d"], loss_weight["2d"]], dtype=torch.float64, device=intrinsics.device))
         self.losses = []
 
     def reprojection_residuals(self, flow, pcl1, pcl2, weights1, weights2, y):
