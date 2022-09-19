@@ -8,9 +8,10 @@ from alley_oop.ddn.ddn.pytorch.node import DeclarativeLayer
 from alley_oop.pose.pose_head import MLPPoseHead, HornPoseHead, DeclarativePoseHead3DNode, DeclarativeRGBD
 
 
-class PoseN(RAFT):
+class PoseN(nn.Module):
     def __init__(self, config, intrinsics):
-        super(PoseN, self).__init__(config)
+        super(PoseN, self).__init__()
+        self.config = config
         H, W = config["image_shape"]
         if config['mode'] == 'mlp':
             self.pose_head = MLPPoseHead((H*W) // 64)
@@ -30,6 +31,8 @@ class PoseN(RAFT):
                                        nn.Conv2d(32, out_channels=1, kernel_size=(3,3), padding="same"), nn.Sigmoid())
         self.up = nn.UpsamplingBilinear2d((H,W))
         self.repr = nn.Parameter(torch.linalg.inv(intrinsics.cpu())@ img_coords.view(3, -1), requires_grad=False)
+        self.flow = RAFT(config)
+        self.flow.freeze_bn()
 
     def proj(self, depth):
         n = depth.shape[0]
@@ -41,7 +44,7 @@ class PoseN(RAFT):
         pcl1 = self.proj(depth1)
         pcl2 = self.proj(depth2)
 
-        flow_predictions, gru_hidden_state, context = super().forward(image1, image2, iters, flow_init)
+        flow_predictions, gru_hidden_state, context = self.flow(image1, image2, iters, flow_init)
         context_up = self.up(torch.cat((gru_hidden_state, context), dim=1))
         conf1 = self.conf_head(torch.cat((image1, pcl1, context_up), dim=1))
         conf2 = self.conf_head(torch.cat((image2, pcl2, context_up), dim=1))
@@ -60,11 +63,11 @@ class PoseN(RAFT):
             name = k.replace('module.','')  # remove `module.`
             new_state_dict[name] = v
         raft.load_state_dict(new_state_dict)
-        self.load_state_dict(new_state_dict, strict=False)
+        self.flow.load_state_dict(new_state_dict)
         return self, raft
 
     def freeze_flow(self, freeze=True):
-        for param in super().parameters():
+        for param in self.flow.parameters():
             param.requires_grad = not freeze
         try:
             for param in self.pose_head.parameters():
@@ -74,4 +77,10 @@ class PoseN(RAFT):
         except AttributeError:
             pass
         self.repr.requires_grad = False
+        return self
+
+    def train(self, mode: bool = True):
+        self.conf_head.train(mode)
+        self.pose_head.train(mode)
+        self.flow.eval()
         return self

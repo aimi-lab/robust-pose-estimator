@@ -89,7 +89,6 @@ def main(args, config, force_cpu):
 
     model.train()
     model = model.to(device)
-    model.freeze_bn()
     model.freeze_flow()
     parallel = False
     if (device != torch.device('cpu')) & (torch.cuda.device_count() > 1):
