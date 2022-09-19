@@ -177,6 +177,9 @@ def main(args, config, force_cpu):
 
             if total_steps % VAL_FREQ == VAL_FREQ - 1:
                 val_loss = val(model, val_loader, device, loss_weights, intrinsics, logger)
+                if torch.isnan(val_loss):
+                    should_keep_training = False
+                    break
                 if val_loss < best_loss:
                     best_loss = val_loss
                     path = os.path.join(args.outpath, f'{args.name}.pth')
