@@ -92,7 +92,7 @@ def geometric_3d_loss(flow_preds, se3_preds, intrinsics, trg_depth, ref_depth, t
     T_est = lie_se3_to_SE3_batch(-se3_preds)  #
     img_coordinates = create_img_coords_t(y=trg_depth.shape[-2], x=trg_depth.shape[-1]).to(flow_preds.device)
     trg_opts = reproject(trg_depth, intrinsics, img_coordinates)
-    trg_opts = transform(trg_opts, T_est).reshape(n,4,h,w) #SurfelMap(frame=trg_frame, kmat=intrinsics, ignore_mask=True, pmat=T_est)
+    trg_opts = transform(trg_opts, T_est).reshape(n,4,h,w) #SurfelMap(frame=trg_frame, kmat=intrinsics, ignore_mask=True, pmat=pose)
     ref_opts = reproject(ref_depth, intrinsics, img_coordinates).reshape(n, 4, h, w)
 
     # get optical flow correspondences

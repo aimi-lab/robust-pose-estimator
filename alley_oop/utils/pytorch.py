@@ -6,7 +6,16 @@ import torch.nn.functional as F
 
 
 def batched_dot_product(t1:torch.tensor, t2:torch.tensor):
-    return (t1.unsqueeze(1) @ t2.unsqueeze(-1)).squeeze(0).squeeze(0)
+    if t1.ndim == 2:
+        # 3xn
+        return (t1.unsqueeze(1) @ t2.unsqueeze(-1)).squeeze(0).squeeze(0)
+    else:
+        # nx3xm
+        n,c,m = t1.shape
+        tb1 = t1.permute(0, 2, 1).reshape(-1, c)
+        tb2 = t2.permute(0, 2, 1).reshape(-1, c)
+        b = torch.bmm(tb1.unsqueeze(1), tb2.unsqueeze(-1)).squeeze(0)
+        return b.view(n, m)
 
 
 def beye(shape:Iterable, device=None, dtype=None):

@@ -5,7 +5,7 @@ from collections import OrderedDict
 from alley_oop.geometry.pinhole_transforms import create_img_coords_t
 from alley_oop.photometry.raft.core.raft import RAFT
 from alley_oop.ddn.ddn.pytorch.node import DeclarativeLayer
-from alley_oop.pose.pose_head import MLPPoseHead, HornPoseHead, DeclarativePoseHead3DNode
+from alley_oop.pose.pose_head import MLPPoseHead, HornPoseHead, DeclarativePoseHead3DNode, DeclarativeRGBD
 
 
 class PoseN(RAFT):
@@ -16,8 +16,10 @@ class PoseN(RAFT):
             self.pose_head = MLPPoseHead((H*W) // 64)
         elif config['mode'] == 'horn':
             self.pose_head = HornPoseHead()
-        elif config['mode'] == 'declarative':
+        elif config['mode'] == 'lbgfs':
             self.pose_head = DeclarativeLayer(DeclarativePoseHead3DNode(intrinsics))
+        elif config['mode'] == 'newton':
+            self.pose_head = DeclarativeLayer(DeclarativeRGBD(intrinsics))
         else:
             raise NotImplementedError(f'mode {config["mode"]} not supported')
         # replace by 4-channel input conv (RGB + D)
