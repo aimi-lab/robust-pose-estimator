@@ -226,7 +226,7 @@ class DeclarativeRGBD(AbstractDeclarativeNode):
         J = []
         for i in range(n):
             J.append(-self.j_norm(flow_off[i], warped_pts[i]) @ self.j_wt(pcl2[i].view(3,-1)))
-        J = torch.stack(J, dim=0).squeeze()
+        J = torch.stack(J, dim=0).squeeze(-2)
         valid = (flow_off[:, 0] > 0) & (flow_off[:, 1] > 0) & (flow_off[:, 0] < w) & (flow_off[:, 1] < h)
         valid = torch.isinf(J) | torch.isnan(J) | ~valid.view(n, -1).unsqueeze(-1)
         # weight residuals by confidences
