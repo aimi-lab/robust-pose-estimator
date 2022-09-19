@@ -122,7 +122,7 @@ def main(args, config, force_cpu):
 
             # forward pass
             flow_predictions, pose_predictions = model(trg_img, ref_img, trg_depth,
-                                                       ref_depth, iters=config['model']['iters'])
+                                                       ref_depth, iters=config['model']['iters']) #ToDo add mask if necessary
 
             with torch.inference_mode():
                 ref_flow = ref_model(trg_img, ref_img, iters=config['model']['iters'])[0]

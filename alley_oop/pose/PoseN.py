@@ -39,7 +39,7 @@ class PoseN(nn.Module):
         opts = depth.view(n, 1, -1) * self.repr.unsqueeze(0)
         return opts.view(n,3,*depth.shape[-2:])
 
-    def forward(self, image1, image2, depth1, depth2, iters=12, flow_init=None, pose_init=None):
+    def forward(self, image1, image2, depth1, depth2, mask1=None, mask2=None, iters=12, flow_init=None, pose_init=None):
         """ Estimate optical flow and rigid pose between pair of frames """
         pcl1 = self.proj(depth1)
         pcl2 = self.proj(depth2)
@@ -48,6 +48,12 @@ class PoseN(nn.Module):
         context_up = self.up(torch.cat((gru_hidden_state, context), dim=1))
         conf1 = self.conf_head(torch.cat((image1, pcl1, context_up), dim=1))
         conf2 = self.conf_head(torch.cat((image2, pcl2, context_up), dim=1))
+
+        # set confidence weights to zero where the mask is False
+        if mask1 is not None:
+            conf1[~mask1] = 0.0
+        if mask2 is not None:
+            conf2[~mask2] = 0.0
 
         pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2, conf1, conf2)
         return flow_predictions, pose_se3.float()/self.pose_scale
