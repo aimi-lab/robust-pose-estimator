@@ -9,7 +9,7 @@ from alley_oop.pose.pose_head import MLPPoseHead, HornPoseHead, DeclarativePoseH
 
 
 class PoseN(nn.Module):
-    def __init__(self, config, intrinsics):
+    def __init__(self, config, intrinsics, baseline):
         super(PoseN, self).__init__()
         self.config = config
         H, W = config["image_shape"]
@@ -33,21 +33,39 @@ class PoseN(nn.Module):
         self.repr = nn.Parameter(torch.linalg.inv(intrinsics.cpu())@ img_coords.view(3, -1), requires_grad=False)
         self.flow = RAFT(config)
         self.flow.freeze_bn()
+        self.baseline = baseline # normalized stereo baseline, should yield depth maps between 0 a 1.
 
     def proj(self, depth):
         n = depth.shape[0]
         opts = depth.view(n, 1, -1) * self.repr.unsqueeze(0)
         return opts.view(n,3,*depth.shape[-2:])
 
-    def forward(self, image1, image2, depth1, depth2, mask1=None, mask2=None, iters=12, flow_init=None, pose_init=None, ret_confmap=False):
+    def flow2depth(self, imagel, imager, vertical_disp_thr=1.0):
+        n, _, h, w = imagel.shape
+        flow = self.flow(imagel, imager)[0][-1]
+        # check if vertical disparity is small
+        valid = torch.abs(flow[:, 1]) < vertical_disp_thr
+        depth = self.baseline / -flow[:, 0]
+        valid &= (depth > 0) & (depth < 1.0)
+        return depth, valid.unsqueeze(1)
+
+    def forward(self, image1l, image2l, image1r=None, image2r=None, depth1=None, depth2=None, mask1=None, mask2=None, iters=12, flow_init=None, pose_init=None, ret_confmap=False):
+
+        """ estimate optical flow from stereo pair to get disparity map"""
+        if depth1 is None:
+            depth1, valid1 = self.flow2depth(image1l, image1r)
+            mask1 = mask1 & valid1 if mask1 is not None else valid1
+        if depth2 is None:
+            depth2, valid2 = self.flow2depth(image2l, image2r)
+            mask2 = mask2 & valid2 if mask2 is not None else valid2
         """ Estimate optical flow and rigid pose between pair of frames """
         pcl1 = self.proj(depth1)
         pcl2 = self.proj(depth2)
 
-        flow_predictions, gru_hidden_state, context = self.flow(image1, image2, iters, flow_init)
+        flow_predictions, gru_hidden_state, context = self.flow(image1l, image2l, iters, flow_init)
         context_up = self.up(torch.cat((gru_hidden_state, context), dim=1))
-        conf1 = self.conf_head(torch.cat((image1, pcl1, context_up), dim=1))
-        conf2 = self.conf_head(torch.cat((image2, pcl2, context_up), dim=1))
+        conf1 = self.conf_head(torch.cat((image1l, pcl1, context_up), dim=1))
+        conf2 = self.conf_head(torch.cat((image2l, pcl2, context_up), dim=1))
 
         # set confidence weights to zero where the mask is False
         if mask1 is not None:
@@ -57,8 +75,8 @@ class PoseN(nn.Module):
 
         pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2, conf1, conf2)
         if ret_confmap:
-            return flow_predictions, pose_se3.float() / self.pose_scale, conf1, conf2
-        return flow_predictions, pose_se3.float()/self.pose_scale
+            return flow_predictions, pose_se3.float() / self.pose_scale, depth1, depth2, conf1, conf2
+        return flow_predictions, pose_se3.float()/self.pose_scale, depth1, depth2
 
     def init_from_raft(self, raft_ckp):
         raft = RAFT(self.config)

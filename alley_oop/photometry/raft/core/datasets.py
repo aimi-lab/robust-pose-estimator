@@ -18,10 +18,12 @@ def get_data(dataset_type: str, input_path: str, sequences: str, img_size: Tuple
 
     # check the format of the calibration file
     img_size = tuple(img_size)
-
+    infer_depth = True
     if dataset_type == 'TUM':
         dataset = TUMDataset(root=input_path, step=step, img_size=img_size, depth_cutoff=depth_cutoff)
         intrinsics = torch.tensor([[525.0, 0, 319.5], [0, 525.0, 239.5], [0.0, 0.0, 1.0]]).float()
+        infer_depth = False
+        baseline= 1.0
     elif dataset_type == 'TartanAir':
         dataset = TartainAir(root=input_path, seqs=sequences, step=step, img_size=img_size, depth_cutoff=depth_cutoff)
     elif dataset_type == 'Intuitive':
@@ -42,42 +44,49 @@ def get_data(dataset_type: str, input_path: str, sequences: str, img_size: Tuple
                                   img_size=img_size, depth_cutoff=depth_cutoff)
 
         intrinsics = torch.tensor(calib['intrinsics']['left']).float()
+        baseline = calib['bf'] / depth_cutoff
     else:
         raise NotImplementedError
 
-    return dataset, intrinsics
+    return dataset, intrinsics, baseline, infer_depth
 
 
 class PoseDataset(Dataset):
     def __init__(self, root, baseline, depth_cutoff=300.0,conf_thr=0.0, step=(1,10), img_size=(512, 640)):
         super(PoseDataset, self).__init__()
-        images = sorted(glob(os.path.join(root, 'video_frames', '*l.png')))
+        images_l = sorted(glob(os.path.join(root, 'video_frames', '*l.png')))
+        images_r = sorted(glob(os.path.join(root, 'video_frames', '*r.png')))
         disparities = sorted(glob(os.path.join(root, 'disparity_frames', '*l.pfm')))
         gt_file = os.path.join(root, 'groundtruth.txt')
         poses = read_freiburg(gt_file)
         depth_noise = sorted(glob(os.path.join(root,'disparity_noise', '*l.pfm')))
-        assert len(images) == len(disparities)
-        assert len(images) == len(depth_noise)
+        assert len(images_l) == len(disparities)
+        assert len(images_l) == len(depth_noise)
+        assert len(images_l) == len(images_r)
         self.baseline = baseline
         self.conf_thr = conf_thr
         self.depth_cutoff = depth_cutoff
         self.image_list = []
+        self.image_list_r = []
         self.disp_list = []
         self.rel_pose_list = []
         self.depth_noise_list = []
         if isinstance(step, int):
             step = (step, step)
-        for i in range(len(images)-step[1]):
+        for i in range(len(images_l)-step[1]):
             s = np.random.randint(*step) if step[0] < step[1] else step[0]  # select a random step in given range
-            self.image_list.append([images[i], images[i+s]])
+            self.image_list.append([images_l[i], images_l[i+s]])
             self.disp_list.append([disparities[i], disparities[i+s]])
             self.rel_pose_list.append(np.linalg.inv(poses[i+s].astype(np.float64)) @ poses[i].astype(np.float64))
             self.depth_noise_list.append([depth_noise[i], depth_noise[i+s]])
+            self.image_list_r.append([images_r[i], images_r[i+s]])
         self.resize = Resize(img_size)
 
     def __getitem__(self, index):
         img1 = self._read_img(self.image_list[index][0])
         img2 = self._read_img(self.image_list[index][1])
+        img1_r = self._read_img(self.image_list_r[index][0])
+        img2_r = self._read_img(self.image_list_r[index][1])
         disp1 = self._read_disp(self.disp_list[index][0])
         disp2 = self._read_disp(self.disp_list[index][1])
 
@@ -99,7 +108,7 @@ class PoseDataset(Dataset):
         valid &= depth1 > 1e-3
         valid &= depth2 > 1e-3
         # ToDo add tool mask!
-        return img1, img2, depth1, depth2, depth_conf1, depth_conf2, valid, pose_se3.float()
+        return img1, img2, img1_r, img2_r, depth_conf1, depth_conf2, valid, pose_se3.float()
 
     def _read_img(self, path):
         img = torch.from_numpy(cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)).permute(2, 0, 1).float()
@@ -124,14 +133,17 @@ class MultiSeqPoseDataset(PoseDataset):
         disp_list1 = []
         rel_pose_list1 = []
         depth_noise_list1 = []
+        image_list_r1 = []
         for d in datasets:
             if os.path.isfile(os.path.join(d, 'groundtruth.txt')):
                 super().__init__(d, baseline, depth_cutoff, conf_thr, step, img_size)
                 image_list1 += self.image_list
+                image_list_r1 += self.image_list_r
                 disp_list1 += self.disp_list
                 rel_pose_list1 += self.rel_pose_list
                 depth_noise_list1 += self.depth_noise_list
         self.image_list = image_list1
+        self.image_list_r = image_list_r1
         self.disp_list = disp_list1
         self.rel_pose_list = rel_pose_list1
         self.depth_noise_list = depth_noise_list1

@@ -37,17 +37,32 @@ def fetch_optimizer(config, model):
     return optimizer, scheduler
     
 
-def val(model, dataloader, device, loss_weights, intrinsics, logger):
+def val(model, dataloader, device, loss_weights, intrinsics, logger, infer_depth):
     model.eval()
     with torch.no_grad():
         for i_batch, data_blob in enumerate(dataloader):
-            ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, pose = [x.to(device) for x in data_blob]
-            flow_predictions, pose_predictions, confmap1, confmap2 = model(trg_img, ref_img, trg_depth, ref_depth, iters=config['model']['iters'], ret_confmap=True)
+            if infer_depth:
+                ref_img, trg_img, ref_img_r, trg_img_r, ref_conf, trg_conf, valid, gt_pose = [x.to(device) for x in
+                                                                                              data_blob]
+                flow_predictions, pose_predictions, trg_depth, ref_depth, conf1, conf2 = model(trg_img, ref_img,
+                                                                                               image1r=trg_img_r,
+                                                                                               image2r=ref_img_r,
+                                                                                               iters=config['model'][
+                                                                                                   'iters'],
+                                                                                               ret_confmap=True)  # ToDo add mask if necessary
+            else:
+                ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, gt_pose = [x.to(device) for x in
+                                                                                              data_blob]
+                flow_predictions, pose_predictions, *_, conf1, conf2 = model(trg_img, ref_img, depth1=trg_depth,
+                                                                         depth2=ref_depth,
+                                                                         iters=config['model']['iters'],
+                                                                         ret_confmap=True)  # ToDo add mask if necessary
+
             loss2d = geometric_2d_loss(flow_predictions[-1], pose_predictions, intrinsics, trg_depth, trg_conf,
                                        valid)[0]
             loss3d = geometric_3d_loss(flow_predictions[-1], pose_predictions, intrinsics, trg_depth, ref_depth,
                                        trg_conf, ref_conf, valid)
-            loss_pose = supervised_pose_loss(pose_predictions, pose)
+            loss_pose = supervised_pose_loss(pose_predictions, gt_pose)
             loss = loss_weights['pose'] * loss_pose + loss_weights['2d'] * loss2d + loss_weights['3d'] * loss3d
 
             metrics = {"val/loss2d": loss2d.detach().mean().cpu().item(),
@@ -57,7 +72,7 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger):
                        "val/loss_total": loss.detach().mean().cpu().item()}
             logger.push(metrics, len(dataloader))
         logger.flush()
-        logger.log_plot(plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth, lie_se3_to_SE3_batch(-pose), confmap1, confmap2, intrinsics)[0])
+        logger.log_plot(plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth, lie_se3_to_SE3_batch(-pose_predictions), conf1, conf2, intrinsics)[0])
     model.train()
     return loss.detach().mean().cpu().item()
 
@@ -69,9 +84,9 @@ def main(args, config, force_cpu):
     device = torch.device('cuda') if (torch.cuda.is_available() & (not force_cpu)) else torch.device('cpu')
 
     # get data
-    data_train, intrinsics = datasets.get_data(config['data']['train']['type'], config['data']['train']['basepath'],config['data']['train']['sequences'],
+    data_train, *_ = datasets.get_data(config['data']['train']['type'], config['data']['train']['basepath'],config['data']['train']['sequences'],
                                                config['image_shape'], config['data']['train']['step'], config['depth_scale'])
-    data_val, intrinsics = datasets.get_data(config['data']['val']['type'], config['data']['val']['basepath'],config['data']['val']['sequences'],
+    data_val, intrinsics, baseline, infer_depth = datasets.get_data(config['data']['val']['type'], config['data']['val']['basepath'],config['data']['val']['sequences'],
                                              config['image_shape'], config['data']['val']['step'], config['depth_scale'])
     print(f"train: {len(data_train)} samples, val: {len(data_val)} samples")
     intrinsics = intrinsics.to(device)
@@ -80,9 +95,8 @@ def main(args, config, force_cpu):
                             sampler=SubsetRandomSampler(torch.from_numpy(np.random.choice(len(data_val), size=(400,), replace=False))))
 
     # get model
-    model = PoseN(config['model'], intrinsics)
-    model, ref_model = model.init_from_raft(config['model']['pretrained'])
-    ref_model = ref_model.to(device)
+    model = PoseN(config['model'], intrinsics, baseline=baseline)
+    model, _ = model.init_from_raft(config['model']['pretrained'])
     if args.restore_ckpt is not None:
         model.load_state_dict(torch.load(args.restore_ckpt)['state_dict'], strict=False)
 
@@ -112,7 +126,11 @@ def main(args, config, force_cpu):
             if i_batch == config['train']['freeze_flow_steps']:
                 model.module.freeze_flow(False) if parallel else model.freeze_flow(False)
             optimizer.zero_grad()
-            ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, gt_pose = [x.to(device)for x in data_blob]
+            if infer_depth:
+                ref_img, trg_img, ref_img_r, trg_img_r, ref_conf, trg_conf, valid, gt_pose = [x.to(device) for x in
+                                                                                              data_blob]
+            else:
+                ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, gt_pose = [x.to(device)for x in data_blob]
 
             if config['train']['add_noise']:
                 stdv = np.random.uniform(0.0, 5.0)
@@ -120,21 +138,22 @@ def main(args, config, force_cpu):
                 trg_img = (trg_img + stdv * torch.randn(*trg_img.shape).to(device)).clamp(0.0, 255.0)
 
             # forward pass
-            flow_predictions, pose_predictions, conf1, conf2 = model(trg_img, ref_img, trg_depth,
-                                                       ref_depth, iters=config['model']['iters'], ret_confmap=True) #ToDo add mask if necessary
-
-            with torch.inference_mode():
-                ref_flow = ref_model(trg_img, ref_img, iters=config['model']['iters'])[0]
+            if infer_depth:
+                flow_predictions, pose_predictions, trg_depth, ref_depth, conf1, conf2 = model(trg_img, ref_img, image1r=trg_img_r,
+                                                                         image2r=ref_img_r, iters=config['model']['iters'],
+                                                                         ret_confmap=True)  # ToDo add mask if necessary
+            else:
+                flow_predictions, pose_predictions, *_, conf1, conf2 = model(trg_img, ref_img, depth1=trg_depth,
+                                                       depth2=ref_depth, iters=config['model']['iters'], ret_confmap=True) #ToDo add mask if necessary
 
             # loss computations
-            loss_flow = seq_loss(l1_loss, (flow_predictions, ref_flow,))
             loss2d, theoretical_flow = geometric_2d_loss(flow_predictions[-1], pose_predictions, intrinsics, trg_depth, trg_conf,
                                        valid)
 
             loss3d = geometric_3d_loss(flow_predictions[-1], pose_predictions, intrinsics, trg_depth, ref_depth,
                                        trg_conf, ref_conf, valid)
             loss_pose = supervised_pose_loss(pose_predictions, gt_pose)
-            loss = loss_weights['pose']*loss_pose.mean()+loss_weights['2d']*loss2d+loss_weights['3d']*loss3d + loss_weights['flow']*loss_flow
+            loss = loss_weights['pose']*loss_pose.mean()+loss_weights['2d']*loss2d+loss_weights['3d']*loss3d
 
             # debug
             if args.dbg & (i_batch%SUM_FREQ == 0):
@@ -146,7 +165,6 @@ def main(args, config, force_cpu):
                 print(" rot loss: ", loss_pose[:, :3].detach().mean().cpu().item())
                 print(" 2d loss: ", loss2d.detach().mean().cpu().item())
                 print(" 3d loss: ", loss3d.detach().mean().cpu().item())
-                print(" flow loss: ", loss_flow.detach().mean().cpu().item())
                 if device == torch.device('cpu'):
                     pose = pose_predictions.clone()
                     pose[:,3:] *= config['depth_scale']
@@ -162,7 +180,6 @@ def main(args, config, force_cpu):
                       "train/loss3d": loss3d.detach().mean().cpu().item(),
                       "train/loss_rot": loss_pose[:,:3].detach().mean().cpu().item(),
                       "train/loss_trans": loss_pose[:, 3:].detach().mean().cpu().item(),
-                      "train/loss_flow": loss_flow.detach().mean().cpu().item(),
                       "train/loss_total": loss.detach().mean().cpu().item()}
 
             scaler.step(optimizer)
