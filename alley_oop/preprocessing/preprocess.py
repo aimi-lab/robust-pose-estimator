@@ -41,7 +41,7 @@ class PreProcess(object):
         depth = depth * self.depth_scale
 
         # filter depth to smooth out noisy points
-        depth = cv2.bilateralFilter(depth, d=-1, sigmaColor=0.01, sigmaSpace=10)
+        #depth = cv2.bilateralFilter(depth, d=-1, sigmaColor=0.01, sigmaSpace=10)
         mask = np.ones_like(depth).astype(bool) if mask is None else mask
         if self.mask_specularities:
             mask &= self.specularity_mask(img)

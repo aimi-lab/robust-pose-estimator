@@ -31,8 +31,12 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fo
         wandb.init(project='Alley-OOP', config=config, group=log)
 
     dataset, calib = get_data(input_path, config['img_size'], force_video=force_video)
+    # check for ground-truth pose data for logging purposes
+    gt_file = os.path.join(input_path, 'groundtruth.txt')
+    gt_trajectory = read_freiburg(gt_file) if os.path.isfile(gt_file) else None
+
     slam = SLAM(torch.tensor(calib['intrinsics']['left']).to(device), config['slam'], baseline=calib['bf'],
-                checkpoint=checkpoint).to(device)
+                checkpoint=checkpoint, init_pose=torch.tensor(gt_trajectory[0]) if gt_trajectory is not None else None).to(device)
     if not isinstance(dataset, StereoVideoDataset):
         sampler = SequentialSubSampler(dataset, start, stop, step)
     else:
@@ -44,9 +48,6 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fo
         seg_model = SemanticSegmentationModel('../dataset/preprocess/segmentation_network/trained/deepLabv3plus_trained_intuitive.pth',
                                               device, config['img_size'])
 
-    # check for ground-truth pose data for logging purposes
-    gt_file = os.path.join(input_path, 'groundtruth.txt')
-    gt_trajectory = read_freiburg(gt_file) if os.path.isfile(gt_file) else None
     slam.recorder.set_gt(gt_trajectory)
     with torch.no_grad():
         viewer = None
