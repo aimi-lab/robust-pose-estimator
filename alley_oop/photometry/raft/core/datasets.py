@@ -114,7 +114,7 @@ class PoseDataset(Dataset):
         valid &= depth1 > 1e-3
         valid &= depth2 > 1e-3
         # ToDo add tool mask!
-        return img1, img2, img1_r, img2_r, depth_conf1, depth_conf2, valid, pose_se3.float(), self.intrinsics[index], self.baseline[index]/self.depth_cutoff
+        return img1, img2, img1_r, img2_r, depth_conf1, depth_conf2, valid, pose_se3.float(), self.intrinsics[index], float(self.baseline[index]/self.depth_cutoff)
 
     def _read_img(self, path):
         img = torch.from_numpy(cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)).permute(2, 0, 1).float()
