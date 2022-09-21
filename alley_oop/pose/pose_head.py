@@ -91,7 +91,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         flow, pcl1, pcl2, weights1, weights2, loss_weight = xs
         loss3d = self.depth_objective(flow, pcl1, pcl2, weights1, weights2, y)
         loss2d = self.reprojection_objective(flow, pcl1, pcl2, weights2, y)
-        return loss_weight[1]*loss2d + loss_weight[0]*loss3d
+        return loss_weight[:, 1]*loss2d + loss_weight[:, 0]*loss3d
 
     def solve(self, *xs):
         flow, pcl1, pcl2, weights1, weights2, loss_weight = xs
@@ -107,6 +107,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
             # Solve using LBFGS optimizer:
             y = torch.zeros((n,6), device=flow.device, requires_grad=True)
             optimizer = torch.optim.LBFGS([y], lr=1.0, max_iter=100, line_search_fn="strong_wolfe", )
+
             def fun():
                 optimizer.zero_grad()
                 loss = self.objective(flow, pcl1, pcl2, weights1, weights2, loss_weight, y=y).sum()
@@ -172,7 +173,7 @@ class DeclarativeRGBD(AbstractDeclarativeNode):
         flow, pcl1, pcl2, weights1, weights2, loss_weights = xs
         loss3d = torch.mean(self.depth_residuals(*xs, y=y)**2, dim=-1)
         loss2d = torch.mean(self.reprojection_residuals(*xs, y=y)**2, dim=-1)
-        return loss_weights[1]*loss2d + loss_weights[0]*loss3d
+        return loss_weights[:, 1]*loss2d + loss_weights[:, 0]*loss3d
 
     def j_wt(self, pts):
         points3d = pts.permute(1, 0)
@@ -261,7 +262,7 @@ class DeclarativeRGBD(AbstractDeclarativeNode):
         residuals = [residuals_3d, residuals_2d]
         loss3d = torch.mean(residuals_3d ** 2, dim=-1)
         loss2d = torch.mean(residuals_2d ** 2, dim=-1)
-        self.losses.append(loss_weights[1].float() * loss2d + loss_weights[0].float() * loss3d)
+        self.losses.append(loss_weights[:, 1].float() * loss2d + loss_weights[:, 0].float() * loss3d)
 
         return torch.stack(residuals, dim=1).double()
 
@@ -305,21 +306,23 @@ class DeclarativeRGBD(AbstractDeclarativeNode):
         return y.float().detach(), None
 
     def solve_lbgfs(self, *xs):
-        flow, pcl1, pcl2, weights1, weights2 = xs
+        flow, pcl1, pcl2, weights1, weights2, loss_weights = xs
         # solve using method of Horn
         flow = flow.detach()
         pcl1 = pcl1.detach().clone()
         pcl2 = pcl2.detach().clone()
         weights1 = weights1.detach().clone()
         weights2 = weights2.detach().clone()
+        loss_weights = loss_weights.detach().double()
         with torch.enable_grad():
             n = pcl1.shape[0]
             # Solve using LBFGS optimizer:
             y = torch.zeros((n,6), device=flow.device, requires_grad=True)
             optimizer = torch.optim.LBFGS([y], lr=1.0, max_iter=100, line_search_fn="strong_wolfe", )
+
             def fun():
                 optimizer.zero_grad()
-                loss = self.objective(flow, pcl1, pcl2, weights1, weights2, y=y).sum()
+                loss = self.objective(flow, pcl1, pcl2, weights1, weights2, loss_weights, y=y).sum()
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(y, 100)
                 return loss
