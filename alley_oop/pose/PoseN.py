@@ -48,7 +48,7 @@ class PoseN(nn.Module):
         valid = torch.abs(flow[:, 1]) < vertical_disp_thr
         depth = self.baseline / -flow[:, 0]
         valid &= (depth > 0) & (depth < 1.0)
-        return depth, valid.unsqueeze(1)
+        return depth.unsqueeze(1), valid.unsqueeze(1)
 
     def forward(self, image1l, image2l, image1r=None, image2r=None, depth1=None, depth2=None, mask1=None, mask2=None, iters=12, flow_init=None, pose_init=None, ret_confmap=False):
 
