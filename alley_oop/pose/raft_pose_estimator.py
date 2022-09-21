@@ -8,13 +8,13 @@ from torchvision.transforms import Resize
 
 
 class RAFTPoseEstimator(torch.nn.Module):
-    def __init__(self, intrinsics: torch.Tensor, checkpoint: str, frame2frame: bool=False):
+    def __init__(self, intrinsics: torch.Tensor, baseline: float, checkpoint: str, frame2frame: bool=False):
         """
 
         """
         super(RAFTPoseEstimator, self).__init__()
         checkp = torch.load(checkpoint)
-        model = PoseN(checkp['config']['model'], intrinsics)
+        model = PoseN(checkp['config']['model'], intrinsics, baseline)
         new_state_dict = OrderedDict()
         state_dict = checkp['state_dict']
         for k, v in state_dict.items():
@@ -32,8 +32,8 @@ class RAFTPoseEstimator(torch.nn.Module):
     def estimate(self, frame: FrameClass, scene: SurfelMap):
         if self.frame2frame:
             if self.last_frame is not None:
-                rel_pose_se3 = self.model(self.last_frame.img, frame.img, self.last_frame.depth, frame.depth,
-                                          self.last_frame.mask, frame.mask)[1].squeeze(0)
+                rel_pose_se3 = self.model(255*self.last_frame.img, 255*frame.img, depth1=self.last_frame.depth, depth2=frame.depth,
+                                          mask1=self.last_frame.mask, mask2=frame.mask)[1].squeeze(0)
                 rel_pose = lie_se3_to_SE3(rel_pose_se3)
                 ret_frame = self.last_frame
             else:
@@ -44,7 +44,7 @@ class RAFTPoseEstimator(torch.nn.Module):
             # transform scene to last camera pose coordinates
             scene_tlast = scene.transform_cpy(inv_transform(self.last_pose))
             model_frame = scene_tlast.render(self.intrinsics)
-            rel_pose_se3 = self.model(model_frame.img, frame.img, model_frame.depth, frame.depth, model_frame.mask, frame.mask)[1].squeeze(0)
+            rel_pose_se3 = self.model(255*model_frame.img, 255*frame.img, depth1=model_frame.depth, depth2=frame.depth, mask1=model_frame.mask, mask2=frame.mask)[1].squeeze(0)
             rel_pose = lie_se3_to_SE3(rel_pose_se3)
             ret_frame = model_frame
         self.last_pose.data = self.last_pose.data @ torch.linalg.inv(rel_pose)
@@ -53,4 +53,7 @@ class RAFTPoseEstimator(torch.nn.Module):
     @property
     def device(self):
         return self.last_pose.device
+
+    def estimate_depth(self, img_l, img_r):
+        return self.model.flow2depth(255*img_l, 255*img_r)
 

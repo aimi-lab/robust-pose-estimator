@@ -31,7 +31,7 @@ class PreProcess(object):
         self.cmp_illumination = compensate_illumination
         self.conf_thr = conf_thr
 
-    def __call__(self, img:torch.tensor, depth:torch.tensor, mask:torch.tensor=None, semantics:torch.tensor=None, depth_noise:torch.tensor=None):
+    def __call__(self, img:torch.tensor, depth:torch.tensor, mask:torch.tensor=None, semantics:torch.tensor=None):
         assert torch.is_tensor(img)
 
         # need to go back to numpy to use opencv functions
@@ -39,7 +39,6 @@ class PreProcess(object):
         mask = mask.cpu().numpy().squeeze()
         # normalize depth for numerical stability
         depth = depth * self.depth_scale
-        depth_noise = depth_noise * self.depth_scale**2
 
         # filter depth to smooth out noisy points
         depth = cv2.bilateralFilter(depth, d=-1, sigmaColor=0.01, sigmaSpace=10)
@@ -58,12 +57,7 @@ class PreProcess(object):
         if self.cmp_illumination:
             img = self.compensate_illumination(rgb2gray_t(img.cpu(), ax0=0), depth, self.intrinsics)
 
-        # compute confidence from depth noise
-        depth_noise = torch.ones_like(depth) if depth_noise is None else depth_noise
-        confidence = torch.special.erf(5e-3/torch.sqrt(depth_noise)).cpu()
-        # mask out values with low depth confidence
-        mask &= confidence > self.conf_thr
-        return img, depth, mask, confidence, depth_noise
+        return img, depth, mask
 
     def specularity_mask(self, img, spec_thr=0.96):
         """ specularities can cause issues in the photometric pose estimation.

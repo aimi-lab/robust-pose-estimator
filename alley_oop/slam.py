@@ -9,7 +9,7 @@ from alley_oop.utils.logging import OptimizationRecordings
 
 
 class SLAM(object):
-    def __init__(self, intrinsics:torch.tensor, config:dict, img_shape: Tuple, checkpoint: str):
+    def __init__(self, intrinsics:torch.tensor, config:dict, baseline: float, checkpoint: str):
         """
         Alley-OOP SLAM (imitation of ElasticFusion)
         :param intrinsics: camera intrinsics tensor
@@ -20,7 +20,7 @@ class SLAM(object):
         self.device = intrinsics.device
         self.dtype = torch.float32
         self.intrinsics = intrinsics.to(self.dtype)
-        self.pose_estimator = RAFTPoseEstimator(self.intrinsics, checkpoint, config['frame2frame'])
+        self.pose_estimator = RAFTPoseEstimator(self.intrinsics, baseline, checkpoint, config['frame2frame'])
         self.cnt = 0
         self.rendered_frame = None
         self.frame = None
@@ -34,7 +34,7 @@ class SLAM(object):
                                       self.dtype, mask_specularities=config['mask_specularities'],
                                       compensate_illumination=config['compensate_illumination'])
 
-    def processFrame(self, img: tensor, depth:tensor, mask:tensor=None, confidence:torch.tensor=None):
+    def processFrame(self, img: tensor, depth:tensor, mask:tensor=None):
         """
         track frame and fuse points to SurfelMap
         :param img: RGB input image
@@ -43,7 +43,7 @@ class SLAM(object):
         :param confidence: depth confidence value between 0 and 1
         """
         with torch.no_grad():
-            self.frame = FrameClass(img, depth, intrinsics=self.intrinsics, mask=mask, confidence=confidence)
+            self.frame = FrameClass(img, depth, intrinsics=self.intrinsics, mask=mask)
             if self.scene is None:
                 # initialize scene with first frame
                 self.scene = SurfelMap(frame=self.frame, kmat=self.intrinsics, upscale=1,

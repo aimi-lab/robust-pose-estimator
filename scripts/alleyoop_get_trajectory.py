@@ -5,7 +5,6 @@ import os
 import torch
 import numpy as np
 from tqdm import tqdm
-from dataset.preprocess.disparity.disparity_model import DisparityModel
 from dataset.preprocess.segmentation_network.seg_model import SemanticSegmentationModel
 import matplotlib.pyplot as plt
 from alley_oop.fusion.surfel_map import SurfelMap
@@ -32,7 +31,7 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fo
         wandb.init(project='Alley-OOP', config=config, group=log)
 
     dataset, calib = get_data(input_path, config['img_size'], force_video=force_video)
-    slam = SLAM(torch.tensor(calib['intrinsics']['left']), config['slam'], img_shape=config['img_size'],
+    slam = SLAM(torch.tensor(calib['intrinsics']['left']), config['slam'], baseline=calib['bf'],
                 checkpoint=checkpoint).to(device)
     if not isinstance(dataset, StereoVideoDataset):
         sampler = SequentialSubSampler(dataset, start, stop, step)
@@ -44,8 +43,6 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fo
     if isinstance(dataset, StereoVideoDataset):
         seg_model = SemanticSegmentationModel('../dataset/preprocess/segmentation_network/trained/deepLabv3plus_trained_intuitive.pth',
                                               device, config['img_size'])
-    if not isinstance(dataset, RGBDDataset):
-        disp_model = DisparityModel(calibration=calib, device=device)
 
     # check for ground-truth pose data for logging purposes
     gt_file = os.path.join(input_path, 'groundtruth.txt')
@@ -64,15 +61,14 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fo
             if isinstance(dataset, StereoVideoDataset):
                 limg, rimg, pose_kinematics, img_number = data
                 mask, semantics = seg_model.get_mask(limg.to(device))
-                disparity, depth, depth_noise = disp_model(limg.to(device), rimg.to(device))
+                depth, _ = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
             elif isinstance(dataset, RGBDDataset):
                 limg, depth, depth_noise, mask, semantics, img_number = data
             else:
                 limg, rimg, mask, semantics, img_number = data
-                disparity, depth, depth_noise = disp_model(limg.to(device), rimg.to(device))
-            limg, depth, mask, confidence, depth_noise = slam.pre_process(limg, depth, mask, semantics, depth_noise)
-            pose, scene, pose_relscale = slam.processFrame(limg.to(device), depth.to(device), mask.to(device),
-                                                           confidence.to(device))
+                depth, _ = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
+            limg, depth, mask = slam.pre_process(limg, depth, mask, semantics)
+            pose, scene, pose_relscale = slam.processFrame(limg.to(device), depth.to(device), mask.to(device))
 
             if viewer is not None:
                 curr_pcl = SurfelMap(frame=slam.get_frame(), kmat=torch.tensor(calib['intrinsics']['left']).float(),
