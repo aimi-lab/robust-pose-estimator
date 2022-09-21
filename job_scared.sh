@@ -23,7 +23,7 @@ sequence=$(cat $param_store | awk -v var=$SLURM_ARRAY_TASK_ID 'NR==var {print $1
 
 cd scripts
 
-python -u alleyoop_get_trajectory.py ${sequence} --device gpu --outpath ${sequence}/data/raft_slam --log scared_raftslam --checkpoint wandb/run-20220921_094227-1ew18scu/files/RAFT-poseEstimator.pth --config ././configuration/alleyoop_scared.yaml
+python -u alleyoop_get_trajectory.py ${sequence} --device gpu --outpath ${sequence}/data/raft_slam --log scared_raftslam --checkpoint wandb/run-20220921_094227-1ew18scu/files/RAFT-poseEstimator.pth --config ../configuration/alleyoop_scared.yaml --force_video
 
 
 

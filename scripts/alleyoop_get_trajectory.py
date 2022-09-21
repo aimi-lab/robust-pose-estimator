@@ -31,7 +31,7 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fo
         wandb.init(project='Alley-OOP', config=config, group=log)
 
     dataset, calib = get_data(input_path, config['img_size'], force_video=force_video)
-    slam = SLAM(torch.tensor(calib['intrinsics']['left']), config['slam'], baseline=calib['bf'],
+    slam = SLAM(torch.tensor(calib['intrinsics']['left']).to(device), config['slam'], baseline=calib['bf'],
                 checkpoint=checkpoint).to(device)
     if not isinstance(dataset, StereoVideoDataset):
         sampler = SequentialSubSampler(dataset, start, stop, step)
