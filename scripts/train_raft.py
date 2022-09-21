@@ -191,7 +191,7 @@ def main(args, config, force_cpu):
                 logger.flush()
 
             if total_steps % VAL_FREQ == VAL_FREQ - 1:
-                val_loss = val(model, val_loader, device, loss_weights, intrinsics, logger)
+                val_loss = val(model, val_loader, device, loss_weights, intrinsics, logger, infer_depth)
                 if torch.isnan(torch.tensor(val_loss)):
                     should_keep_training = False
                     break
