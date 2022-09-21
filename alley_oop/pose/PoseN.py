@@ -34,6 +34,7 @@ class PoseN(nn.Module):
         self.flow = RAFT(config)
         self.flow.freeze_bn()
         self.baseline = baseline # normalized stereo baseline, should yield depth maps between 0 a 1.
+        self.loss_weight = nn.Parameter(torch.tensor([10.0, 1.0]))  # 3d vs 2d loss weights
 
     def proj(self, depth):
         n = depth.shape[0]
@@ -73,7 +74,7 @@ class PoseN(nn.Module):
         if mask2 is not None:
             conf2 = conf2 * mask2 + 1e-7  # to avoid all zero confidence
 
-        pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2, conf1, conf2)
+        pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2, conf1, conf2, self.loss_weight)
         if ret_confmap:
             return flow_predictions, pose_se3.float() / self.pose_scale, depth1, depth2, conf1, conf2
         return flow_predictions, pose_se3.float()/self.pose_scale, depth1, depth2

@@ -47,16 +47,15 @@ class HornPoseHead(MLPPoseHead):
 
 
 class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
-    def __init__(self, intrinsics: torch.tensor, loss_weight: dict={"3d": 10.0, "2d": 1.0}):
+    def __init__(self, intrinsics: torch.tensor):
         super(DeclarativePoseHead3DNode, self).__init__()
         self.intrinsics = intrinsics
-        self.loss_weight= loss_weight
 
     def reprojection_objective(self, flow, pcl1, pcl2, weights2, y):
         # this is generally better for rotation
         n, _, h, w = flow.shape
         img_coordinates = create_img_coords_t(y=pcl1.shape[-2], x=pcl1.shape[-1]).to(pcl1.device)
-        pose = lie_se3_to_SE3_batch_small(-y)  # invert transform to be consistent with other pose estimators #ToDo check if this is ok
+        pose = lie_se3_to_SE3_batch_small(-y)  # invert transform to be consistent with other pose estimators
         # project to image plane
         warped_pts = project(pcl2.view(n,3,-1), pose, self.intrinsics[None, ...])
         flow_off = img_coordinates[None, :2] + flow.view(n, 2, -1)
@@ -89,19 +88,20 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         return torch.mean(residuals, dim=-1)
 
     def objective(self, *xs, y):
-        flow, pcl1, pcl2, weights1, weights2 = xs
+        flow, pcl1, pcl2, weights1, weights2, loss_weight = xs
         loss3d = self.depth_objective(flow, pcl1, pcl2, weights1, weights2, y)
         loss2d = self.reprojection_objective(flow, pcl1, pcl2, weights2, y)
-        return self.loss_weight["2d"]*loss2d + self.loss_weight["3d"]*loss3d
+        return loss_weight[1]*loss2d + loss_weight[0]*loss3d
 
     def solve(self, *xs):
-        flow, pcl1, pcl2, weights1, weights2 = xs
+        flow, pcl1, pcl2, weights1, weights2, loss_weight = xs
         # solve using method of Horn
         flow = flow.detach()
         pcl1 = pcl1.detach().clone()
         pcl2 = pcl2.detach().clone()
         weights1 = weights1.detach().clone()
         weights2 = weights2.detach().clone()
+        loss_weight = loss_weight.detach()
         with torch.enable_grad():
             n = pcl1.shape[0]
             # Solve using LBFGS optimizer:
@@ -109,7 +109,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
             optimizer = torch.optim.LBFGS([y], lr=1.0, max_iter=100, line_search_fn="strong_wolfe", )
             def fun():
                 optimizer.zero_grad()
-                loss = self.objective(flow, pcl1, pcl2, weights1, weights2, y=y).sum()
+                loss = self.objective(flow, pcl1, pcl2, weights1, weights2, loss_weight, y=y).sum()
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(y, 100)
                 return loss
@@ -118,13 +118,12 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
 
 
 class DeclarativeRGBD(AbstractDeclarativeNode):
-    def __init__(self, intrinsics: torch.tensor, loss_weight: dict={"3d": 10.0, "2d": 1.0}):
+    def __init__(self, intrinsics: torch.tensor):
         super(DeclarativeRGBD, self).__init__()
         self.intrinsics = intrinsics
-        self.wvec = torch.nn.Parameter(torch.tensor([loss_weight["3d"], loss_weight["2d"]], dtype=torch.float64, device=intrinsics.device))
         self.losses = []
 
-    def reprojection_residuals(self, flow, pcl1, pcl2, weights1, weights2, y):
+    def reprojection_residuals(self, flow, pcl1, pcl2, weights1, weights2, _, y):
         # this is generally better for rotation
         n, _, h, w = flow.shape
         img_coordinates = create_img_coords_t(y=pcl1.shape[-2], x=pcl1.shape[-1]).to(pcl1.device)
@@ -142,7 +141,7 @@ class DeclarativeRGBD(AbstractDeclarativeNode):
         residuals /= (h*w)  # normalize with width and height
         return residuals
 
-    def depth_residuals(self, flow, pcl1, pcl2, weights1, weights2, y):
+    def depth_residuals(self, flow, pcl1, pcl2, weights1, weights2, _, y):
         # this is generally better for translation (essentially in z-direction)
         # 3D geometric L2 loss
         n, _, h, w = pcl1.shape
@@ -170,10 +169,10 @@ class DeclarativeRGBD(AbstractDeclarativeNode):
         return residuals
 
     def objective(self, *xs, y):
-        flow, pcl1, pcl2, weights1, weights2 = xs
-        loss3d = torch.mean(self.depth_residuals(flow, pcl1, pcl2, weights1, weights2, y=y)**2, dim=-1)
-        loss2d = torch.mean(self.reprojection_residuals(flow, pcl1, pcl2, weights1, weights2, y=y)**2, dim=-1)
-        return self.wvec[1].float()*loss2d + self.wvec[0].float()*loss3d
+        flow, pcl1, pcl2, weights1, weights2, loss_weights = xs
+        loss3d = torch.mean(self.depth_residuals(*xs, y=y)**2, dim=-1)
+        loss2d = torch.mean(self.reprojection_residuals(*xs, y=y)**2, dim=-1)
+        return loss_weights[1]*loss2d + loss_weights[0]*loss3d
 
     def j_wt(self, pts):
         points3d = pts.permute(1, 0)
@@ -217,7 +216,7 @@ class DeclarativeRGBD(AbstractDeclarativeNode):
         return J
 
     def reprojection_jacobian(self, *xs, y):
-        flow, pcl1, pcl2, weights1, weights2 = xs
+        flow, pcl1, pcl2, weights1, weights2, _ = xs
         n, _ ,h, w = flow.shape
         img_coordinates = create_img_coords_t(y=pcl1.shape[-2], x=pcl1.shape[-1]).to(pcl1.device)
         pose = lie_se3_to_SE3_batch_small(y)  # invert transform to be consistent with other pose estimators
@@ -236,7 +235,7 @@ class DeclarativeRGBD(AbstractDeclarativeNode):
         return J
 
     def depth_jacobian(self, *xs, y):
-        flow, pcl1, pcl2, weights1, weights2 = xs
+        flow, pcl1, pcl2, weights1, weights2, _ = xs
         n, _, h, w = flow.shape
         pose = lie_se3_to_SE3_batch_small(-y)
         pcl2_aligned = transform(homogenous(pcl2.view(n, 3, -1)), pose).reshape(n, 4, h, w)[:, :3] # are we sure we should transform pcl2?
@@ -256,12 +255,13 @@ class DeclarativeRGBD(AbstractDeclarativeNode):
         return jacobian
 
     def multi_cost_fun(self, *xs, y):
+        *_, loss_weights = xs
         residuals_3d = self.depth_residuals(*xs, y=y.float())
         residuals_2d = self.reprojection_residuals(*xs, y=y.float())
         residuals = [residuals_3d, residuals_2d]
         loss3d = torch.mean(residuals_3d ** 2, dim=-1)
         loss2d = torch.mean(residuals_2d ** 2, dim=-1)
-        self.losses.append(self.wvec[1].float() * loss2d + self.wvec[0].float() * loss3d)
+        self.losses.append(loss_weights[1].float() * loss2d + loss_weights[0].float() * loss3d)
 
         return torch.stack(residuals, dim=1).double()
 
@@ -273,16 +273,17 @@ class DeclarativeRGBD(AbstractDeclarativeNode):
         return torch.stack(jacobians, dim=1).double()
 
     def solve(self, *xs):
-        flow, pcl1, pcl2, weights1, weights2 = xs
+        flow, pcl1, pcl2, weights1, weights2, loss_weights = xs
         # solve using method of Horn
         flow = flow.detach()
         pcl1 = pcl1.detach().clone()
         pcl2 = pcl2.detach().clone()
         weights1 = weights1.detach().clone()
         weights2 = weights2.detach().clone()
+        loss_weights = loss_weights.detach().double()
 
-        multi_cost_fun_args = lambda y: self.multi_cost_fun(flow, pcl1, pcl2, weights1, weights2, y=y)
-        multi_jaco_fun_args = lambda y: self.mult_jacobian_fun(flow, pcl1, pcl2, weights1, weights2, y=y)
+        multi_cost_fun_args = lambda y: self.multi_cost_fun(flow, pcl1, pcl2, weights1, weights2, loss_weights, y=y)
+        multi_jaco_fun_args = lambda y: self.mult_jacobian_fun(flow, pcl1, pcl2, weights1, weights2, loss_weights,  y=y)
 
         n = pcl1.shape[0]
         y = torch.zeros((n,6), device=flow.device, requires_grad=True, dtype=torch.float64)
@@ -291,7 +292,7 @@ class DeclarativeRGBD(AbstractDeclarativeNode):
             p=y,
             function=multi_cost_fun_args,
             jac_function=multi_jaco_fun_args,
-            wvec=self.wvec,
+            wvec=loss_weights,
             ftol=1e-9,
             ptol=1e-9,
             gtol=1e-9,
