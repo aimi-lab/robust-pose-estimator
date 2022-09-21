@@ -205,7 +205,7 @@ def reproject(depth: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.T
     # pinhole projection
     n = depth.shape[0]
     repr = torch.linalg.inv(intrinsics) @ img_coords.view(3, -1)
-    opts = depth.view(n, 1, -1) * repr.unsqueeze(0)
+    opts = depth.view(n, 1, -1) * repr
 
     opts = homogenous(opts)
     return opts

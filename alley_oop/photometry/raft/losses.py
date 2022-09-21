@@ -9,7 +9,7 @@ def _warp_frame(depth: torch.Tensor, T: torch.Tensor, intrinsics: torch.Tensor, 
     # pinhole projection
     opts = reproject(depth, intrinsics, img_coords)
     # compose projection matrix
-    pmat = intrinsics[None,...] @ T[:,:3]
+    pmat = intrinsics @ T[:,:3]
 
     # pinhole projection
     ipts = torch.bmm(pmat, opts)

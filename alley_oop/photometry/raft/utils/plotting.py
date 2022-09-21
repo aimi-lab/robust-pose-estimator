@@ -12,7 +12,7 @@ from alley_oop.fusion.surfel_map import SurfelMap, FrameClass
 
 def warp_frame(src_frame, depth, T, intrinsics):
     img_coordinates = create_img_coords_t(y=depth.shape[-2], x=depth.shape[-1])
-    warpfield = _warp_frame(depth.unsqueeze(0).detach().cpu(), T.unsqueeze(0).detach().cpu(), intrinsics.detach().cpu(), img_coordinates.detach().cpu()).squeeze().reshape(2, depth.shape[-2], depth.shape[-1])
+    warpfield = _warp_frame(depth.unsqueeze(0).detach().cpu(), T.unsqueeze(0).detach().cpu(), intrinsics[0].detach().cpu(), img_coordinates.detach().cpu()).squeeze().reshape(2, depth.shape[-2], depth.shape[-1])
 
     u = warpfield.numpy()[0].squeeze()
     v = warpfield.numpy()[1].squeeze()
