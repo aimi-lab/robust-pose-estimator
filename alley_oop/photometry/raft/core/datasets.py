@@ -66,6 +66,7 @@ class PoseDataset(Dataset):
         assert len(images_l) == len(disparities)
         assert len(images_l) == len(depth_noise)
         assert len(images_l) == len(images_r)
+        assert len(images_l) > 0 , f'no images in {root}'
         self.conf_thr = conf_thr
         self.depth_cutoff = depth_cutoff
         self.image_list = []
@@ -146,14 +147,17 @@ class MultiSeqPoseDataset(PoseDataset):
             intr = intrinsics[i]
             for d in datasets[i]:
                 if os.path.isfile(os.path.join(d, 'groundtruth.txt')):
-                    super().__init__(d, b, intr, depth_cutoff, conf_thr, step, img_size)
-                    image_list1 += self.image_list
-                    image_list_r1 += self.image_list_r
-                    disp_list1 += self.disp_list
-                    rel_pose_list1 += self.rel_pose_list
-                    depth_noise_list1 += self.depth_noise_list
-                    intrinsics_list += self.intrinsics
-                    baseline_list += self.baseline
+                    try:
+                        super().__init__(d, b, intr, depth_cutoff, conf_thr, step, img_size)
+                        image_list1 += self.image_list
+                        image_list_r1 += self.image_list_r
+                        disp_list1 += self.disp_list
+                        rel_pose_list1 += self.rel_pose_list
+                        depth_noise_list1 += self.depth_noise_list
+                        intrinsics_list += self.intrinsics
+                        baseline_list += self.baseline
+                    except AssertionError:
+                        pass
         self.image_list = image_list1
         self.image_list_r = image_list_r1
         self.disp_list = disp_list1
