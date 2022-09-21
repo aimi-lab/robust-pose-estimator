@@ -69,9 +69,9 @@ class PoseN(nn.Module):
 
         # set confidence weights to zero where the mask is False
         if mask1 is not None:
-            conf1[~mask1] = 0.0
+            conf1 = conf1 * mask1
         if mask2 is not None:
-            conf2[~mask2] = 0.0
+            conf2 = conf2 * mask2
 
         pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2, conf1, conf2)
         if ret_confmap:
