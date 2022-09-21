@@ -9,7 +9,7 @@ from alley_oop.pose.pose_head import MLPPoseHead, HornPoseHead, DeclarativePoseH
 
 
 class PoseN(nn.Module):
-    def __init__(self, config, intrinsics, baseline):
+    def __init__(self, config):
         super(PoseN, self).__init__()
         self.config = config
         H, W = config["image_shape"]
@@ -18,50 +18,51 @@ class PoseN(nn.Module):
         elif config['mode'] == 'horn':
             self.pose_head = HornPoseHead()
         elif config['mode'] == 'lbgfs':
-            self.pose_head = DeclarativeLayer(DeclarativePoseHead3DNode(intrinsics))
+            self.pose_head = DeclarativeLayer(DeclarativePoseHead3DNode())
         elif config['mode'] == 'newton':
-            self.pose_head = DeclarativeLayer(DeclarativeRGBD(intrinsics))
+            self.pose_head = DeclarativeLayer(DeclarativeRGBD())
         else:
             raise NotImplementedError(f'mode {config["mode"]} not supported')
         # replace by 4-channel input conv (RGB + D)
         self.pose_scale = config['pose_scale']
 
-        img_coords = create_img_coords_t(y=H, x=W)
+        self.img_coords = nn.Parameter(create_img_coords_t(y=H, x=W), requires_grad=False)
         self.conf_head = nn.Sequential(nn.Conv2d(128+128+3+3, out_channels=32, kernel_size=(5,5), padding="same"), nn.BatchNorm2d(32),
                                        nn.Conv2d(32, out_channels=1, kernel_size=(3,3), padding="same"), nn.Sigmoid())
         self.up = nn.UpsamplingBilinear2d((H,W))
-        self.repr = nn.Parameter(torch.linalg.inv(intrinsics.cpu())@ img_coords.view(3, -1), requires_grad=False)
         self.flow = RAFT(config)
         self.flow.freeze_bn()
-        self.baseline = baseline # normalized stereo baseline, should yield depth maps between 0 a 1.
         self.loss_weight = nn.Parameter(torch.tensor([10.0, 1.0]))  # 3d vs 2d loss weights
 
-    def proj(self, depth):
+    def proj(self, depth, intrinsics):
         n = depth.shape[0]
-        opts = depth.view(n, 1, -1) * self.repr.unsqueeze(0)
+        repr = torch.linalg.inv(intrinsics)@ self.img_coords.view(1, 3, -1)
+        opts = depth.view(n, 1, -1) * repr
         return opts.view(n,3,*depth.shape[-2:])
 
-    def flow2depth(self, imagel, imager, vertical_disp_thr=1.0):
+    def flow2depth(self, imagel, imager, baseline, vertical_disp_thr=1.0):
         n, _, h, w = imagel.shape
         flow = self.flow(imagel, imager)[0][-1]
         # check if vertical disparity is small
         valid = torch.abs(flow[:, 1]) < vertical_disp_thr
-        depth = self.baseline / -flow[:, 0]
+        depth = baseline[:, None, None] / -flow[:, 0]
         valid &= (depth > 0) & (depth < 1.0)
         return depth.unsqueeze(1), valid.unsqueeze(1)
 
-    def forward(self, image1l, image2l, image1r=None, image2r=None, depth1=None, depth2=None, mask1=None, mask2=None, iters=12, flow_init=None, pose_init=None, ret_confmap=False):
-
+    def forward(self, image1l, image2l, intrinsics, baseline, image1r=None, image2r=None, depth1=None, depth2=None, mask1=None, mask2=None, iters=12, flow_init=None, pose_init=None, ret_confmap=False):
+        intrinsics.requires_grad = False
+        baseline.requires_grad = False
         """ estimate optical flow from stereo pair to get disparity map"""
         if depth1 is None:
-            depth1, valid1 = self.flow2depth(image1l, image1r)
+            depth1, valid1 = self.flow2depth(image1l, image1r, baseline)
             mask1 = mask1 & valid1 if mask1 is not None else valid1
         if depth2 is None:
-            depth2, valid2 = self.flow2depth(image2l, image2r)
+            depth2, valid2 = self.flow2depth(image2l, image2r, baseline)
             mask2 = mask2 & valid2 if mask2 is not None else valid2
         """ Estimate optical flow and rigid pose between pair of frames """
-        pcl1 = self.proj(depth1)
-        pcl2 = self.proj(depth2)
+
+        pcl1 = self.proj(depth1, intrinsics)
+        pcl2 = self.proj(depth2, intrinsics)
 
         flow_predictions, gru_hidden_state, context = self.flow(image1l, image2l, iters, flow_init)
         context_up = self.up(torch.cat((gru_hidden_state, context), dim=1))
@@ -74,7 +75,7 @@ class PoseN(nn.Module):
         if mask2 is not None:
             conf2 = conf2 * mask2 + 1e-7  # to avoid all zero confidence
         n = image1l.shape[0]
-        pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2, conf1, conf2, self.loss_weight.repeat(n, 1))
+        pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2, conf1, conf2, self.loss_weight.repeat(n, 1), intrinsics)
         if ret_confmap:
             return flow_predictions, pose_se3.float() / self.pose_scale, depth1, depth2, conf1, conf2
         return flow_predictions, pose_se3.float()/self.pose_scale, depth1, depth2
@@ -104,7 +105,7 @@ class PoseN(nn.Module):
             self.loss_weight.requires_grad = True
         except AttributeError:
             pass
-        self.repr.requires_grad = False
+        self.img_coords.requires_grad = False
         return self
 
     def train(self, mode: bool = True):

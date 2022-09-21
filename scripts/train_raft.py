@@ -42,18 +42,20 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger, infer_depth
     with torch.no_grad():
         for i_batch, data_blob in enumerate(dataloader):
             if infer_depth:
-                ref_img, trg_img, ref_img_r, trg_img_r, ref_conf, trg_conf, valid, gt_pose = [x.to(device) for x in
+                ref_img, trg_img, ref_img_r, trg_img_r, ref_conf, trg_conf, valid, gt_pose, intrinsics, baseline = [x.to(device) for x in
                                                                                               data_blob]
                 flow_predictions, pose_predictions, trg_depth, ref_depth, conf1, conf2 = model(trg_img, ref_img,
+                                                                                               intrinsics, baseline,
                                                                                                image1r=trg_img_r,
                                                                                                image2r=ref_img_r,
                                                                                                iters=config['model'][
                                                                                                    'iters'],
                                                                                                ret_confmap=True)  # ToDo add mask if necessary
             else:
-                ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, gt_pose = [x.to(device) for x in
+                ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, gt_pose, intrinsics, baseline  = [x.to(device) for x in
                                                                                               data_blob]
-                flow_predictions, pose_predictions, *_, conf1, conf2 = model(trg_img, ref_img, depth1=trg_depth,
+                flow_predictions, pose_predictions, *_, conf1, conf2 = model(trg_img, ref_img,intrinsics, baseline,
+                                                                             depth1=trg_depth,
                                                                          depth2=ref_depth,
                                                                          iters=config['model']['iters'],
                                                                          ret_confmap=True)  # ToDo add mask if necessary
@@ -86,16 +88,15 @@ def main(args, config, force_cpu):
     # get data
     data_train, *_ = datasets.get_data(config['data']['train']['type'], config['data']['train']['basepath'],config['data']['train']['sequences'],
                                                config['image_shape'], config['data']['train']['step'], config['depth_scale'])
-    data_val, intrinsics, baseline, infer_depth = datasets.get_data(config['data']['val']['type'], config['data']['val']['basepath'],config['data']['val']['sequences'],
+    data_val, infer_depth = datasets.get_data(config['data']['val']['type'], config['data']['val']['basepath'],config['data']['val']['sequences'],
                                              config['image_shape'], config['data']['val']['step'], config['depth_scale'])
     print(f"train: {len(data_train)} samples, val: {len(data_val)} samples")
-    intrinsics = intrinsics.to(device)
     train_loader = DataLoader(data_train, num_workers=4, pin_memory=True, batch_size=config['train']['batch_size'], shuffle=True)
     val_loader = DataLoader(data_val, num_workers=4, pin_memory=True, batch_size=config['val']['batch_size'],
                             sampler=SubsetRandomSampler(torch.from_numpy(np.random.choice(len(data_val), size=(400,), replace=False))))
 
     # get model
-    model = PoseN(config['model'], intrinsics, baseline=baseline)
+    model = PoseN(config['model'])
     model, _ = model.init_from_raft(config['model']['pretrained'])
     if args.restore_ckpt is not None:
         model.load_state_dict(torch.load(args.restore_ckpt)['state_dict'], strict=False)
@@ -127,10 +128,12 @@ def main(args, config, force_cpu):
                 model.module.freeze_flow(False) if parallel else model.freeze_flow(False)
             optimizer.zero_grad()
             if infer_depth:
-                ref_img, trg_img, ref_img_r, trg_img_r, ref_conf, trg_conf, valid, gt_pose = [x.to(device) for x in
-                                                                                              data_blob]
+                ref_img, trg_img, ref_img_r, trg_img_r, ref_conf, trg_conf, valid, gt_pose, intrinsics, baseline = [
+                    x.to(device) for x in
+                    data_blob]
             else:
-                ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, gt_pose = [x.to(device)for x in data_blob]
+                ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, gt_pose, intrinsics, baseline = [
+                    x.to(device) for x in data_blob]
 
             if config['train']['add_noise']:
                 stdv = np.random.uniform(0.0, 5.0)
@@ -139,13 +142,20 @@ def main(args, config, force_cpu):
 
             # forward pass
             if infer_depth:
-                flow_predictions, pose_predictions, trg_depth, ref_depth, conf1, conf2 = model(trg_img, ref_img, image1r=trg_img_r,
-                                                                         image2r=ref_img_r, iters=config['model']['iters'],
-                                                                         ret_confmap=True)  # ToDo add mask if necessary
+                flow_predictions, pose_predictions, trg_depth, ref_depth, conf1, conf2 = model(trg_img, ref_img,
+                                                                                               intrinsics, baseline,
+                                                                                               image1r=trg_img_r,
+                                                                                               image2r=ref_img_r,
+                                                                                               iters=config['model'][
+                                                                                                   'iters'],
+                                                                                               ret_confmap=True)  # ToDo add mask if necessary
+                torch.save(ref_depth, 'depth0.pth')
             else:
-                flow_predictions, pose_predictions, *_, conf1, conf2 = model(trg_img, ref_img, depth1=trg_depth,
-                                                       depth2=ref_depth, iters=config['model']['iters'], ret_confmap=True) #ToDo add mask if necessary
-
+                flow_predictions, pose_predictions, *_, conf1, conf2 = model(trg_img, ref_img, intrinsics, baseline,
+                                                                             depth1=trg_depth,
+                                                                             depth2=ref_depth,
+                                                                             iters=config['model']['iters'],
+                                                                             ret_confmap=True)  # ToDo add mask if necessary
             # loss computations
             loss2d, theoretical_flow = geometric_2d_loss(flow_predictions[-1], pose_predictions, intrinsics, trg_depth, trg_conf,
                                        valid)

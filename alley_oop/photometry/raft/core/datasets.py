@@ -27,32 +27,35 @@ def get_data(dataset_type: str, input_path: str, sequences: str, img_size: Tuple
     elif dataset_type == 'TartanAir':
         dataset = TartainAir(root=input_path, seqs=sequences, step=step, img_size=img_size, depth_cutoff=depth_cutoff)
     elif dataset_type == 'Intuitive':
-        calib_path = os.path.join(input_path, sequences[0], 'keyframe_1')
-        if os.path.isfile(os.path.join(calib_path, 'camcal.json')):
-            calib_file = os.path.join(calib_path, 'camcal.json')
-        elif os.path.isfile(os.path.join(calib_path, 'camera_calibration.json')):
-            calib_file = os.path.join(calib_path, 'camera_calibration.json')
-        elif os.path.isfile(os.path.join(calib_path, 'StereoCalibration.ini')):
-            calib_file = os.path.join(calib_path, 'StereoCalibration.ini')
-        elif os.path.isfile(os.path.join(calib_path, 'endoscope_calibration.yaml')):
-            calib_file = os.path.join(calib_path, 'endoscope_calibration.yaml')
-        else:
-            raise ValueError("no calibration file found")
-        rect = StereoRectifier(calib_file, img_size_new=(img_size[1], img_size[0]), mode='conventional')
-        calib = rect.get_rectified_calib()
-        dataset = MultiSeqPoseDataset(root=input_path, seqs=sequences, baseline=calib['bf_orig'], conf_thr=0.0, step=step,
+        baseline = []
+        intrinsics = []
+        for i in range(len(sequences)):
+            calib_path = os.path.join(input_path, sequences[i], 'keyframe_1')
+            if os.path.isfile(os.path.join(calib_path, 'camcal.json')):
+                calib_file = os.path.join(calib_path, 'camcal.json')
+            elif os.path.isfile(os.path.join(calib_path, 'camera_calibration.json')):
+                calib_file = os.path.join(calib_path, 'camera_calibration.json')
+            elif os.path.isfile(os.path.join(calib_path, 'StereoCalibration.ini')):
+                calib_file = os.path.join(calib_path, 'StereoCalibration.ini')
+            elif os.path.isfile(os.path.join(calib_path, 'endoscope_calibration.yaml')):
+                calib_file = os.path.join(calib_path, 'endoscope_calibration.yaml')
+            else:
+                raise ValueError("no calibration file found")
+            rect = StereoRectifier(calib_file, img_size_new=(img_size[1], img_size[0]), mode='conventional')
+            calib = rect.get_rectified_calib()
+            baseline.append(calib['bf'].astype(np.float32))
+            intrinsics.append(calib['intrinsics']['left'].astype(np.float32))
+        dataset = MultiSeqPoseDataset(root=input_path, seqs=sequences, baseline=baseline, intrinsics=intrinsics,conf_thr=0.0, step=step,
                                   img_size=img_size, depth_cutoff=depth_cutoff)
 
-        intrinsics = torch.tensor(calib['intrinsics']['left']).float()
-        baseline = calib['bf'] / depth_cutoff
     else:
         raise NotImplementedError
 
-    return dataset, intrinsics, baseline, infer_depth
+    return dataset, infer_depth
 
 
 class PoseDataset(Dataset):
-    def __init__(self, root, baseline, depth_cutoff=300.0,conf_thr=0.0, step=(1,10), img_size=(512, 640)):
+    def __init__(self, root, baseline, intrinsics, depth_cutoff=300.0,conf_thr=0.0, step=(1,10), img_size=(512, 640)):
         super(PoseDataset, self).__init__()
         images_l = sorted(glob(os.path.join(root, 'video_frames', '*l.png')))
         images_r = sorted(glob(os.path.join(root, 'video_frames', '*r.png')))
@@ -63,7 +66,6 @@ class PoseDataset(Dataset):
         assert len(images_l) == len(disparities)
         assert len(images_l) == len(depth_noise)
         assert len(images_l) == len(images_r)
-        self.baseline = baseline
         self.conf_thr = conf_thr
         self.depth_cutoff = depth_cutoff
         self.image_list = []
@@ -71,6 +73,7 @@ class PoseDataset(Dataset):
         self.disp_list = []
         self.rel_pose_list = []
         self.depth_noise_list = []
+
         if isinstance(step, int):
             step = (step, step)
         for i in range(len(images_l)-step[1]):
@@ -81,6 +84,9 @@ class PoseDataset(Dataset):
             self.depth_noise_list.append([depth_noise[i], depth_noise[i+s]])
             self.image_list_r.append([images_r[i], images_r[i+s]])
         self.resize = Resize(img_size)
+        self.scale = float(img_size[0])/float(cv2.imread(images_l[0]).shape[1])
+        self.intrinsics = len(self.image_list) * [intrinsics]
+        self.baseline = len(self.image_list) * [baseline]
 
     def __getitem__(self, index):
         img1 = self._read_img(self.image_list[index][0])
@@ -93,8 +99,8 @@ class PoseDataset(Dataset):
         pose = torch.from_numpy(self.rel_pose_list[index]).clone()
         pose[:3,3] /= self.depth_cutoff  # normalize translation
         pose_se3 = lie_SE3_to_se3(pose)
-        depth1 = self.baseline / disp1 / self.depth_cutoff  # normalize depth
-        depth2 = self.baseline / disp2 / self.depth_cutoff  # normalize depth
+        depth1 = self.baseline[index] / disp1 / self.depth_cutoff  # normalize depth
+        depth2 = self.baseline[index] / disp2 / self.depth_cutoff  # normalize depth
 
         # generate mask
         # depth confidence threshold
@@ -108,7 +114,7 @@ class PoseDataset(Dataset):
         valid &= depth1 > 1e-3
         valid &= depth2 > 1e-3
         # ToDo add tool mask!
-        return img1, img2, img1_r, img2_r, depth_conf1, depth_conf2, valid, pose_se3.float()
+        return img1, img2, img1_r, img2_r, depth_conf1, depth_conf2, valid, pose_se3.float(), self.intrinsics[index], self.baseline[index]/self.depth_cutoff
 
     def _read_img(self, path):
         img = torch.from_numpy(cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)).permute(2, 0, 1).float()
@@ -116,7 +122,7 @@ class PoseDataset(Dataset):
 
     def _read_disp(self, path):
         disp = torch.from_numpy(load_pfm(path)[0].copy()).unsqueeze(0).float()
-        return self.resize(disp)
+        return self.resize(disp)*self.scale
 
     def __len__(self):
         return len(self.image_list)
@@ -126,27 +132,35 @@ class DummyDataset(PoseDataset):
         return super().__getitem__(0)
 
 class MultiSeqPoseDataset(PoseDataset):
-    def __init__(self, root, seqs, baseline, depth_cutoff=300.0, conf_thr=0.0, step=1, img_size=(512, 640)):
+    def __init__(self, root, seqs, baseline, intrinsics, depth_cutoff=300.0, conf_thr=0.0, step=1, img_size=(512, 640)):
         datasets = [sorted(glob(os.path.join(root, s, 'keyframe_*'))) for s in seqs]
-        datasets = [item for sublist in datasets for item in sublist]
         image_list1 = []
         disp_list1 = []
         rel_pose_list1 = []
         depth_noise_list1 = []
         image_list_r1 = []
-        for d in datasets:
-            if os.path.isfile(os.path.join(d, 'groundtruth.txt')):
-                super().__init__(d, baseline, depth_cutoff, conf_thr, step, img_size)
-                image_list1 += self.image_list
-                image_list_r1 += self.image_list_r
-                disp_list1 += self.disp_list
-                rel_pose_list1 += self.rel_pose_list
-                depth_noise_list1 += self.depth_noise_list
+        intrinsics_list = []
+        baseline_list = []
+        for i,s in enumerate(seqs):
+            b = baseline[i]
+            intr = intrinsics[i]
+            for d in datasets[i]:
+                if os.path.isfile(os.path.join(d, 'groundtruth.txt')):
+                    super().__init__(d, b, intr, depth_cutoff, conf_thr, step, img_size)
+                    image_list1 += self.image_list
+                    image_list_r1 += self.image_list_r
+                    disp_list1 += self.disp_list
+                    rel_pose_list1 += self.rel_pose_list
+                    depth_noise_list1 += self.depth_noise_list
+                    intrinsics_list += self.intrinsics
+                    baseline_list += self.baseline
         self.image_list = image_list1
         self.image_list_r = image_list_r1
         self.disp_list = disp_list1
         self.rel_pose_list = rel_pose_list1
         self.depth_noise_list = depth_noise_list1
+        self.baseline = baseline_list
+        self.intrinsics = intrinsics_list
 
 
 class TUMDataset(Dataset):
