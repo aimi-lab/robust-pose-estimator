@@ -58,7 +58,7 @@ class StereoVideoDataset(IterableDataset):
             if self.rectify is not None:
                 img_left, img_right = self.rectify(img_left, img_right)
             img_number = self.timestamps[counter-1] if self.timestamps is not None else counter
-            yield img_left, img_right, pose, img_number
+            yield img_left, img_right, pose, str(img_number)
         vid_grabber.release()
 
     def __len__(self):
