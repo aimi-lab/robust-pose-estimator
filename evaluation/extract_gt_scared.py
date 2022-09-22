@@ -16,9 +16,10 @@ if __name__ == '__main__':
         for i, fname in enumerate(fnames):
             with open(str(fname), 'r') as f: pose_elem = json.load(f)
             pose = np.array(pose_elem['camera-pose'])
-            pose[:3, 3] = -pose[:3, 3]
-            pose[:3, :3] = pose[:3, :3].T
-            pose_list.append({'camera-pose': pose, 'timestamp': i})
+            pose_inv = np.eye(4)
+            pose_inv[:3,:3] = pose[:3,:3].T
+            pose_inv[:3,3] = -pose[:3,:3].T @ pose[:3, 3]
+            pose_list.append({'camera-pose': pose_inv, 'timestamp': i})
         return pose_list
 
     with open(os.path.join('..', 'scared.txt'), 'r') as f:
@@ -27,9 +28,8 @@ if __name__ == '__main__':
         print(sequence)
         sequence = sequence.replace(PATH_REPLACEMENT[1], PATH_REPLACEMENT[0])
         sequence = sequence.replace('\n', '')
-        if not os.path.isfile(os.path.join(sequence, 'groundtruth.txt')):
-            gt_files = sorted(glob.glob(os.path.join(sequence, 'data', 'frame_data', '*.json')))
-            assert len(gt_files) > 0
-            pose_list = load_scared_pose(gt_files)
-            save_freiburg(pose_list, sequence)
-            shutil.move(os.path.join(sequence, 'trajectory.freiburg'), os.path.join(sequence, 'groundtruth.txt'))
+        gt_files = sorted(glob.glob(os.path.join(sequence, 'archive', 'frame_data', '*.json')))
+        assert len(gt_files) > 0
+        pose_list = load_scared_pose(gt_files)
+        save_freiburg(pose_list, sequence)
+        shutil.move(os.path.join(sequence, 'trajectory.freiburg'), os.path.join(sequence, 'groundtruth.txt'))
