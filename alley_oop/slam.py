@@ -33,8 +33,9 @@ class SLAM(object):
                                       self.dtype, mask_specularities=config['mask_specularities'],
                                       compensate_illumination=config['compensate_illumination'])
         init_pose[:3, 3] *= self.depth_scale
+        self.init_pose = init_pose.to(self.device)
         self.pose_estimator = RAFTPoseEstimator(self.intrinsics, baseline, checkpoint, config['frame2frame'],
-                                                init_pose.to(self.device))
+                                                self.init_pose)
 
     def processFrame(self, img: tensor, depth:tensor, mask:tensor=None):
         """
@@ -48,8 +49,8 @@ class SLAM(object):
             self.frame = FrameClass(img, depth, intrinsics=self.intrinsics, mask=mask)
             if self.scene is None:
                 # initialize scene with first frame
-                self.scene = SurfelMap(frame=self.frame, kmat=self.intrinsics, upscale=1,
-                                       d_thresh=self.config['dist_thr'], depth_scale=self.depth_scale).to(self.device)
+                self.scene = SurfelMap(frame=self.frame, kmat=self.intrinsics.squeeze(), upscale=1,
+                                       d_thresh=self.config['dist_thr'], depth_scale=self.depth_scale, pmat=self.init_pose).to(self.device)
             pose, self.rendered_frame = self.pose_estimator.estimate(self.frame, self.scene)
             pose_scaled = pose.clone()
             pose_scaled[:3, 3] /= self.depth_scale  # de-normalize depth scaling
