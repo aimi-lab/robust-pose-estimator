@@ -26,6 +26,7 @@ def get_data(input_path: str, img_size: Tuple, sample_video: int=1, rect_mode: s
         # no calibration file found, then it could be a TUM Dataset
         try:
             dataset = TUMDataset(input_path, img_size)
+            print(" TUM Dataset")
             calib = {'intrinsics': {'left': dataset.get_intrinsics()}}
         except AssertionError:
             raise RuntimeError('no calibration file found')
@@ -35,20 +36,24 @@ def get_data(input_path: str, img_size: Tuple, sample_video: int=1, rect_mode: s
         calib = rect.get_rectified_calib()
         try:
             assert not force_video
+            assert False
             dataset = RGBDDataset(input_path, img_size=calib['img_size'], baseline=calib['bf_orig'])
+            print(" RGBD Dataset with precomputed depth")
         except AssertionError:
             try:
                 assert not force_video
                 dataset = StereoDataset(input_path, img_size=calib['img_size'])
+                print(" Stereo Dataset")
             except AssertionError:
                 try:
                     assert not force_video
                     dataset = ScaredDataset(input_path, img_size=calib['img_size'])
+                    print(" SCARED Dataset")
                 except AssertionError:
                     video_file = glob.glob(os.path.join(input_path, '*.mp4'))[0]
                     pose_file = os.path.join(input_path, 'groundtruth.txt')
                     dataset = StereoVideoDataset(video_file, pose_file, img_size=calib['img_size'], sample=sample_video, rectify=rect)
-
+                    print(" Stereo Video Dataset")
     return dataset, calib
 
 
