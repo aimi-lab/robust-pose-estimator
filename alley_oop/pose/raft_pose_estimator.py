@@ -28,7 +28,7 @@ class RAFTPoseEstimator(torch.nn.Module):
         self.cost = [0]
         self.last_frame = None
         self.frame2frame = frame2frame
-        self.baseline = torch.tensor(baseline).unsqueeze(0).float()
+        self.baseline = torch.tensor(baseline).unsqueeze(0).float().to(intrinsics.device)
 
     def estimate(self, frame: FrameClass, scene: SurfelMap):
         if self.frame2frame:
