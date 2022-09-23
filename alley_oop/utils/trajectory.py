@@ -34,27 +34,37 @@ def json2freiburg(json_path, outpath):
         pose_list.append({'camera-pose': pose, 'timestamp': pose_elem['timestamp']})
     save_freiburg(pose_list, outpath)
 
-def read_freiburg(path: str, ret_stamps=False):
+def read_freiburg(path: str, ret_stamps=False, no_stamp=False):
     with open(path, 'r') as f:
         data = f.read()
         lines = data.replace(",", " ").replace("\t", " ").split("\n")
         list = [[v.strip() for v in line.split(" ") if v.strip() != ""] for line in lines if
                 len(line) > 0 and line[0] != "#"]
-    time_stamp = [l[0] for l in list if len(l) > 0]
-    try:
-        time_stamp = np.asarray([int(l.split('.')[0] + l.split('.')[1]) for l in time_stamp])*100
-    except IndexError:
-        time_stamp = np.asarray([int(l) for l in time_stamp])
-    translation = [l[1:4] for l in list if len(l) > 0]
-    quaternions = [l[4:] for l in list if len(l) > 0]
-    pose_list = []
-    for t, q in zip(translation, quaternions):
-        pose = np.eye(4)
-        pose[:3, 3] = 1000.0*np.asarray(t).astype(float)  #m to mm
-        pose[:3,:3] = Rotation.from_quat(q).as_matrix()
-        pose_list.append(pose)
-    if ret_stamps:
-        return pose_list, time_stamp
+    if no_stamp:
+        translation = [l[0:3] for l in list if len(l) > 0]
+        quaternions = [l[3:] for l in list if len(l) > 0]
+        pose_list = []
+        for t, q in zip(translation, quaternions):
+            pose = np.eye(4)
+            pose[:3, 3] = 1000.0 * np.asarray(t).astype(float)  # m to mm
+            pose[:3, :3] = Rotation.from_quat(q).as_matrix()
+            pose_list.append(pose)
+    else:
+        time_stamp = [l[0] for l in list if len(l) > 0]
+        try:
+            time_stamp = np.asarray([int(l.split('.')[0] + l.split('.')[1]) for l in time_stamp])*100
+        except IndexError:
+            time_stamp = np.asarray([int(l) for l in time_stamp])
+        translation = [l[1:4] for l in list if len(l) > 0]
+        quaternions = [l[4:] for l in list if len(l) > 0]
+        pose_list = []
+        for t, q in zip(translation, quaternions):
+            pose = np.eye(4)
+            pose[:3, 3] = 1000.0*np.asarray(t).astype(float)  #m to mm
+            pose[:3,:3] = Rotation.from_quat(q).as_matrix()
+            pose_list.append(pose)
+        if ret_stamps:
+            return pose_list, time_stamp
     return pose_list
 
 

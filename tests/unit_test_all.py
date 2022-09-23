@@ -9,11 +9,12 @@ from tests.unit_test_grayscale import GrayscaleTester
 from tests.unit_test_surfel_map import SurfelMapTest
 from tests.unit_test_pyr_estimation import PyramidPoseEstimatorTester
 from tests.unit_test_icp_rgb_estimation import RGBICPPoseEstimatorTester
+from tests.unit_test_pose_head import PoseHeadTester
 
 test_classes = [
     NormalsTester, PinholeTransformTester, PhotoLossTest, Lie3DTester, QuaternionConversionTester,
     RotEstimatorTester, GaussPyramidTester, GrayscaleTester, SurfelMapTest,
-    PyramidPoseEstimatorTester, RGBICPPoseEstimatorTester
+    PyramidPoseEstimatorTester, RGBICPPoseEstimatorTester,PoseHeadTester
     ]
 
 for test_class in test_classes:

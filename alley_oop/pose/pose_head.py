@@ -50,25 +50,27 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
     def __init__(self):
         super(DeclarativePoseHead3DNode, self).__init__()
 
-    def reprojection_objective(self, flow, pcl1, pcl2, weights2, intrinsics, y):
+    def reprojection_objective(self, flow, pcl1, pcl2, weights1, intrinsics, y, ret_res=False):
         # this is generally better for rotation
         n, _, h, w = flow.shape
         img_coordinates = create_img_coords_t(y=pcl1.shape[-2], x=pcl1.shape[-1]).to(pcl1.device)
         pose = lie_se3_to_SE3_batch_small(-y)  # invert transform to be consistent with other pose estimators
         # project to image plane
-        warped_pts = project(pcl2.view(n,3,-1), pose, intrinsics)
+        warped_pts = project(pcl1.view(n,3,-1), pose, intrinsics)
         flow_off = img_coordinates[None, :2] + flow.view(n, 2, -1)
-        residuals = torch.sum((flow_off - warped_pts) ** 2, dim=1)
-
+        residuals = torch.sum((flow_off - warped_pts)**2, dim=1)
         valid = (flow_off[:, 0] > 0) & (flow_off[:, 1] > 0) & (flow_off[:, 0] < w) & (flow_off[:, 1] < h)
         valid = torch.isnan(residuals) | ~valid.view(n,-1)
         # weight residuals by confidences
-        residuals *= weights2.view(n, -1)
+        residuals *= weights1.view(n,-1)
         residuals[valid] = 0.0
         loss = torch.mean(residuals, dim=1) / (h*w)  # normalize with width and height
+        if ret_res:
+            flow = warped_pts - img_coordinates[None, :2]
+            return loss, residuals, flow
         return loss
 
-    def depth_objective(self, flow, pcl1, pcl2, weights1, weights2, y):
+    def depth_objective(self, flow, pcl1, pcl2, weights1, weights2, y, ret_res=False):
         # this is generally better for translation (essentially in z-direction)
         # 3D geometric L2 loss
         n, _, h, w = pcl1.shape
@@ -84,16 +86,18 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         # reweighing residuals
         residuals *= torch.sqrt(weights2_aligned.view(n,-1)*weights1.view(n,-1))
         residuals[~valid[:, 0]] = 0.0
+        if ret_res:
+            return torch.mean(residuals, dim=-1), residuals
         return torch.mean(residuals, dim=-1)
 
     def objective(self, *xs, y):
-        flow, pcl1, pcl2, weights1, weights2, loss_weight, intrinsics = xs
+        flow, pcl1, pcl2, weights1, weights2, loss_weight, intrinsics= xs
         loss3d = self.depth_objective(flow, pcl1, pcl2, weights1, weights2, y)
-        loss2d = self.reprojection_objective(flow, pcl1, pcl2, weights2,intrinsics, y)
+        loss2d = self.reprojection_objective(flow, pcl1, pcl2, weights1,intrinsics, y)
         return loss_weight[:, 1]*loss2d + loss_weight[:, 0]*loss3d
 
     def solve(self, *xs):
-        flow, pcl1, pcl2, weights1, weights2, loss_weight, intrinsics = xs
+        flow, pcl1, pcl2, weights1, weights2, loss_weight, intrinsics= xs
         # solve using method of Horn
         flow = flow.detach()
         pcl1 = pcl1.detach().clone()
