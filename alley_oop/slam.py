@@ -36,6 +36,7 @@ class SLAM(object):
         self.init_pose = init_pose.to(self.device)
         self.pose_estimator = RAFTPoseEstimator(self.intrinsics, baseline, checkpoint, config['frame2frame'],
                                                 self.init_pose)
+        self.pose_estimator.model.use_weights = config['conf_weighing']
 
     def processFrame(self, img: tensor, depth:tensor, mask:tensor=None):
         """
