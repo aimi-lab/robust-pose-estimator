@@ -5,7 +5,9 @@ model:
   small: False
   RGBD: False
   pose_scale: 1.0
-  mode: newton #mlp # horn
+  mode: lbgfs #mlp # horn
+  use_weights: True
+
 data:
   train:
     type: Intuitive

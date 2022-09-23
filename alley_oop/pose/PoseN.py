@@ -29,6 +29,7 @@ class PoseN(nn.Module):
         self.register_buffer("img_coords", create_img_coords_t(y=H, x=W), persistent=False)
         self.conf_head = nn.Sequential(nn.Conv2d(128+128+3+3, out_channels=32, kernel_size=(5,5), padding="same"), nn.BatchNorm2d(32),
                                        nn.Conv2d(32, out_channels=1, kernel_size=(3,3), padding="same"), nn.Sigmoid())
+        self.use_weights = config["use_weights"]
         self.up = nn.UpsamplingBilinear2d((H,W))
         self.flow = RAFT(config)
         self.flow.freeze_bn()
@@ -65,15 +66,21 @@ class PoseN(nn.Module):
         pcl2 = self.proj(depth2, intrinsics)
 
         flow_predictions, gru_hidden_state, context = self.flow(image1l, image2l, iters, flow_init)
-        context_up = self.up(torch.cat((gru_hidden_state, context), dim=1))
-        conf1 = self.conf_head(torch.cat((image1l, pcl1, context_up), dim=1))
-        conf2 = self.conf_head(torch.cat((image2l, pcl2, context_up), dim=1))
+        if self.use_weights:
+            context_up = self.up(torch.cat((gru_hidden_state, context), dim=1))
+            conf1 = self.conf_head(torch.cat((image1l, pcl1, context_up), dim=1))
+            conf2 = self.conf_head(torch.cat((image2l, pcl2, context_up), dim=1))
+        else:
+            conf1 = torch.ones_like(depth1)
+            conf2 = torch.ones_like(depth2)
 
         # set confidence weights to zero where the mask is False
         if mask1 is not None:
-            conf1 = conf1 * mask1 + 1e-7  # to avoid all zero confidence
+            conf1 = conf1 * mask1
+            conf1 = conf1.clamp(0, 1e-12)
         if mask2 is not None:
-            conf2 = conf2 * mask2 + 1e-7  # to avoid all zero confidence
+            conf2 = conf2 * mask2
+            conf2 = conf2.clamp(0, 1e-12)
         n = image1l.shape[0]
         pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2, conf1, conf2, self.loss_weight.repeat(n, 1), intrinsics)
         if ret_confmap:
