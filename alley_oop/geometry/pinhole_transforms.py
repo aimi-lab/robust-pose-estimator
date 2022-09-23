@@ -216,5 +216,5 @@ def project(opts: torch.Tensor, pmat:torch.tensor, kmat:torch.tensor):
     # pinhole projection
     ipts = torch.bmm(p, homogenous(opts))
     # inhomogenization
-    ipts = ipts[:, :3] / (ipts[:, -1].unsqueeze(1) + 1e-12)
+    ipts = ipts[:, :3] / ipts[:, -1].unsqueeze(1)
     return ipts[:, :2]
