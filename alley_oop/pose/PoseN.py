@@ -26,7 +26,7 @@ class PoseN(nn.Module):
         # replace by 4-channel input conv (RGB + D)
         self.pose_scale = config['pose_scale']
 
-        self.img_coords = nn.Parameter(create_img_coords_t(y=H, x=W), requires_grad=False)
+        self.register_buffer("img_coords", create_img_coords_t(y=H, x=W), persistent=False)
         self.conf_head = nn.Sequential(nn.Conv2d(128+128+3+3, out_channels=32, kernel_size=(5,5), padding="same"), nn.BatchNorm2d(32),
                                        nn.Conv2d(32, out_channels=1, kernel_size=(3,3), padding="same"), nn.Sigmoid())
         self.up = nn.UpsamplingBilinear2d((H,W))
