@@ -32,7 +32,7 @@ class PoseN(nn.Module):
         self.up = nn.UpsamplingBilinear2d((H,W))
         self.flow = RAFT(config)
         self.flow.freeze_bn()
-        self.loss_weight = nn.Parameter(torch.tensor([10.0, 1.0]))  # 3d vs 2d loss weights
+        self.loss_weight = nn.Parameter(torch.tensor([1.0, 1.0]))  # 3d vs 2d loss weights
 
     def proj(self, depth, intrinsics):
         n = depth.shape[0]
