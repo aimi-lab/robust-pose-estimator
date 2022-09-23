@@ -17,7 +17,7 @@ from alley_oop.photometry.raft.utils.plotting import plot_res, plot_3d
 import wandb
 from torch.cuda.amp import GradScaler
 
-from alley_oop.geometry.lie_3d import lie_se3_to_SE3, lie_se3_to_SE3_batch
+from alley_oop.geometry.lie_3d_pseudo import pseudo_lie_se3_to_SE3, pseudo_lie_se3_to_SE3_batch
 
 
 # exclude extremly large displacements
@@ -74,7 +74,7 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger, infer_depth
                        "val/loss_total": loss.detach().mean().cpu().item()}
             logger.push(metrics, len(dataloader))
         logger.flush()
-        logger.log_plot(plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth, lie_se3_to_SE3_batch(-pose_predictions), conf1, conf2, intrinsics)[0])
+        logger.log_plot(plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth, pseudo_lie_se3_to_SE3_batch(-pose_predictions), conf1, conf2, intrinsics)[0])
     model.train()
     return loss.detach().mean().cpu().item()
 
@@ -170,7 +170,7 @@ def main(args, config, force_cpu):
                 print("\n se3 pose")
                 print(f"gt_pose: {gt_pose[0].detach().cpu().numpy()}\npred_pose: {pose_predictions[0].detach().cpu().numpy()}")
                 print(" SE3 pose")
-                print(f"gt_pose: {lie_se3_to_SE3(gt_pose[0]).detach().cpu().numpy()}\npred_pose: {lie_se3_to_SE3(pose_predictions[0]).detach().cpu().numpy()}\n")
+                print(f"gt_pose: {pseudo_lie_se3_to_SE3(gt_pose[0]).detach().cpu().numpy()}\npred_pose: {pseudo_lie_se3_to_SE3(pose_predictions[0]).detach().cpu().numpy()}\n")
                 print(" trans loss: ", loss_pose[:, 3:].detach().mean().cpu().item())
                 print(" rot loss: ", loss_pose[:, :3].detach().mean().cpu().item())
                 print(" 2d loss: ", loss2d.detach().mean().cpu().item())
@@ -178,10 +178,10 @@ def main(args, config, force_cpu):
                 if device == torch.device('cpu'):
                     pose = pose_predictions.clone()
                     pose[:,3:] *= config['depth_scale']
-                    fig, ax = plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth*config['depth_scale'], lie_se3_to_SE3_batch(-pose), conf1, conf2, intrinsics)
+                    fig, ax = plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth*config['depth_scale'], pseudo_lie_se3_to_SE3_batch(-pose), conf1, conf2, intrinsics)
                     import matplotlib.pyplot as plt
                     plt.show()
-                    plot_3d(ref_img, trg_img, ref_depth*config['depth_scale'], trg_depth*config['depth_scale'], lie_se3_to_SE3_batch(pose).detach(), intrinsics)
+                    plot_3d(ref_img, trg_img, ref_depth*config['depth_scale'], trg_depth*config['depth_scale'], pseudo_lie_se3_to_SE3_batch(pose).detach(), intrinsics)
             # update params
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)                

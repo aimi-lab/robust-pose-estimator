@@ -2,7 +2,7 @@ from alley_oop.pose.PoseN import PoseN
 from alley_oop.geometry.pinhole_transforms import inv_transform
 import torch
 from alley_oop.fusion.surfel_map import SurfelMap, FrameClass
-from alley_oop.geometry.lie_3d import lie_se3_to_SE3
+from alley_oop.geometry.lie_3d_pseudo import pseudo_lie_se3_to_SE3
 from collections import OrderedDict
 from torchvision.transforms import Resize
 
@@ -35,7 +35,7 @@ class RAFTPoseEstimator(torch.nn.Module):
             if self.last_frame is not None:
                 rel_pose_se3 = self.model(255*self.last_frame.img, 255*frame.img, self.intrinsics, self.baseline, depth1=self.last_frame.depth, depth2=frame.depth,
                                           mask1=self.last_frame.mask, mask2=frame.mask)[1].squeeze(0)
-                rel_pose = lie_se3_to_SE3(rel_pose_se3)
+                rel_pose = pseudo_lie_se3_to_SE3(rel_pose_se3)
                 ret_frame = self.last_frame
             else:
                 rel_pose = torch.eye(4, dtype=torch.float32, device=self.last_pose.device)
@@ -46,7 +46,7 @@ class RAFTPoseEstimator(torch.nn.Module):
             scene_tlast = scene.transform_cpy(inv_transform(self.last_pose))
             model_frame = scene_tlast.render(self.intrinsics.squeeze())
             rel_pose_se3 = self.model(255*model_frame.img, 255*frame.img, self.intrinsics, self.baseline, depth1=model_frame.depth, depth2=frame.depth, mask1=model_frame.mask, mask2=frame.mask)[1].squeeze(0)
-            rel_pose = lie_se3_to_SE3(rel_pose_se3)
+            rel_pose = pseudo_lie_se3_to_SE3(rel_pose_se3)
             ret_frame = model_frame
         self.last_pose.data = self.last_pose.data @ rel_pose
         return self.last_pose, ret_frame

@@ -5,7 +5,7 @@ from alley_oop.geometry.pinhole_transforms import create_img_coords_t, transform
 from alley_oop.geometry.absolute_pose_quarternion import align_torch
 from alley_oop.ddn.ddn.pytorch.node import AbstractDeclarativeNode
 from alley_oop.photometry.raft.core.utils.flow_utils import remap_from_flow
-from alley_oop.geometry.lie_3d import lie_se3_to_SE3_batch, lie_se3_to_SE3_batch_small
+from alley_oop.geometry.lie_3d_pseudo import pseudo_lie_se3_to_SE3_batch_small
 from alley_oop.utils.pytorch import batched_dot_product
 from torchimize.functions import lsq_gna_parallel, lsq_lma_parallel
 from alley_oop.geometry.normals import normals_from_regular_grid
@@ -54,7 +54,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         # this is generally better for rotation
         n, _, h, w = flow.shape
         img_coordinates = create_img_coords_t(y=pcl1.shape[-2], x=pcl1.shape[-1]).to(pcl1.device)
-        pose = lie_se3_to_SE3_batch_small(-y)  # invert transform to be consistent with other pose estimators
+        pose = pseudo_lie_se3_to_SE3_batch_small(-y)  # invert transform to be consistent with other pose estimators
         # project to image plane
         warped_pts = project(pcl1.view(n,3,-1), pose, intrinsics)
         flow_off = img_coordinates[None, :2] + flow.view(n, 2, -1)
@@ -75,7 +75,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         # 3D geometric L2 loss
         n, _, h, w = pcl1.shape
         # se(3) to SE(3)
-        pose = lie_se3_to_SE3_batch_small(y)
+        pose = pseudo_lie_se3_to_SE3_batch_small(y)
         # # transform point cloud given the pose
         pcl2_aligned = transform(homogenous(pcl2.view(n, 3, -1)), pose).reshape(n, 4, h, w)[:, :3]
         # resample point clouds given the optical flow
@@ -131,7 +131,7 @@ class DeclarativeRGBD(AbstractDeclarativeNode):
         # this is generally better for rotation
         n, _, h, w = flow.shape
         img_coordinates = create_img_coords_t(y=pcl1.shape[-2], x=pcl1.shape[-1]).to(pcl1.device)
-        pose = lie_se3_to_SE3_batch_small(-y)  # invert transform to be consistent with other pose estimators
+        pose = pseudo_lie_se3_to_SE3_batch_small(-y)  # invert transform to be consistent with other pose estimators
         # project to image plane
         warped_pts = project(pcl2.view(n,3,-1), pose, intrinsics)
         flow_off = img_coordinates[None, :2] + flow.view(n, 2, -1)
@@ -150,7 +150,7 @@ class DeclarativeRGBD(AbstractDeclarativeNode):
         # 3D geometric L2 loss
         n, _, h, w = pcl1.shape
         # se(3) to SE(3)
-        pose = lie_se3_to_SE3_batch_small(y)
+        pose = pseudo_lie_se3_to_SE3_batch_small(y)
         # transform point cloud given the pose
         pcl2_aligned = transform(homogenous(pcl2.view(n, 3, -1)), pose).reshape(n, 4, h, w)[:, :3]
         # resample point clouds given the optical flow
@@ -223,7 +223,7 @@ class DeclarativeRGBD(AbstractDeclarativeNode):
         flow, pcl1, pcl2, weights1, weights2, _, intrinsics = xs
         n, _ ,h, w = flow.shape
         img_coordinates = create_img_coords_t(y=pcl1.shape[-2], x=pcl1.shape[-1]).to(pcl1.device)
-        pose = lie_se3_to_SE3_batch_small(y)  # invert transform to be consistent with other pose estimators
+        pose = pseudo_lie_se3_to_SE3_batch_small(y)  # invert transform to be consistent with other pose estimators
         warped_pts = project(pcl2.view(n, 3, -1), pose, intrinsics)
         flow_off = img_coordinates[None, :2] + flow.view(n, 2, -1)
         J = []
@@ -241,7 +241,7 @@ class DeclarativeRGBD(AbstractDeclarativeNode):
     def depth_jacobian(self, *xs, y):
         flow, pcl1, pcl2, weights1, weights2, _, intrinsics = xs
         n, _, h, w = flow.shape
-        pose = lie_se3_to_SE3_batch_small(-y)
+        pose = pseudo_lie_se3_to_SE3_batch_small(-y)
         pcl2_aligned = transform(homogenous(pcl2.view(n, 3, -1)), pose).reshape(n, 4, h, w)[:, :3] # are we sure we should transform pcl2?
         # resample point clouds given the optical flow
         pcl2_aligned, _ = remap_from_flow(pcl2_aligned, flow)
