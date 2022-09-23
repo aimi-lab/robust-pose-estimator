@@ -5,7 +5,7 @@ import cv2
 import os
 from alley_oop.pose.pose_head import DeclarativePoseHead3DNode
 from alley_oop.utils.trajectory import read_freiburg
-from alley_oop.geometry.lie_3d import lie_SE3_to_se3, lie_se3_to_SE3
+from alley_oop.geometry.lie_3d_pseudo import pseudo_lie_SE3_to_se3, lie_SE3_to_se3
 from alley_oop.geometry.pinhole_transforms import create_img_coords_t, transform, homogenous
 from alley_oop.photometry.raft.core.utils.flow_utils import remap_from_flow
 
@@ -41,7 +41,7 @@ class PoseHeadTester(unittest.TestCase):
 
         poses[:,:3,3] /=scale
         rel_pose = torch.tensor(NED2opencv(np.linalg.inv(poses[0]) @ poses[1])).float()
-        self.pose_se3 = lie_SE3_to_se3(rel_pose)
+        self.pose_se3 = pseudo_lie_SE3_to_se3(rel_pose)
         self.pose_SE3 = rel_pose
         self.intrinsics = torch.tensor([[320.0, 0, 320], [0, 320, 240], [0,0,1]]).unsqueeze(0)  # focal length x
 
