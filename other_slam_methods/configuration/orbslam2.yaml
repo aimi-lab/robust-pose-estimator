@@ -11,6 +11,8 @@ depth_clipping:
   - 0
   - 8000 # in mm
 
+rect_mode: 'conventional'
+
 viewer:
   enable: True
   show: True

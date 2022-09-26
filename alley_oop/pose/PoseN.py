@@ -120,3 +120,24 @@ class PoseN(nn.Module):
         self.pose_head.train(mode)
         self.flow.eval()
         return self
+
+
+class DepthNet(RAFT):
+    def __init__(self):
+        config = {'dropout': 0.0, 'small': False}
+        super().__init__(config)
+        state_dict = torch.load('../alley_oop/photometry/raft/pretrained/raft-things.pth', map_location='cpu')
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+            name = k.replace('module.','')  # remove `module.`
+            new_state_dict[name] = v
+        self.load_state_dict(new_state_dict)
+
+    def forward(self, imagel, imager, baseline, vertical_disp_thr=1.0):
+        n, _, h, w = imagel.shape
+        flow = super().forward(imagel, imager)[0][-1]
+        # check if vertical disparity is small
+        valid = torch.abs(flow[:, 1]) < vertical_disp_thr
+        depth = baseline[:, None, None] / -flow[:, 0]
+        valid &= (depth > 0) & (depth < 1.0)
+        return depth.unsqueeze(1), valid.unsqueeze(1)
