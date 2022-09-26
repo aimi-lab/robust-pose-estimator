@@ -27,7 +27,7 @@ def get_data(input_path: str, img_size: Tuple, sample_video: int=1, rect_mode: s
         try:
             dataset = TUMDataset(input_path, img_size)
             print(" TUM Dataset")
-            calib = {'intrinsics': {'left': dataset.get_intrinsics()}}
+            calib = {'intrinsics': {'left': dataset.get_intrinsics()}, 'bf': 1.0}
         except AssertionError:
             raise RuntimeError('no calibration file found')
 
