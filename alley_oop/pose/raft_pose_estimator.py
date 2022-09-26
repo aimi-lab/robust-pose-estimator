@@ -36,8 +36,12 @@ class RAFTPoseEstimator(torch.nn.Module):
             if self.last_frame is not None:
                 rel_pose_se3 = self.model(255*self.last_frame.img, 255*frame.img, self.intrinsics, self.baseline, depth1=self.last_frame.depth, depth2=frame.depth,
                                           mask1=self.last_frame.mask, mask2=frame.mask)[1].squeeze(0)
-                rel_pose = pseudo_lie_se3_to_SE3(rel_pose_se3.double())
-                ret_frame = self.last_frame
+                if torch.isnan(rel_pose_se3).any():
+                    # pose estimation failed, keep last image as reference and skip this one
+                    rel_pose = torch.eye(4, dtype=torch.float64, device=self.last_pose.device)
+                else:
+                    rel_pose = pseudo_lie_se3_to_SE3(rel_pose_se3.double())
+                    ret_frame = self.last_frame
             else:
                 rel_pose = torch.eye(4, dtype=torch.float64, device=self.last_pose.device)
                 ret_frame = None
@@ -47,7 +51,11 @@ class RAFTPoseEstimator(torch.nn.Module):
             scene_tlast = scene.transform_cpy(inv_transform(self.last_pose.float()))
             model_frame = scene_tlast.render(self.intrinsics.squeeze())
             rel_pose_se3 = self.model(255*model_frame.img, 255*frame.img, self.intrinsics, self.baseline, depth1=model_frame.depth, depth2=frame.depth, mask1=model_frame.mask, mask2=frame.mask)[1].squeeze(0)
-            rel_pose = pseudo_lie_se3_to_SE3(rel_pose_se3.double())
+            if torch.isnan(rel_pose_se3).any():
+                # pose estimation failed, keep last image as reference and skip this one
+                rel_pose = torch.eye(4, dtype=torch.float64, device=self.last_pose.device)
+            else:
+                rel_pose = pseudo_lie_se3_to_SE3(rel_pose_se3.double())
             ret_frame = model_frame
         self.last_pose.data = self.last_pose.data @ rel_pose
         return self.last_pose.float(), ret_frame
