@@ -22,7 +22,7 @@ class StereoRectifier(object):
         assert mode in ['conventional', 'pseudo']
         self.mode = mode
         if self.mode =='pseudo':
-            warnings.warn(UserWarning, 'pseudo rectification used')
+            warnings.warn('pseudo rectification used', UserWarning)
 
         self.scale = 1.0
         if img_size_new is not None:
