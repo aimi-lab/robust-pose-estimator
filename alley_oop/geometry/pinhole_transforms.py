@@ -150,8 +150,8 @@ def create_img_coords_t(
         ) -> torch.Tensor:
 
     # create 2-D coordinates
-    x_mesh = torch.linspace(0, x-1, x, device=device).repeat(b, y, 1)
-    y_mesh = torch.linspace(0, y-1, y, device=device).repeat(b, x, 1).transpose(1, 2)
+    x_mesh = torch.linspace(0, x-1, x, device=device).repeat(b, y, 1) + .5
+    y_mesh = torch.linspace(0, y-1, y, device=device).repeat(b, x, 1).transpose(1, 2) + .5
     ipts = torch.vstack([x_mesh.flatten(), y_mesh.flatten(), torch.ones(x_mesh.flatten().shape[0], device=device)])
 
     return ipts
