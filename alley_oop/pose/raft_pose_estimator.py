@@ -5,15 +5,16 @@ from alley_oop.fusion.surfel_map import SurfelMap, FrameClass
 from alley_oop.geometry.lie_3d_pseudo import pseudo_lie_se3_to_SE3
 from collections import OrderedDict
 from torchvision.transforms import Resize
-
+from typing import Tuple
 
 class RAFTPoseEstimator(torch.nn.Module):
-    def __init__(self, intrinsics: torch.Tensor, baseline: float, checkpoint: str, frame2frame: bool=False, init_pose: torch.tensor=torch.eye(4)):
+    def __init__(self, intrinsics: torch.Tensor, baseline: float, checkpoint: str, img_shape: Tuple, frame2frame: bool=False, init_pose: torch.tensor=torch.eye(4)):
         """
 
         """
         super(RAFTPoseEstimator, self).__init__()
         checkp = torch.load(checkpoint)
+        checkp['config']['model']['img_shape'] = img_shape
         model = PoseN(checkp['config']['model'])
         new_state_dict = OrderedDict()
         state_dict = checkp['state_dict']
