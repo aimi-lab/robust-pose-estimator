@@ -1,0 +1,21 @@
+slam:
+  frame2frame: False
+  dist_thr: 0.05 # relative distance threshold for data association
+  depth_clipping:
+    - 1
+    - 5000 # in mm
+  debug: False
+  mask_specularities: False
+  conf_weighing: False
+  compensate_illumination: False  # do not use this with noisy depth estimates
+
+img_size:
+  - 640
+  - 480
+
+rect_mode: pseudo
+
+viewer:
+  enable: False
+  blocking: False
+  stable: False
