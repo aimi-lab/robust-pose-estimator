@@ -49,7 +49,7 @@ class ResizeRGBD(RGBDTransform):
     def __init__(self, size):
         self.size = [int(size[1]), int(size[0])]
 
-    def __call__(self, img, depth, depth_noise, mask=None, semantics=None):
+    def __call__(self, img, depth, depth_noise=None, mask=None, semantics=None):
         # resize with cropping to conserve aspect ratio
         h, w = img.shape[-2:]
 

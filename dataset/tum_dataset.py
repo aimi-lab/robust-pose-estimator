@@ -38,7 +38,12 @@ class TUMDataset(Dataset):
         depth = cv2.imread(self.depth[self._find_closest_timestamp(item)], cv2.IMREAD_ANYDEPTH)
         depth = depth.astype(np.float32) / 5.0
 
-        data = self.transform(img, depth)
+        img = torch.tensor(img).permute(2, 0, 1).float() / 255.0
+        depth = torch.tensor(depth).unsqueeze(0)
+        mask = torch.ones_like(depth, dtype=torch.bool)
+        depth_noise = torch.exp(-depth)
+        semantics = torch.ones_like(depth)
+        data = self.transform(img, depth, depth_noise, mask, semantics)
 
         return (*data, img_number)
 

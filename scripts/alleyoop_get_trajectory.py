@@ -9,7 +9,7 @@ from dataset.preprocess.segmentation_network.seg_model import SemanticSegmentati
 import matplotlib.pyplot as plt
 from alley_oop.fusion.surfel_map import SurfelMap
 from alley_oop.utils.trajectory import save_trajectory, read_freiburg
-from dataset.dataset_utils import get_data, StereoVideoDataset, SequentialSubSampler, RGBDDataset
+from dataset.dataset_utils import get_data, StereoVideoDataset, SequentialSubSampler, RGBDDataset, TUMDataset
 from dataset.transforms import Compose
 import warnings
 from torch.utils.data import DataLoader
@@ -63,7 +63,7 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fo
                 limg, rimg, pose_kinematics, img_number = data
                 mask, semantics = seg_model.get_mask(limg.to(device))
                 depth, _ = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
-            elif isinstance(dataset, RGBDDataset):
+            elif isinstance(dataset, RGBDDataset) | isinstance(dataset, TUMDataset):
                 limg, depth, depth_noise, mask, semantics, img_number = data
             else:
                 limg, rimg, mask, semantics, img_number = data
