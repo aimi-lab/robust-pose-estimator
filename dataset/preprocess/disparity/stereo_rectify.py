@@ -11,27 +11,34 @@ def get_rect_maps(
     rdist_coeffs = None,
     img_size: Tuple[int, int] = (1280, 1024),
     triangular_intrinsics: bool = False,
+    mode: str = 'conventional'
     ) -> dict:
+    if mode == 'conventional':
+        if triangular_intrinsics:
+            lcam_mat = np.array([[lcam_mat[0, 0], 0, lcam_mat[0, 2]], [0, lcam_mat[1, 1], lcam_mat[1, 2]], [0, 0, 1]], dtype=np.float64)
+            rcam_mat = np.array([[rcam_mat[0, 0], 0, rcam_mat[0, 2]], [0, rcam_mat[1, 1], rcam_mat[1, 2]], [0, 0, 1]], dtype=np.float64)
 
-    if triangular_intrinsics:
-        lcam_mat = np.array([[lcam_mat[0, 0], 0, lcam_mat[0, 2]], [0, lcam_mat[1, 1], lcam_mat[1, 2]], [0, 0, 1]], dtype=np.float64)
-        rcam_mat = np.array([[rcam_mat[0, 0], 0, rcam_mat[0, 2]], [0, rcam_mat[1, 1], rcam_mat[1, 2]], [0, 0, 1]], dtype=np.float64)
+        # compute pixel mappings
+        r1, r2, p1, p2, q, valid_pix_roi1, valid_pix_roi2 = cv2.stereoRectify(cameraMatrix1=lcam_mat.astype('float64'), distCoeffs1=ldist_coeffs.astype('float64'),
+                                                                            cameraMatrix2=rcam_mat.astype('float64'), distCoeffs2=rdist_coeffs.astype('float64'),
+                                                                            imageSize=tuple(img_size), R=rmat.astype('float64'), T=tvec.T.astype('float64'),
+                                                                            alpha=0)
 
-    # compute pixel mappings
-    r1, r2, p1, p2, q, valid_pix_roi1, valid_pix_roi2 = cv2.stereoRectify(cameraMatrix1=lcam_mat.astype('float64'), distCoeffs1=ldist_coeffs.astype('float64'), 
-                                                                        cameraMatrix2=rcam_mat.astype('float64'), distCoeffs2=rdist_coeffs.astype('float64'), 
-                                                                        imageSize=tuple(img_size), R=rmat.astype('float64'), T=tvec.T.astype('float64'),
-                                                                        alpha=0)
-
-    lmap1, lmap2 = cv2.initUndistortRectifyMap(cameraMatrix=lcam_mat, distCoeffs=ldist_coeffs, R=r1, newCameraMatrix=p1, size=tuple(img_size), m1type=cv2.CV_32FC1)
-    rmap1, rmap2 = cv2.initUndistortRectifyMap(cameraMatrix=rcam_mat, distCoeffs=ldist_coeffs, R=r2, newCameraMatrix=p2, size=tuple(img_size), m1type=cv2.CV_32FC1)
-
-    maps = {'lmap1': lmap1,
-            'lmap2': lmap2,
-            'rmap1': rmap1,
-            'rmap2': rmap2}
+        lmap1, lmap2 = cv2.initUndistortRectifyMap(cameraMatrix=lcam_mat, distCoeffs=ldist_coeffs, R=r1, newCameraMatrix=p1, size=tuple(img_size), m1type=cv2.CV_32FC1)
+        rmap1, rmap2 = cv2.initUndistortRectifyMap(cameraMatrix=rcam_mat, distCoeffs=ldist_coeffs, R=r2, newCameraMatrix=p2, size=tuple(img_size), m1type=cv2.CV_32FC1)
+        maps = {'lmap1': lmap1,
+                'lmap2': lmap2,
+                'rmap1': rmap1,
+                'rmap2': rmap2}
+    elif mode == 'pseudo':
+        maps = {}
+        p1 = lcam_mat.astype('float64')
+        p2 = rcam_mat.astype('float64')
+    else:
+        raise NotImplementedError
 
     return maps, p1, p2
+
 
 def rectify_pair(limg, rimg, maps, method='nearest'):
 

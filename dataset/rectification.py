@@ -4,6 +4,7 @@ import numpy as np
 import configparser
 import json
 import torch
+import warnings
 from dataset.preprocess.disparity.stereo_rectify import rectify_pair, get_rect_maps, pseudo_rectify_2d
 
 
@@ -20,6 +21,8 @@ class StereoRectifier(object):
 
         assert mode in ['conventional', 'pseudo']
         self.mode = mode
+        if self.mode =='pseudo':
+            warnings.warn(UserWarning, 'pseudo rectification used')
 
         self.scale = 1.0
         if img_size_new is not None:
@@ -42,7 +45,8 @@ class StereoRectifier(object):
             tvec=cal['T'],
             ldist_coeffs=cal['ld'],
             rdist_coeffs=cal['rd'],
-            img_size=cal['img_size']
+            img_size=cal['img_size'],
+            mode=self.mode
         )
 
     def __call__(self, img_left, img_right):
@@ -63,7 +67,10 @@ class StereoRectifier(object):
         calib_rectifed['intrinsics']['left'] = self.l_intr[:3,:3]
         calib_rectifed['intrinsics']['right'] = self.r_intr[:3,:3]
         calib_rectifed['extrinsics'] = np.eye(4)
-        calib_rectifed['extrinsics'][:3,3] = np.array([self.r_intr[0, 3] / self.r_intr[0, 0], 0., 0.]) # Tx*f, see cv2 website
+        if self.mode == 'conventional':
+            calib_rectifed['extrinsics'][:3,3] = np.array([self.r_intr[0, 3] / self.r_intr[0, 0], 0., 0.]) # Tx*f, see cv2 website
+        else:
+            calib_rectifed['extrinsics'][:3,3] = self.cal['T']
         calib_rectifed['bf'] = np.sqrt(np.sum(calib_rectifed['extrinsics'][:3, 3] ** 2))*self.l_intr[0, 0]
         calib_rectifed['bf_orig'] = calib_rectifed['bf']/self.scale
         calib_rectifed['img_size'] = self.img_size
