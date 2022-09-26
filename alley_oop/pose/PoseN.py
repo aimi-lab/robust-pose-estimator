@@ -27,7 +27,7 @@ class PoseN(nn.Module):
         self.pose_scale = config['pose_scale']
 
         self.register_buffer("img_coords", create_img_coords_t(y=H, x=W), persistent=False)
-        self.conf_head = nn.Sequential(nn.Conv2d(128+128+3+3, out_channels=32, kernel_size=(5,5), padding="same"), nn.BatchNorm2d(32),
+        self.conf_head = nn.Sequential(nn.Conv2d(128+128+3+3+2, out_channels=32, kernel_size=(5,5), padding="same"), nn.BatchNorm2d(32),
                                        nn.Conv2d(32, out_channels=1, kernel_size=(3,3), padding="same"), nn.Sigmoid())
         self.use_weights = config["use_weights"]
         self.up = nn.UpsamplingBilinear2d((H,W))
@@ -41,25 +41,20 @@ class PoseN(nn.Module):
         opts = depth.view(n, 1, -1) * repr
         return opts.view(n,3,*depth.shape[-2:])
 
-    def flow2depth(self, imagel, imager, baseline, vertical_disp_thr=1.0):
+    def flow2depth(self, imagel, imager, baseline):
         n, _, h, w = imagel.shape
         flow = self.flow(imagel, imager)[0][-1]
-        # check if vertical disparity is small
-        valid = torch.abs(flow[:, 1]) < vertical_disp_thr
         depth = baseline[:, None, None] / -flow[:, 0]
-        valid &= (depth > 0) & (depth < 1.0)
-        return depth.unsqueeze(1), valid.unsqueeze(1)
+        return depth.unsqueeze(1), flow
 
     def forward(self, image1l, image2l, intrinsics, baseline, image1r=None, image2r=None, depth1=None, depth2=None, mask1=None, mask2=None, iters=12, flow_init=None, pose_init=None, ret_confmap=False):
         intrinsics.requires_grad = False
         baseline.requires_grad = False
         """ estimate optical flow from stereo pair to get disparity map"""
         if depth1 is None:
-            depth1, valid1 = self.flow2depth(image1l, image1r, baseline)
-            mask1 = mask1 & valid1 if mask1 is not None else valid1
+            depth1, flow1 = self.flow2depth(image1l, image1r, baseline)
         if depth2 is None:
-            depth2, valid2 = self.flow2depth(image2l, image2r, baseline)
-            mask2 = mask2 & valid2 if mask2 is not None else valid2
+            depth2, flow2 = self.flow2depth(image2l, image2r, baseline)
         """ Estimate optical flow and rigid pose between pair of frames """
 
         pcl1 = self.proj(depth1, intrinsics)
@@ -68,8 +63,8 @@ class PoseN(nn.Module):
         flow_predictions, gru_hidden_state, context = self.flow(image1l, image2l, iters, flow_init)
         if self.use_weights:
             context_up = self.up(torch.cat((gru_hidden_state, context), dim=1))
-            conf1 = self.conf_head(torch.cat((image1l, pcl1, context_up), dim=1))
-            conf2 = self.conf_head(torch.cat((image2l, pcl2, context_up), dim=1))
+            conf1 = self.conf_head(torch.cat((flow1, image1l, pcl1, context_up), dim=1))
+            conf2 = self.conf_head(torch.cat((flow2, image2l, pcl2, context_up), dim=1))
         else:
             conf1 = torch.ones_like(depth1)
             conf2 = torch.ones_like(depth2)
