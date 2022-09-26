@@ -9,7 +9,7 @@ from alley_oop.utils.logging import OptimizationRecordings
 
 
 class SLAM(object):
-    def __init__(self, intrinsics:torch.tensor, config:dict, baseline: float, checkpoint: str, init_pose: torch.tensor=torch.eye(4)):
+    def __init__(self, intrinsics:torch.tensor, config:dict, baseline: float, checkpoint: str, img_shape: Tuple, init_pose: torch.tensor=torch.eye(4)):
         """
         Alley-OOP SLAM (imitation of ElasticFusion)
         :param intrinsics: camera intrinsics tensor
@@ -34,7 +34,7 @@ class SLAM(object):
                                       compensate_illumination=config['compensate_illumination'])
         init_pose[:3, 3] *= self.depth_scale
         self.init_pose = init_pose.to(self.device)
-        self.pose_estimator = RAFTPoseEstimator(self.intrinsics, baseline, checkpoint, config['frame2frame'],
+        self.pose_estimator = RAFTPoseEstimator(self.intrinsics, baseline, checkpoint, img_shape, config['frame2frame'],
                                                 self.init_pose)
         self.pose_estimator.model.use_weights = config['conf_weighing']
 
