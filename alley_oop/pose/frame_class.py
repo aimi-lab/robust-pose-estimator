@@ -10,7 +10,7 @@ class FrameClass:
         Class containing image, depth and normals
     """
     def __init__(self, img: torch.Tensor, depth: torch.Tensor, normals: torch.Tensor=None,
-                 intrinsics: torch.Tensor=None, mask: torch.Tensor=None, confidence: torch.Tensor=None):
+                 intrinsics: torch.Tensor=None, mask: torch.Tensor=None, confidence: torch.Tensor=None, flow: torch.Tensor=None):
         """
 
         :param img: RGB image in range (0, 1) with shape Nx3xHxW or gray-scale Nx1xHxW
@@ -49,12 +49,14 @@ class FrameClass:
             self.normals = pad(normals.permute(2, 0, 1)).contiguous().unsqueeze(0)
 
         self.confidence = confidence.contiguous() if confidence is not None else torch.ones_like(self.img_gray)
+        self.flow = flow.contiguous() if flow is not None else torch.ones_like(self.img_gray).repeat(1,2,1,1)
 
         assert self.img.shape[-2:] == self.img_gray.shape[-2:]
         assert self.img_gray.shape == self.depth.shape
         assert self.img_gray.shape == self.mask.shape
         assert self.img.shape[-2:] == self.normals.shape[-2:]
         assert self.img_gray.shape == self.confidence.shape
+        assert self.img.shape[-2:] == self.flow.shape[-2:]
 
     def to(self, dev_or_type: Union[torch.device, torch.dtype]):
         self.img = self.img.to(dev_or_type)
