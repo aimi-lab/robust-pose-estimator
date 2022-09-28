@@ -6,7 +6,7 @@ import os
 
 api = wandb.Api()
 
-METHODS = [ 'alley_oop_maxscore', 'alley_raft_f2f']
+METHODS = ['orbslam2_raftdepth', 'scared_raftslam_f2f', 'scared_raftslam_f2f_w', 'scared_raftslam_f2m', 'scared_raftslam_f2m_w']
 
 # Download data from WANDB
 
@@ -35,6 +35,9 @@ for run in runs:
 
 runs_df = pd.DataFrame(summary_list)
 runs_df = runs_df[runs_df.method.isin(METHODS)]
+runs_df.method = runs_df.method.astype('category')
+runs_df.method = runs_df.method.cat.set_categories(METHODS)
+runs_df.sort_values(['method'], inplace=True)
 runs_df.to_csv("project.csv")
 runs_df['dataset'] = [os.path.basename(d) for d in runs_df['dataset']]
 
