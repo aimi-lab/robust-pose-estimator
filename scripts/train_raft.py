@@ -42,12 +42,14 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger, infer_depth
     with torch.no_grad():
         for i_batch, data_blob in enumerate(dataloader):
             if infer_depth:
-                ref_img, trg_img, ref_img_r, trg_img_r, ref_conf, trg_conf, valid, gt_pose, intrinsics, baseline = [x.to(device) for x in
+                ref_img, trg_img, ref_img_r, trg_img_r, ref_mask, trg_mask, gt_pose, intrinsics, baseline = [x.to(device) for x in
                                                                                               data_blob]
                 flow_predictions, pose_predictions, trg_depth, ref_depth, conf1, conf2 = model(trg_img, ref_img,
                                                                                                intrinsics.float(), baseline.float(),
                                                                                                image1r=trg_img_r,
                                                                                                image2r=ref_img_r,
+                                                                                               mask1=trg_mask,
+                                                                                               mask2=ref_mask,
                                                                                                iters=config['model'][
                                                                                                    'iters'],
                                                                                                ret_confmap=True)  # ToDo add mask if necessary
@@ -60,16 +62,10 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger, infer_depth
                                                                          iters=config['model']['iters'],
                                                                          ret_confmap=True)  # ToDo add mask if necessary
 
-            loss2d = geometric_2d_loss(flow_predictions[-1], pose_predictions, intrinsics, trg_depth, trg_conf,
-                                       valid)[0]
-            loss3d = geometric_3d_loss(flow_predictions[-1], pose_predictions, intrinsics, trg_depth, ref_depth,
-                                       trg_conf, ref_conf, valid)
             loss_pose = supervised_pose_loss(pose_predictions, gt_pose)
-            loss = loss_weights['pose'] * loss_pose + loss_weights['2d'] * loss2d + loss_weights['3d'] * loss3d
+            loss = loss_weights['pose'] * loss_pose
 
-            metrics = {"val/loss2d": loss2d.detach().mean().cpu().item(),
-                       "val/loss3d": loss3d.detach().mean().cpu().item(),
-                       "val/loss_rot": loss_pose[:, :3].detach().mean().cpu().item(),
+            metrics = {"val/loss_rot": loss_pose[:, :3].detach().mean().cpu().item(),
                        "val/loss_trans": loss_pose[:, 3:].detach().mean().cpu().item(),
                        "val/loss_total": loss.detach().mean().cpu().item()}
             logger.push(metrics, len(dataloader))
@@ -128,7 +124,7 @@ def main(args, config, force_cpu):
                 model.module.freeze_flow(False) if parallel else model.freeze_flow(False)
             optimizer.zero_grad()
             if infer_depth:
-                ref_img, trg_img, ref_img_r, trg_img_r, ref_conf, trg_conf, valid, gt_pose, intrinsics, baseline = [
+                ref_img, trg_img, ref_img_r, trg_img_r, ref_mask, trg_mask, gt_pose, intrinsics, baseline = [
                     x.to(device) for x in
                     data_blob]
             else:
@@ -146,6 +142,8 @@ def main(args, config, force_cpu):
                                                                                                intrinsics.float(), baseline.float(),
                                                                                                image1r=trg_img_r,
                                                                                                image2r=ref_img_r,
+                                                                                               mask1=trg_mask,
+                                                                                               mask2=ref_mask,
                                                                                                iters=config['model'][
                                                                                                    'iters'],
                                                                                                ret_confmap=True)  # ToDo add mask if necessary
@@ -157,13 +155,8 @@ def main(args, config, force_cpu):
                                                                              iters=config['model']['iters'],
                                                                              ret_confmap=True)  # ToDo add mask if necessary
             # loss computations
-            loss2d, theoretical_flow = geometric_2d_loss(flow_predictions[-1], pose_predictions, intrinsics, trg_depth, trg_conf,
-                                       valid)
-
-            loss3d = geometric_3d_loss(flow_predictions[-1], pose_predictions, intrinsics, trg_depth, ref_depth,
-                                       trg_conf, ref_conf, valid)
             loss_pose = supervised_pose_loss(pose_predictions, gt_pose)
-            loss = loss_weights['pose']*loss_pose.mean()+loss_weights['2d']*loss2d+loss_weights['3d']*loss3d
+            loss = loss_weights['pose']*loss_pose.mean()
 
             # debug
             if args.dbg & (i_batch%SUM_FREQ == 0):
@@ -173,8 +166,6 @@ def main(args, config, force_cpu):
                 print(f"gt_pose: {pseudo_lie_se3_to_SE3(gt_pose[0]).detach().cpu().numpy()}\npred_pose: {pseudo_lie_se3_to_SE3(pose_predictions[0]).detach().cpu().numpy()}\n")
                 print(" trans loss: ", loss_pose[:, 3:].detach().mean().cpu().item())
                 print(" rot loss: ", loss_pose[:, :3].detach().mean().cpu().item())
-                print(" 2d loss: ", loss2d.detach().mean().cpu().item())
-                print(" 3d loss: ", loss3d.detach().mean().cpu().item())
                 if device == torch.device('cpu'):
                     pose = pose_predictions.clone()
                     pose[:,3:] *= config['depth_scale']
@@ -186,9 +177,7 @@ def main(args, config, force_cpu):
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)                
             torch.nn.utils.clip_grad_norm_(model.parameters(), config['train']['grad_clip'])
-            metrics = {"train/loss2d": loss2d.detach().mean().cpu().item(),
-                      "train/loss3d": loss3d.detach().mean().cpu().item(),
-                      "train/loss_rot": loss_pose[:,:3].detach().mean().cpu().item(),
+            metrics = {"train/loss_rot": loss_pose[:,:3].detach().mean().cpu().item(),
                       "train/loss_trans": loss_pose[:, 3:].detach().mean().cpu().item(),
                       "train/loss_total": loss.detach().mean().cpu().item()}
 

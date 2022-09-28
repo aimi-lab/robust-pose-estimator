@@ -12,6 +12,7 @@ from alley_oop.geometry.lie_3d_pseudo import pseudo_lie_SE3_to_se3
 from torchvision.transforms import Resize, InterpolationMode
 from torch.utils.data import Dataset
 from dataset.rectification import StereoRectifier
+from dataset.semantic_dataset import RGBDecoder
 
 
 def get_data(dataset_type: str, input_path: str, sequences: str, img_size: Tuple, step: int, depth_cutoff: float):
@@ -59,32 +60,30 @@ class PoseDataset(Dataset):
         super(PoseDataset, self).__init__()
         images_l = sorted(glob(os.path.join(root, 'video_frames', '*l.png')))
         images_r = sorted(glob(os.path.join(root, 'video_frames', '*r.png')))
-        disparities = sorted(glob(os.path.join(root, 'disparity_frames', '*l.pfm')))
+        semantics = sorted(glob(os.path.join(root, 'semantic_predictions', '*l.png')))
         gt_file = os.path.join(root, 'groundtruth.txt')
         poses = read_freiburg(gt_file)
-        depth_noise = sorted(glob(os.path.join(root,'disparity_noise', '*l.pfm')))
-        assert len(images_l) == len(disparities)
-        assert len(images_l) == len(depth_noise)
         assert len(images_l) == len(images_r)
         assert len(images_l) > 0 , f'no images in {root}'
+        assert len(semantics) == len(images_l)
         self.conf_thr = conf_thr
         self.depth_cutoff = depth_cutoff
         self.image_list = []
         self.image_list_r = []
-        self.disp_list = []
+        self.mask_list = []
         self.rel_pose_list = []
-        self.depth_noise_list = []
+        self.rgb_decoder = RGBDecoder()
 
         if isinstance(step, int):
             step = (step, step)
         for i in range(len(images_l)-step[1]):
             s = np.random.randint(*step) if step[0] < step[1] else step[0]  # select a random step in given range
             self.image_list.append([images_l[i], images_l[i+s]])
-            self.disp_list.append([disparities[i], disparities[i+s]])
             self.rel_pose_list.append(np.linalg.inv(poses[i+s].astype(np.float64)) @ poses[i].astype(np.float64))
-            self.depth_noise_list.append([depth_noise[i], depth_noise[i+s]])
             self.image_list_r.append([images_r[i], images_r[i+s]])
+            self.mask_list.append(semantics[i], semantics[i+s])
         self.resize = Resize(img_size)
+        self.resize_msk = Resize(img_size, interpolation=InterpolationMode.NEAREST)
         self.scale = float(img_size[0])/float(cv2.imread(images_l[0]).shape[1])
         self.intrinsics = len(self.image_list) * [intrinsics]
         self.baseline = len(self.image_list) * [baseline]
@@ -94,36 +93,26 @@ class PoseDataset(Dataset):
         img2 = self._read_img(self.image_list[index][1])
         img1_r = self._read_img(self.image_list_r[index][0])
         img2_r = self._read_img(self.image_list_r[index][1])
-        disp1 = self._read_disp(self.disp_list[index][0])
-        disp2 = self._read_disp(self.disp_list[index][1])
 
         pose = torch.from_numpy(self.rel_pose_list[index]).clone()
         pose[:3,3] /= self.depth_cutoff  # normalize translation
         pose_se3 = pseudo_lie_SE3_to_se3(pose)
-        depth1 = self.baseline[index] / disp1 / self.depth_cutoff  # normalize depth
-        depth2 = self.baseline[index] / disp2 / self.depth_cutoff  # normalize depth
 
         # generate mask
-        # depth confidence threshold
-        depth_conf1 = torch.special.erf(5e-3*250/torch.sqrt(self._read_disp(self.depth_noise_list[index][0])))
-        depth_conf2 = torch.special.erf(5e-3*250/torch.sqrt(self._read_disp(self.depth_noise_list[index][1])))
-        valid = depth_conf1 > self.conf_thr
-        valid &= depth_conf2 > self.conf_thr
-        # depth threshold
-        valid &= depth1 < 1.0
-        valid &= depth2 < 1.0
-        valid &= depth1 > 1e-3
-        valid &= depth2 > 1e-3
-        # ToDo add tool mask!
-        return img1, img2, img1_r, img2_r, depth_conf1, depth_conf2, valid, pose_se3.float(), self.intrinsics[index], float(self.baseline[index]/self.depth_cutoff)
+        mask1 = self._read_mask(self.mask_list[index][0])
+        mask2 = self._read_mask(self.mask_list[index][1])
+
+        return img1, img2, img1_r, img2_r, mask1, mask2, pose_se3.float(), self.intrinsics[index], float(self.baseline[index]/self.depth_cutoff)
 
     def _read_img(self, path):
         img = torch.from_numpy(cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)).permute(2, 0, 1).float()
         return self.resize(img)
 
-    def _read_disp(self, path):
-        disp = torch.from_numpy(load_pfm(path)[0].copy()).unsqueeze(0).float()
-        return self.resize(disp)*self.scale
+    def _read_mask(self, path):
+        mask = cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
+        mask = self.rgb_decoder.getToolMask(mask)
+        mask = torch.from_numpy(mask).unsqueeze(0)
+        return self.resize_msk(mask)
 
     def __len__(self):
         return len(self.image_list)
