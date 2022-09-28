@@ -30,11 +30,7 @@ def count_parameters(model):
 def fetch_optimizer(config, model):
     """ Create the optimizer and learning rate scheduler """
     optimizer = optim.AdamW(model.parameters(), lr=config['learning_rate'], weight_decay=config['weight_decay'], eps=config['epsilon'])
-
-    scheduler = optim.lr_scheduler.OneCycleLR(optimizer, config['learning_rate'], config['epochs']+100,
-        pct_start=0.05, cycle_momentum=False, anneal_strategy='linear')
-
-    return optimizer, scheduler
+    return optimizer
     
 
 def val(model, dataloader, device, loss_weights, intrinsics, logger, infer_depth):
@@ -104,12 +100,12 @@ def main(args, config, force_cpu):
     if (device != torch.device('cpu')) & (torch.cuda.device_count() > 1):
         parallel = True
         model = nn.DataParallel(model).to(device)
-    optimizer, scheduler = fetch_optimizer(config['train'], model)
+    optimizer = fetch_optimizer(config['train'], model)
 
     # training loop
     total_steps = 0
     scaler = GradScaler()
-    logger = Logger(model, scheduler, config, args.name, args.log)
+    logger = Logger(model, config, args.name, args.log)
     if args.log:
         args.outpath = wandb.run.dir
     if not os.path.isdir(args.outpath):
@@ -182,7 +178,6 @@ def main(args, config, force_cpu):
 
             scaler.step(optimizer)
             scaler.update()
-            scheduler.step()
 
             logger.push(metrics, SUM_FREQ)
             if total_steps % SUM_FREQ == SUM_FREQ - 1:

@@ -1,9 +1,8 @@
 import wandb
 
 class Logger:
-    def __init__(self, model, scheduler, config, project_name, log):
+    def __init__(self, model, config, project_name, log):
         self.model = model
-        self.scheduler = scheduler
         self.total_steps = 0
         self.running_loss = {}
         self.log = log
@@ -13,22 +12,20 @@ class Logger:
 
     def _print_header(self):
         metrics_data = [k for k in sorted(self.running_loss.keys())]
-        training_str = "[steps, lr] ".format(self.total_steps + 1, self.scheduler.get_last_lr()[0])
         metrics_str = ("{:<15}, " * len(metrics_data)).format(*metrics_data)
 
         # print the training status
-        print(training_str + metrics_str)
+        print(metrics_str)
 
     def _print_training_status(self):
         if not self.header:
             self.header = True
             self._print_header()
         metrics_data = [self.running_loss[k] for k in sorted(self.running_loss.keys())]
-        training_str = "[{:6d}, {:10.7f}] ".format(self.total_steps + 1, self.scheduler.get_last_lr()[0])
         metrics_str = ("{:10.4f}, " * len(metrics_data)).format(*metrics_data)
 
         # print the training status
-        print(training_str + metrics_str)
+        print(metrics_str)
 
         for k in self.running_loss:
             self.running_loss[k] = 0.0
