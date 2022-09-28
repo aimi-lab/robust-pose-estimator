@@ -104,7 +104,7 @@ class Viewer3D(object):
                 try:
                     dists = np.asarray(pcd.compute_point_cloud_distance(add_pcd))
                     cmap = cm.hot
-                    pcd.colors = o3d.utility.Vector3dVector(cmap(dists)[:, :3])
+                    #pcd.colors = o3d.utility.Vector3dVector(cmap(dists)[:, :3])
                 except AttributeError:
                     pass
             self.pcd = pcd
