@@ -39,11 +39,16 @@ def main(input_path, outpath, config, device_sel, start, stop, step, log, genera
     settings_path = os.path.join(input_path, 'slam_config_640x480.yaml')
     assert os.path.isfile(settings_path)
     slam = orbslam2.System(os.path.join('Vocabulary', 'ORBvoc.txt'), settings_path, orbslam2.Sensor.RGBD)
-    sampler = SequentialSubSampler(dataset, start, stop, step)
+    if not isinstance(dataset, StereoVideoDataset):
+        sampler = SequentialSubSampler(dataset, start, stop, step)
+    else:
+        warnings.warn('start/stop arguments not supported for video dataset. ignored.', UserWarning)
+        sampler = None
     loader = DataLoader(dataset, num_workers=0 if config['slam']['debug'] else 1, pin_memory=False, sampler=sampler)
     if isinstance(dataset, StereoVideoDataset):
-        seg_model = SemanticSegmentationModel('stereo_slam/segmentation_network/trained/PvtB2_combined_TAM_fold1.pth',
-                                              device, config['img_size'])
+        seg_model = SemanticSegmentationModel(
+            '../dataset/preprocess/segmentation_network/trained/deepLabv3plus_trained_intuitive.pth',
+            device, config['img_size'])
 
     slam.set_use_viewer(config['viewer']['enable'])
     slam.initialize()
