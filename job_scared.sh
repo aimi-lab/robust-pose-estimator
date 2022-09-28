@@ -7,7 +7,7 @@
 #SBATCH --partition=gpu
 #SBATCH --account=ws_00000
 #SBATCH --gres=gpu:1
-#SBATCH --array=16-27%5
+#SBATCH --array=1-12%5
 
 
 #### Your shell commands below this line ####
@@ -22,10 +22,5 @@ param_store=scared.txt     # args.txt contains 1000 lines with 2 arguments per l
 sequence=$(cat $param_store | awk -v var=$SLURM_ARRAY_TASK_ID 'NR==var {print $1}')    # Get first argument
 
 cd scripts
-
-python -u alleyoop_get_trajectory.py ${sequence} --device gpu --outpath ${sequence}/data/raft_slam --log scared_raftslam --checkpoint wandb/run-20220921_094227-1ew18scu/files/RAFT-poseEstimator.pth --config ../configuration/alleyoop_scared.yaml --force_video
-
-
-
-
-
+python -u alleyoop_get_trajectory.py ${sequence} --device gpu --outpath ${sequence}/data/raft_slam --log scared_raftslam_f2f --checkpoint ../trained/dummy.pth --config ../configuration/alleyoop_scared.yaml
+python -u alleyoop_get_trajectory.py ${sequence} --device gpu --outpath ${sequence}/data/raft_slam --log scared_raftslam_f2m --checkpoint ../trained/dummy.pth --config ../configuration/alleyoop_scared_f2m.yaml
