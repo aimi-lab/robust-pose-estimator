@@ -3,7 +3,7 @@ import torch.nn as nn
 
 from alley_oop.geometry.pinhole_transforms import create_img_coords_t, transform, homogenous, project
 from alley_oop.geometry.absolute_pose_quarternion import align_torch
-from alley_oop.ddn.ddn.pytorch.node import AbstractDeclarativeNode
+from alley_oop.ddn.ddn.pytorch.node import *
 from alley_oop.photometry.raft.core.utils.flow_utils import remap_from_flow
 from alley_oop.geometry.lie_3d_pseudo import pseudo_lie_se3_to_SE3_batch_small
 
@@ -45,7 +45,7 @@ class HornPoseHead(MLPPoseHead):
 
 class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
     def __init__(self):
-        super(DeclarativePoseHead3DNode, self).__init__()
+        super(DeclarativePoseHead3DNode, self).__init__(eps=1e-3)
 
     def reprojection_objective(self, flow, pcl1, pcl2, weights1, intrinsics, y, ret_res=False):
         # this is generally better for rotation
@@ -117,3 +117,73 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
                 return loss
             optimizer.step(fun)
         return y.detach(), None
+
+    def gradient(self, *xs, y=None, v=None, ctx=None):
+        """Computes the vector--Jacobian product, that is, the gradient of the
+        loss function with respect to the problem parameters. The returned
+        gradient is a tuple of batched Torch tensors. Can be overridden by the
+        derived class to provide a more efficient implementation.
+
+        Arguments:
+            xs: ((b, ...), ...) tuple of Torch tensors,
+                tuple of batches of input tensors
+
+            y: (b, ...) Torch tensor or None,
+                batch of minima of the objective function
+
+            v: (b, ...) Torch tensor or None,
+                batch of gradients of the loss function with respect to the
+                problem output J_Y(x,y)
+
+            ctx: dictionary of contextual information used for computing the
+                 gradient
+
+        Return Values:
+            gradients: ((b, ...), ...) tuple of Torch tensors or Nones,
+                batch of gradients of the loss function with respect to the
+                problem parameters;
+                strictly, returns the vector--Jacobian products J_Y(x,y) * y'(x)
+        """
+        xs, xs_split, xs_sizes, y, v, ctx = self._gradient_init(xs, y, v, ctx)
+
+        fY, fYY, fXY = self._get_objective_derivatives(xs, y)
+
+        if not self._check_optimality_cond(fY):
+            warnings.warn(
+                "Non-zero objective function gradient at y:\n{}".format(
+                    fY.detach().squeeze().cpu().numpy()))
+            # set gradients to zero, so we do not perform an update
+            gradients = []
+            for x in xs:
+                if x.requires_grad:
+                    gradients.append(torch.zeros_like(x, requires_grad=False))
+                else:
+                    gradients.append(None)
+            return tuple(gradients)
+
+        # Form H:
+        H = fYY
+        H = 0.5 * (H + H.transpose(1, 2))  # Ensure that H is symmetric
+        if self.gamma is not None:
+            H += self.gamma * torch.eye(
+                self.m, dtype=H.dtype, device=H.device).unsqueeze(0)
+
+        # Solve u = -H^-1 v:
+        v = v.reshape(self.b, -1, 1)
+        u = self._solve_linear_system(H, -1.0 * v)  # bxmx1
+        u = u.squeeze(-1)  # bxm
+
+        u[torch.isnan(u)] = 0.0  # check for nan values
+
+        # Compute -b_i^T H^-1 v (== b_i^T u) for all i:
+        gradients = []
+        for x_split, x_size, n in zip(xs_split, xs_sizes, self.n):
+            if isinstance(x_split[0], torch.Tensor) and x_split[0].requires_grad:
+                gradient = []
+                for Bi in fXY(x_split):
+                    gradient.append(torch.einsum('bmc,bm->bc', (Bi, u)))
+                gradient = torch.cat(gradient, dim=-1)  # bxn
+                gradients.append(gradient.reshape(x_size))
+            else:
+                gradients.append(None)
+        return tuple(gradients)
