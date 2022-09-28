@@ -1,17 +1,18 @@
 import sys
 sys.path.append('../')
+from alley_oop.slam import SLAM
 import os
 import torch
 import numpy as np
 from tqdm import tqdm
-from dataset.preprocess.disparity.disparity_model import DisparityModel
 from alley_oop.fusion.surfel_map import SurfelMap, FrameClass
 from alley_oop.utils.trajectory import read_freiburg
-from dataset.dataset_utils import get_data, StereoVideoDataset, SequentialSubSampler
+from dataset.dataset_utils import get_data, StereoVideoDataset, SequentialSubSampler, RGBDDataset
 from dataset.transforms import Compose
 import warnings
 from torch.utils.data import DataLoader
 import tifffile
+import cv2
 
 
 def main(input_path, output_path, config, device_sel, stop, start, step, log, file):
@@ -20,6 +21,7 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fi
         t1 = tifffile.imread(os.path.join(input_path, 'left_depth_map.tiff'))
         t1[(t1 == np.inf) | (t1 != t1) | (t1 < 0)] = 0
         gt_depth = t1[...,2]
+        gt_depth = cv2.resize(gt_depth, (640, 512), interpolation=cv2.INTER_NEAREST)
         gt_depth_valid = gt_depth > 0
 
     device = torch.device('cpu')
@@ -29,18 +31,22 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fi
         else:
             warnings.warn('No GPU available, fallback to CPU')
 
-    dataset, calib = get_data(input_path, config['img_size'], rect_mode=config['rect_mode'], force_video=True)
+    dataset, calib = get_data(input_path, config['img_size'], rect_mode=config['rect_mode'])
+    # check for ground-truth pose data for logging purposes
+    gt_file = os.path.join(input_path, file)
+    gt_trajectory = read_freiburg(gt_file) if os.path.isfile(gt_file) else None
+
+    slam = SLAM(torch.tensor(calib['intrinsics']['left']).to(device), config['slam'],img_shape=config['img_size'], baseline=calib['bf'],
+                checkpoint="../trained/dummy.pth",
+                init_pose=torch.tensor(gt_trajectory[0]) if gt_trajectory is not None else None).to(device)
+
     if not isinstance(dataset, StereoVideoDataset):
-        dataset.transform = Compose([dataset.transform])  # add pre-processing to data loading (CPU)
         sampler = SequentialSubSampler(dataset, start, stop, step)
     else:
         warnings.warn('start/stop arguments not supported for video dataset. ignored.', UserWarning)
         sampler = None
     loader = DataLoader(dataset, num_workers=0 if config['slam']['debug'] else 1, pin_memory=True, sampler=sampler)
-    if isinstance(dataset, StereoVideoDataset):
-        disp_model = DisparityModel(calibration=calib, device=device)
 
-    gt_trajectory = read_freiburg(file)
     with torch.inference_mode():
         from viewer.viewer3d import Viewer3D
         viewer = Viewer3D((2 * config['img_size'][0], 2 * config['img_size'][1]),
@@ -50,19 +56,21 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fi
         for i, data in enumerate(tqdm(loader, total=min(len(dataset), (stop-start)//step))):
             if isinstance(dataset, StereoVideoDataset):
                 limg, rimg, pose_kinematics, img_number = data
-                disparity, depth, depth_noise_std = disp_model(limg, rimg)
+                depth, _ = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
+            elif isinstance(dataset, RGBDDataset):
+                limg, depth, depth_noise, mask, semantics, img_number = data
             else:
-                limg, depth, mask, rimg, disp, _, img_number = data
-                depth = depth.unsqueeze(0)
-                limg = limg.permute(0,3,1,2)/255.0
+                limg, rimg, mask, semantics, img_number = data
+                depth, _ = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
             frame = FrameClass(limg, depth, intrinsics=torch.tensor(calib['intrinsics']['left']).float())
-            pose_gt = torch.tensor(gt_trajectory[i]).float()
+            pose_gt = torch.tensor(gt_trajectory[int(img_number[0])]).float()
             print(depth.median(), pose_gt[2, 3], depth.median()+pose_gt[2, 3])
             if i == 0:
+                frame_gt = FrameClass(limg, torch.tensor(gt_depth)[None,None,...], intrinsics=torch.tensor(calib['intrinsics']['left']).float())
                 first_pcl = SurfelMap(frame=frame, kmat=torch.tensor(calib['intrinsics']['left']).float(),
                                       pmat=pose_gt, depth_scale=1).pcl2open3d(stable=False)
                 if gt_depth is not None:
-                    print("median depth error: ", ((depth.numpy() - gt_depth)[gt_depth_valid]).median())
+                    print("median depth error: ", np.median(((depth.squeeze().numpy() - gt_depth)[gt_depth_valid])))
 
             curr_pcl = SurfelMap(frame=frame, kmat=torch.tensor(calib['intrinsics']['left']).float(),
                                  pmat=pose_gt, depth_scale=1).pcl2open3d(stable=False)
@@ -123,6 +131,7 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--file',
+        default='groundtruth.txt',
         help='path to freiburg file'
     )
     args = parser.parse_args()
