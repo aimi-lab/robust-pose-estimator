@@ -3,10 +3,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from alley_oop.photometry.raft.core.update import BasicUpdateBlock, SmallUpdateBlock
-from alley_oop.photometry.raft.core.extractor import BasicEncoder, SmallEncoder
-from alley_oop.photometry.raft.core.corr import CorrBlock, AlternateCorrBlock
-from alley_oop.photometry.raft.core.utils.utils import bilinear_sampler, coords_grid, upflow8
+from alley_oop.network_core.raft.core.update import BasicUpdateBlock, SmallUpdateBlock
+from alley_oop.network_core.raft.core.extractor import BasicEncoder, SmallEncoder
+from alley_oop.network_core.raft.core.corr import CorrBlock, AlternateCorrBlock
+from alley_oop.network_core.raft.core.utils.utils import bilinear_sampler, coords_grid, upflow8
 
 try:
     autocast = torch.cuda.amp.autocast

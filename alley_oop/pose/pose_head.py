@@ -4,7 +4,7 @@ import torch.nn as nn
 from alley_oop.geometry.pinhole_transforms import create_img_coords_t, transform, homogenous, project
 from alley_oop.geometry.absolute_pose_quarternion import align_torch
 from alley_oop.ddn.ddn.pytorch.node import *
-from alley_oop.photometry.raft.core.utils.flow_utils import remap_from_flow
+from alley_oop.network_core.raft.core.utils.flow_utils import remap_from_flow
 from alley_oop.geometry.lie_3d_pseudo import pseudo_lie_se3_to_SE3_batch_small
 
 

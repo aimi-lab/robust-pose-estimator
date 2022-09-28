@@ -1,7 +1,7 @@
 import torch
 from alley_oop.geometry.lie_3d import lie_se3_to_SE3_batch
 from alley_oop.geometry.pinhole_transforms import create_img_coords_t, reproject, transform
-from alley_oop.photometry.raft.core.utils.flow_utils import remap_from_flow
+from alley_oop.network_core.raft.core.utils.flow_utils import remap_from_flow
 
 
 def _warp_frame(depth: torch.Tensor, T: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.Tensor):

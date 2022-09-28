@@ -10,10 +10,10 @@ from torch.utils.data import DataLoader, SubsetRandomSampler
 
 
 from alley_oop.pose.defPoseN import DefPoseN
-import alley_oop.photometry.raft.core.datasets as datasets
-from alley_oop.photometry.raft.losses import supervised_pose_loss
-from alley_oop.photometry.raft.utils.logger import Logger
-from alley_oop.photometry.raft.utils.plotting import plot_res, plot_3d
+import alley_oop.network_core.raft.core.datasets as datasets
+from alley_oop.network_core.raft.losses import supervised_pose_loss
+from alley_oop.network_core.raft.utils.logger import Logger
+from alley_oop.network_core.raft.utils.plotting import plot_res, plot_3d
 import wandb
 from torch.cuda.amp import GradScaler
 

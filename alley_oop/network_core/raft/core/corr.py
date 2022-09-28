@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-from alley_oop.photometry.raft.core.utils.utils import bilinear_sampler, coords_grid
+from alley_oop.network_core.raft.core.utils.utils import bilinear_sampler, coords_grid
 
 try:
     import alt_cuda_corr

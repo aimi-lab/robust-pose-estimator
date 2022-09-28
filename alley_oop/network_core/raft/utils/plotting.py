@@ -6,7 +6,7 @@ import numpy as np
 import torchvision.transforms.functional as F
 from torchvision.utils import flow_to_image
 from skimage.transform import warp
-from alley_oop.photometry.raft.losses import _warp_frame, create_img_coords_t
+from alley_oop.network_core.raft.losses import _warp_frame, create_img_coords_t
 from alley_oop.fusion.surfel_map import SurfelMap, FrameClass
 
 

@@ -1,5 +1,5 @@
 model:
-  pretrained: ../alley_oop/photometry/raft/pretrained/raft-things.pth
+  pretrained: ../alley_oop/network_core/raft/pretrained/raft-things.pth
   iters: 12
   dropout: 0.0
   small: False

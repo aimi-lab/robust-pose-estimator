@@ -3,9 +3,10 @@ import torch.nn as nn
 from collections import OrderedDict
 
 from alley_oop.geometry.pinhole_transforms import create_img_coords_t
-from alley_oop.photometry.raft.core.raft import RAFT
+from alley_oop.network_core.raft.core.raft import RAFT
 from alley_oop.ddn.ddn.pytorch.node import DeclarativeLayer
 from alley_oop.pose.pose_head import MLPPoseHead, HornPoseHead, DeclarativePoseHead3DNode
+from alley_oop.network_core.unet import TinyUNet
 
 
 class PoseN(nn.Module):
@@ -25,13 +26,9 @@ class PoseN(nn.Module):
         self.pose_scale = config['pose_scale']
 
         self.register_buffer("img_coords", create_img_coords_t(y=H, x=W), persistent=False)
-        self.conf_head1 = nn.Sequential(nn.Conv2d(128+128+3+3+2, out_channels=32, kernel_size=(5,5), padding="same"), nn.BatchNorm2d(32),
-                                       nn.Conv2d(32, out_channels=1, kernel_size=(3,3), padding="same"), nn.Sigmoid())
-        self.conf_head2 = nn.Sequential(
-            nn.Conv2d(128 + 128 + 3 + 3 + 2, out_channels=32, kernel_size=(5, 5), padding="same"), nn.BatchNorm2d(32),
-            nn.Conv2d(32, out_channels=1, kernel_size=(3, 3), padding="same"), nn.Sigmoid())
+        self.conf_head1 = nn.Sequential(TinyUNet(in_channels=128+128+3+3+2, output_size=(H,W)), nn.Sigmoid())
+        self.conf_head2 = nn.Sequential(TinyUNet(in_channels=128+128+3+3+2, output_size=(H,W)), nn.Sigmoid())
         self.use_weights = config["use_weights"]
-        self.up = nn.UpsamplingBilinear2d((H,W))
         self.flow = RAFT(config)
         self.flow.freeze_bn()
         self.loss_weight = nn.Parameter(torch.tensor([1.0, 1.0]))  # 3d vs 2d loss weights
@@ -63,9 +60,10 @@ class PoseN(nn.Module):
 
         flow_predictions, gru_hidden_state, context = self.flow(image1l, image2l, iters, flow_init)
         if self.use_weights:
-            context_up = self.up(torch.cat((gru_hidden_state, context), dim=1))
-            conf1 = self.conf_head1(torch.cat((flow1, image1l, pcl1, context_up), dim=1))
-            conf2 = self.conf_head2(torch.cat((flow2, image2l, pcl2, context_up), dim=1))
+            inp1 = torch.nn.functional.interpolate(torch.cat((flow1, image1l, pcl1), dim=1), scale_factor=0.125, mode='bilinear')
+            inp2 = torch.nn.functional.interpolate(torch.cat((flow2, image2l, pcl2), dim=1), scale_factor=0.125, mode='bilinear')
+            conf1 = self.conf_head1(torch.cat((inp1, gru_hidden_state, context), dim=1))
+            conf2 = self.conf_head2(torch.cat((inp2, gru_hidden_state, context), dim=1))
         else:
             conf1 = torch.ones_like(depth1)
             conf2 = torch.ones_like(depth2)
@@ -124,7 +122,7 @@ class DepthNet(RAFT):
     def __init__(self):
         config = {'dropout': 0.0, 'small': False}
         super().__init__(config)
-        state_dict = torch.load('../alley_oop/photometry/raft/pretrained/raft-things.pth', map_location='cpu')
+        state_dict = torch.load('../alley_oop/network_core/raft/pretrained/raft-things.pth', map_location='cpu')
         new_state_dict = OrderedDict()
         for k, v in state_dict.items():
             name = k.replace('module.','')  # remove `module.`

@@ -16,7 +16,7 @@ class PoseNetTester(unittest.TestCase):
         super(PoseNetTester, self).__init__(*args, **kwargs)
 
     def setUp(self):
-        config = {"pretrained" : "../alley_oop/photometry/raft/pretrained/raft-things.pth",
+        config = {"pretrained" : "../alley_oop/network_core/raft/pretrained/raft-things.pth",
                   "iters": 12, "dropout": 0.0, "small": False, "pose_scale": 1.0, "mode": "lbgfs", "image_shape": (480, 640)}
 
         self.pose_net = PoseN(config)
