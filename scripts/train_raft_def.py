@@ -67,9 +67,9 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger, infer_depth
             loss_pose = supervised_pose_loss(pose_predictions, gt_pose)
             loss = loss_weights['pose'] * loss_pose
 
-            metrics = {"val/loss_rot": loss_pose[:, :3].detach().mean().cpu().item(),
-                       "val/loss_trans": loss_pose[:, 3:].detach().mean().cpu().item(),
-                       "val/loss_total": loss.detach().mean().cpu().item()}
+            metrics = {"val/loss_rot": torch.nanmean(loss_pose[:, :3].detach()).cpu().item(),
+                       "val/loss_trans": torch.nanmean(loss_pose[:, 3:].detach()).cpu().item(),
+                       "val/loss_total": torch.nanmean(loss.detach()).cpu().item()}
             logger.push(metrics, len(dataloader))
         logger.flush()
         logger.log_plot(plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth, pseudo_lie_se3_to_SE3_batch(-pose_predictions), conf1, conf2, intrinsics)[0])
@@ -181,9 +181,9 @@ def main(args, config, force_cpu):
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)                
             torch.nn.utils.clip_grad_norm_(model.parameters(), config['train']['grad_clip'])
-            metrics = {"train/loss_rot": loss_pose[:,:3].detach().mean().cpu().item(),
-                      "train/loss_trans": loss_pose[:, 3:].detach().mean().cpu().item(),
-                      "train/loss_total": loss.detach().mean().cpu().item()}
+            metrics = {"train/loss_rot": torch.nanmean(loss_pose[:,:3].detach()).cpu().item(),
+                      "train/loss_trans": torch.nanmean(loss_pose[:, 3:].detach()).cpu().item(),
+                      "train/loss_total": torch.nanmean(loss.detach()).cpu().item()}
 
             scaler.step(optimizer)
             scaler.update()
