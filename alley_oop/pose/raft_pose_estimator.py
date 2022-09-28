@@ -39,7 +39,7 @@ class RAFTPoseEstimator(torch.nn.Module):
             if self.last_frame is not None:
                 rel_pose_se3 = self.model(255*self.last_frame.img, 255*frame.img, self.intrinsics, self.baseline, depth1=self.last_frame.depth, depth2=frame.depth,
                                           mask1=self.last_frame.mask, mask2=frame.mask, flow1=self.last_frame.flow, flow2=frame.flow)[1].squeeze(0)
-                if torch.isnan(rel_pose_se3).any():
+                if (torch.isnan(rel_pose_se3).any()) | (torch.abs(rel_pose_se3) > 1.0e-1).any():
                     # pose estimation failed, keep last image as reference and skip this one
                     warnings.warn('pose estimation not converged, skip.', RuntimeWarning)
                     rel_pose = torch.eye(4, dtype=torch.float64, device=self.last_pose.device)
@@ -59,7 +59,7 @@ class RAFTPoseEstimator(torch.nn.Module):
                                       depth1=model_frame.depth, depth2=frame.depth,
                                       mask1=model_frame.mask, mask2=frame.mask,
                                       flow1=model_frame.flow, flow2=frame.flow)[1].squeeze(0)
-            if torch.isnan(rel_pose_se3).any():
+            if (torch.isnan(rel_pose_se3).any()) | (torch.abs(rel_pose_se3) > 1.0e-1).any():
                 # pose estimation failed, keep last image as reference and skip this one
                 warnings.warn('pose estimation not converged, skip.', RuntimeWarning)
                 rel_pose = torch.eye(4, dtype=torch.float64, device=self.last_pose.device)
