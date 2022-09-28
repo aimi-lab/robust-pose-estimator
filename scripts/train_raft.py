@@ -147,7 +147,6 @@ def main(args, config, force_cpu):
                                                                                                iters=config['model'][
                                                                                                    'iters'],
                                                                                                ret_confmap=True)  # ToDo add mask if necessary
-                torch.save(ref_depth, 'depth0.pth')
             else:
                 flow_predictions, pose_predictions, *_, conf1, conf2 = model(trg_img, ref_img, intrinsics.float(), baseline.float(),
                                                                              depth1=trg_depth,
