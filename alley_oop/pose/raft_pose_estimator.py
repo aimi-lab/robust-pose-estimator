@@ -38,7 +38,7 @@ class RAFTPoseEstimator(torch.nn.Module):
         if self.frame2frame:
             if self.last_frame is not None:
                 rel_pose_se3 = self.model(255*self.last_frame.img, 255*frame.img, self.intrinsics, self.baseline, depth1=self.last_frame.depth, depth2=frame.depth,
-                                          mask1=self.last_frame.mask, mask2=frame.mask)[1].squeeze(0)
+                                          mask1=self.last_frame.mask, mask2=frame.mask, flow1=self.last_frame.flow, flow2=frame.flow)[1].squeeze(0)
                 if torch.isnan(rel_pose_se3).any():
                     # pose estimation failed, keep last image as reference and skip this one
                     warnings.warn('pose estimation not converged, skip.', RuntimeWarning)
@@ -55,7 +55,10 @@ class RAFTPoseEstimator(torch.nn.Module):
             # transform scene to last camera pose coordinates
             scene_tlast = scene.transform_cpy(inv_transform(self.last_pose.float()))
             model_frame = scene_tlast.render(self.intrinsics.squeeze())
-            rel_pose_se3 = self.model(255*model_frame.img, 255*frame.img, self.intrinsics, self.baseline, depth1=model_frame.depth, depth2=frame.depth, mask1=model_frame.mask, mask2=frame.mask)[1].squeeze(0)
+            rel_pose_se3 = self.model(255*model_frame.img, 255*frame.img, self.intrinsics, self.baseline,
+                                      depth1=model_frame.depth, depth2=frame.depth,
+                                      mask1=model_frame.mask, mask2=frame.mask,
+                                      flow1=model_frame.flow, flow2=frame.flow)[1].squeeze(0)
             if torch.isnan(rel_pose_se3).any():
                 # pose estimation failed, keep last image as reference and skip this one
                 warnings.warn('pose estimation not converged, skip.', RuntimeWarning)

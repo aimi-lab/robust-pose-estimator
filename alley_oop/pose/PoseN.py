@@ -48,7 +48,7 @@ class PoseN(nn.Module):
         depth = baseline[:, None, None] / -flow[:, 0]
         return depth.unsqueeze(1), flow
 
-    def forward(self, image1l, image2l, intrinsics, baseline, image1r=None, image2r=None, depth1=None, depth2=None, mask1=None, mask2=None, iters=12, flow_init=None, pose_init=None, ret_confmap=False):
+    def forward(self, image1l, image2l, intrinsics, baseline, image1r=None, image2r=None, depth1=None, depth2=None, mask1=None, mask2=None, flow1=None, flow2=None, iters=12, flow_init=None, pose_init=None, ret_confmap=False):
         intrinsics.requires_grad = False
         baseline.requires_grad = False
         """ estimate optical flow from stereo pair to get disparity map"""
