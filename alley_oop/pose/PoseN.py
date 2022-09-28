@@ -27,8 +27,11 @@ class PoseN(nn.Module):
         self.pose_scale = config['pose_scale']
 
         self.register_buffer("img_coords", create_img_coords_t(y=H, x=W), persistent=False)
-        self.conf_head = nn.Sequential(nn.Conv2d(128+128+3+3+2, out_channels=32, kernel_size=(5,5), padding="same"), nn.BatchNorm2d(32),
+        self.conf_head1 = nn.Sequential(nn.Conv2d(128+128+3+3+2, out_channels=32, kernel_size=(5,5), padding="same"), nn.BatchNorm2d(32),
                                        nn.Conv2d(32, out_channels=1, kernel_size=(3,3), padding="same"), nn.Sigmoid())
+        self.conf_head2 = nn.Sequential(
+            nn.Conv2d(128 + 128 + 3 + 3 + 2, out_channels=32, kernel_size=(5, 5), padding="same"), nn.BatchNorm2d(32),
+            nn.Conv2d(32, out_channels=1, kernel_size=(3, 3), padding="same"), nn.Sigmoid())
         self.use_weights = config["use_weights"]
         self.up = nn.UpsamplingBilinear2d((H,W))
         self.flow = RAFT(config)
@@ -63,8 +66,8 @@ class PoseN(nn.Module):
         flow_predictions, gru_hidden_state, context = self.flow(image1l, image2l, iters, flow_init)
         if self.use_weights:
             context_up = self.up(torch.cat((gru_hidden_state, context), dim=1))
-            conf1 = self.conf_head(torch.cat((flow1, image1l, pcl1, context_up), dim=1))
-            conf2 = self.conf_head(torch.cat((flow2, image2l, pcl2, context_up), dim=1))
+            conf1 = self.conf_head1(torch.cat((flow1, image1l, pcl1, context_up), dim=1))
+            conf2 = self.conf_head2(torch.cat((flow2, image2l, pcl2, context_up), dim=1))
         else:
             conf1 = torch.ones_like(depth1)
             conf2 = torch.ones_like(depth2)
@@ -102,7 +105,9 @@ class PoseN(nn.Module):
         try:
             for param in self.pose_head.parameters():
                 param.requires_grad = True
-            for param in self.conf_head.parameters():
+            for param in self.conf_head1.parameters():
+                param.requires_grad = True
+            for param in self.conf_head2.parameters():
                 param.requires_grad = True
             self.loss_weight.requires_grad = True
         except AttributeError:
@@ -111,7 +116,8 @@ class PoseN(nn.Module):
         return self
 
     def train(self, mode: bool = True):
-        self.conf_head.train(mode)
+        self.conf_head1.train(mode)
+        self.conf_head2.train(mode)
         self.pose_head.train(mode)
         self.flow.eval()
         return self
