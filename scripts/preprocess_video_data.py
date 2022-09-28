@@ -71,7 +71,6 @@ def main(input_path, output_path, device_sel, step, log, match_color):
     sampler = None
     loader = DataLoader(dataset, num_workers=1, pin_memory=True, sampler=sampler)
 
-    disp_model = DisparityModel(calibration=calib, device=device)
     seg_model = SemanticSegmentationModel('../dataset/preprocess/segmentation_network/trained/deepLabv3plus_trained_intuitive.pth',
                                           device, (1280, 1024))
 
@@ -79,28 +78,23 @@ def main(input_path, output_path, device_sel, step, log, match_color):
 
     os.makedirs(os.path.join(output_path, 'video_frames'), exist_ok=True)
     os.makedirs(os.path.join(output_path, 'semantic_predictions'), exist_ok=True)
-    os.makedirs(os.path.join(output_path, 'disparity_frames'), exist_ok=True)
-    os.makedirs(os.path.join(output_path, 'disparity_noise'), exist_ok=True)
-
 
     with torch.inference_mode():
         os.makedirs(output_path, exist_ok=True)
         for i, data in enumerate(tqdm(loader, total=len(dataset))):
             limg, rimg, pose_kinematics, img_number = data
-            disparity, depth, depth_noise_std = disp_model(limg.to(device), rimg.to(device))
             segmentation = seg_model.segment(limg.to(device))[1]
             segmentation = rgb_decoder.colorize(segmentation.squeeze().cpu().numpy()).astype(np.uint8)
 
             # store images and depth and semantics
-            img_name = f'{img_number.item():06d}'
+            if torch.is_tensor(img_number):
+                img_name = f'{img_number.item():06d}'
+            else:
+                img_name = f'{img_number[0]:06d}'
             cv2.imwrite(os.path.join(output_path, 'video_frames', img_name+'l.png'), cv2.cvtColor(255.0*limg.squeeze().permute(1,2,0).cpu().numpy(), cv2.COLOR_RGB2BGR).astype(np.uint8))
             cv2.imwrite(os.path.join(output_path, 'video_frames', img_name + 'r.png'),
                         cv2.cvtColor(255.0*rimg.squeeze().permute(1,2,0).cpu().numpy(), cv2.COLOR_RGB2BGR).astype(np.uint8))
             cv2.imwrite(os.path.join(output_path, 'semantic_predictions', img_name + 'l.png'), cv2.cvtColor(segmentation, cv2.COLOR_RGB2BGR))
-            cv2.imwrite(os.path.join(output_path, 'disparity_frames', img_name + 'l.png'), disparity.cpu().squeeze().numpy().astype(np.uint8))
-            save_pfm(disparity.cpu().squeeze().numpy(),os.path.join(output_path, 'disparity_frames', img_name + 'l.pfm'))
-            save_pfm(depth_noise_std.cpu().squeeze().numpy(),
-                     os.path.join(output_path, 'disparity_noise', img_name + 'l.pfm'))
 
         print('finished')
 
