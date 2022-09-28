@@ -53,10 +53,10 @@ class SLAM(object):
                 self.scene = SurfelMap(frame=self.frame, kmat=self.intrinsics.squeeze(), upscale=1,
                                        d_thresh=self.config['dist_thr'], depth_scale=self.depth_scale,
                                        pmat=self.init_pose, average_pts=self.config['average_pts']).to(self.device)
-            pose, self.rendered_frame = self.pose_estimator.estimate(self.frame, self.scene)
+            pose, self.rendered_frame, success = self.pose_estimator.estimate(self.frame, self.scene)
             pose_scaled = pose.clone()
             pose_scaled[:3, 3] /= self.depth_scale  # de-normalize depth scaling
-            if self.cnt > 0:
+            if (self.cnt > 0) & success:
                 self.scene.fuse(self.frame, pose)
                 if self.dbg_opt:
                     print(f"number of surfels: {self.scene.opts.shape[1]}, stable: {(self.scene.conf >= 1.0).sum().item()}")

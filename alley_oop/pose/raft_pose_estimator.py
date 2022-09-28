@@ -5,7 +5,9 @@ from alley_oop.fusion.surfel_map import SurfelMap, FrameClass
 from alley_oop.geometry.lie_3d_pseudo import pseudo_lie_se3_to_SE3
 from collections import OrderedDict
 from torchvision.transforms import Resize
+import warnings
 from typing import Tuple
+
 
 class RAFTPoseEstimator(torch.nn.Module):
     def __init__(self, intrinsics: torch.Tensor, baseline: float, checkpoint: str, img_shape: Tuple, frame2frame: bool=False, init_pose: torch.tensor=torch.eye(4)):
@@ -32,16 +34,19 @@ class RAFTPoseEstimator(torch.nn.Module):
         self.baseline = torch.tensor(baseline).unsqueeze(0).float().to(intrinsics.device)
 
     def estimate(self, frame: FrameClass, scene: SurfelMap):
+        success = True
         if self.frame2frame:
             if self.last_frame is not None:
                 rel_pose_se3 = self.model(255*self.last_frame.img, 255*frame.img, self.intrinsics, self.baseline, depth1=self.last_frame.depth, depth2=frame.depth,
                                           mask1=self.last_frame.mask, mask2=frame.mask)[1].squeeze(0)
                 if torch.isnan(rel_pose_se3).any():
                     # pose estimation failed, keep last image as reference and skip this one
+                    warnings.warn('pose estimation not converged, skip.', RuntimeWarning)
                     rel_pose = torch.eye(4, dtype=torch.float64, device=self.last_pose.device)
+                    success = False
                 else:
                     rel_pose = pseudo_lie_se3_to_SE3(rel_pose_se3.double())
-                    ret_frame = self.last_frame
+                ret_frame = self.last_frame
             else:
                 rel_pose = torch.eye(4, dtype=torch.float64, device=self.last_pose.device)
                 ret_frame = None
@@ -53,12 +58,14 @@ class RAFTPoseEstimator(torch.nn.Module):
             rel_pose_se3 = self.model(255*model_frame.img, 255*frame.img, self.intrinsics, self.baseline, depth1=model_frame.depth, depth2=frame.depth, mask1=model_frame.mask, mask2=frame.mask)[1].squeeze(0)
             if torch.isnan(rel_pose_se3).any():
                 # pose estimation failed, keep last image as reference and skip this one
+                warnings.warn('pose estimation not converged, skip.', RuntimeWarning)
                 rel_pose = torch.eye(4, dtype=torch.float64, device=self.last_pose.device)
+                success = False
             else:
                 rel_pose = pseudo_lie_se3_to_SE3(rel_pose_se3.double())
             ret_frame = model_frame
         self.last_pose.data = self.last_pose.data @ rel_pose
-        return self.last_pose.float(), ret_frame
+        return self.last_pose.float(), ret_frame, success
 
     @property
     def device(self):
