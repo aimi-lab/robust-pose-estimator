@@ -32,6 +32,8 @@ def get_data(dataset_type: str, input_path: str, sequences: str, img_size: Tuple
         intrinsics = []
         for i in range(len(sequences)):
             calib_path = os.path.join(input_path, sequences[i], 'keyframe_1')
+            if not os.path.exists(calib_path):
+                calib_path = os.path.join(input_path, sequences[i])
             if os.path.isfile(os.path.join(calib_path, 'camcal.json')):
                 calib_file = os.path.join(calib_path, 'camcal.json')
             elif os.path.isfile(os.path.join(calib_path, 'camera_calibration.json')):
@@ -81,7 +83,7 @@ class PoseDataset(Dataset):
             self.image_list.append([images_l[i], images_l[i+s]])
             self.rel_pose_list.append(np.linalg.inv(poses[i+s].astype(np.float64)) @ poses[i].astype(np.float64))
             self.image_list_r.append([images_r[i], images_r[i+s]])
-            self.mask_list.append(semantics[i], semantics[i+s])
+            self.mask_list.append([semantics[i], semantics[i+s]])
         self.resize = Resize(img_size)
         self.resize_msk = Resize(img_size, interpolation=InterpolationMode.NEAREST)
         self.scale = float(img_size[0])/float(cv2.imread(images_l[0]).shape[1])
@@ -123,14 +125,17 @@ class DummyDataset(PoseDataset):
 
 class MultiSeqPoseDataset(PoseDataset):
     def __init__(self, root, seqs, baseline, intrinsics, depth_cutoff=300.0, conf_thr=0.0, step=1, img_size=(512, 640)):
+        # for nested scared dataset
         datasets = [sorted(glob(os.path.join(root, s, 'keyframe_*'))) for s in seqs]
+        # others
+        if len(datasets[0]) == 0:
+            datasets = [[os.path.join(root, s)] for s in seqs]
         image_list1 = []
-        disp_list1 = []
         rel_pose_list1 = []
-        depth_noise_list1 = []
         image_list_r1 = []
         intrinsics_list = []
         baseline_list = []
+        mask_list = []
         for i,s in enumerate(seqs):
             b = baseline[i]
             intr = intrinsics[i]
@@ -140,18 +145,16 @@ class MultiSeqPoseDataset(PoseDataset):
                         super().__init__(d, b, intr, depth_cutoff, conf_thr, step, img_size)
                         image_list1 += self.image_list
                         image_list_r1 += self.image_list_r
-                        disp_list1 += self.disp_list
+                        mask_list += self.mask_list
                         rel_pose_list1 += self.rel_pose_list
-                        depth_noise_list1 += self.depth_noise_list
                         intrinsics_list += self.intrinsics
                         baseline_list += self.baseline
                     except AssertionError:
                         pass
         self.image_list = image_list1
         self.image_list_r = image_list_r1
-        self.disp_list = disp_list1
+        self.mask_list = mask_list
         self.rel_pose_list = rel_pose_list1
-        self.depth_noise_list = depth_noise_list1
         self.baseline = baseline_list
         self.intrinsics = intrinsics_list
 

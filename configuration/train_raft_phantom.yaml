@@ -1,0 +1,60 @@
+model:
+  pretrained: ../alley_oop/photometry/raft/pretrained/raft-things.pth
+  iters: 12
+  dropout: 0.0
+  small: False
+  RGBD: False
+  pose_scale: 1.0
+  mode: lbgfs #mlp # horn
+  use_weights: True
+
+data:
+  train:
+    type: Intuitive
+    basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_phantom
+    sequences:
+      - part0007
+      - part0008
+      - part0009
+      - part0010
+      - part0011
+      - part0012
+      - part0013
+      - part0014
+      - part0015
+      - part0016
+    step:
+      - 1
+      - 20
+  val:
+    type: Intuitive
+    basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_phantom
+    sequences:
+      - part0017
+      - part0018
+      - part0019
+    step: 1
+
+train:
+  batch_size: 8
+  learning_rate: 1.0e-4
+  weight_decay: 5.0e-5
+  epsilon: 1.0e-8
+  epochs: 100000
+  gamma: 0.8
+  grad_clip: 1.0
+  loss_weights:
+    pose: 1.0
+    2d: 0.0
+    3d: 0.0
+    flow: 0.0
+  add_noise: False
+  freeze_flow_steps: 1000000000000000000
+
+val:
+  batch_size: 10
+
+image_shape:
+  - 512
+  - 640
+depth_scale: 250
