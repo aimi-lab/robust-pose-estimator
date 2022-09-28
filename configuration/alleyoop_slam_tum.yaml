@@ -9,6 +9,7 @@ slam:
   mask_specularities: False
   conf_weighing: False
   compensate_illumination: False  # do not use this with noisy depth estimates
+  average_pts: False
 
 img_size:
   - 640

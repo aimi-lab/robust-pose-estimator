@@ -28,6 +28,7 @@ class SurfelMap(object):
         self.interpolate = SparseImgInterpolator(5, 2, 0)
         self.depth_scale = kwargs['depth_scale'] if 'depth_scale' in kwargs else 1.0  # only used for open3d pcl
         self.patch_colors = None
+        self.average_points = kwargs['average_pts'] if 'average_pts' in kwargs else True
         # either provide opts, normals and color or a frame class
         if 'opts' in kwargs:
             assert 'normals' in kwargs
@@ -133,9 +134,10 @@ class SurfelMap(object):
         conf_idx = self.conf[:, vidx]
 
         # update existing points, intensities, normals, radii and confidences
-        self.opts[:, vidx] = (conf_idx*self.opts[:, vidx] + ccor*opts[:, midx]) / (conf_idx + ccor)
-        self.rgb[:, vidx] = (conf_idx * self.rgb[:, vidx] + ccor * rgb[:, midx]) / (conf_idx + ccor)
-        self.nrml[:, vidx] = (conf_idx*self.nrml[:, vidx] + ccor*normals[:, midx]) / (conf_idx + ccor)
+        if self.average_points:
+            self.opts[:, vidx] = (conf_idx*self.opts[:, vidx] + ccor*opts[:, midx]) / (conf_idx + ccor)
+            self.rgb[:, vidx] = (conf_idx * self.rgb[:, vidx] + ccor * rgb[:, midx]) / (conf_idx + ccor)
+            self.nrml[:, vidx] = (conf_idx*self.nrml[:, vidx] + ccor*normals[:, midx]) / (conf_idx + ccor)
         self.conf[:, vidx] = torch.clamp(conf_idx + ccor, 0.0, 1.0)  # saturate confidence to 1
 
         # create mask identifying unmatched indices

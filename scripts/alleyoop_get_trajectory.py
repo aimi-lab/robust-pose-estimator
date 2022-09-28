@@ -36,7 +36,7 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fo
     gt_trajectory = read_freiburg(gt_file) if os.path.isfile(gt_file) else None
 
     slam = SLAM(torch.tensor(calib['intrinsics']['left']).to(device), config['slam'], img_shape=config['img_size'], baseline=calib['bf'],
-                checkpoint=checkpoint, init_pose=torch.tensor(gt_trajectory[0]) if gt_trajectory is not None else None).to(device)
+                checkpoint=checkpoint, init_pose=torch.tensor(gt_trajectory[0]) if gt_trajectory is not None else torch.eye(4)).to(device)
     if not isinstance(dataset, StereoVideoDataset):
         sampler = SequentialSubSampler(dataset, start, stop, step)
     else:
