@@ -90,7 +90,7 @@ def main(input_path, output_path, device_sel, step, log, match_color):
             if torch.is_tensor(img_number):
                 img_name = f'{img_number.item():06d}'
             else:
-                img_name = f'{img_number[0]:06d}'
+                img_name = f'{int(img_number[0]):06d}'
             cv2.imwrite(os.path.join(output_path, 'video_frames', img_name+'l.png'), cv2.cvtColor(255.0*limg.squeeze().permute(1,2,0).cpu().numpy(), cv2.COLOR_RGB2BGR).astype(np.uint8))
             cv2.imwrite(os.path.join(output_path, 'video_frames', img_name + 'r.png'),
                         cv2.cvtColor(255.0*rimg.squeeze().permute(1,2,0).cpu().numpy(), cv2.COLOR_RGB2BGR).astype(np.uint8))
