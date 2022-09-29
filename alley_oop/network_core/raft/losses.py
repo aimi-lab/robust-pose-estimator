@@ -49,7 +49,6 @@ def of_sequence_loss(flow_preds, flow_gt, valid, gamma=0.8, max_flow=400):
 
 def supervised_pose_loss(pose_pred, pose_gt):
     l1 = (pose_pred - pose_gt).abs()
-    l1[torch.isnan(l1)] = 0.0
     return l1
 
 

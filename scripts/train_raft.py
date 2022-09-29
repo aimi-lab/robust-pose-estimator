@@ -152,7 +152,13 @@ def main(args, config, force_cpu):
                                                                              ret_confmap=True)  # ToDo add mask if necessary
             # loss computations
             loss_pose = supervised_pose_loss(pose_predictions, gt_pose)
-            loss = torch.nanmean(loss_pose)
+            loss = torch.mean(loss_pose)
+            if torch.isnan(loss):
+                print("found nan in loss")
+                has_nan = False
+                for param in model.parameters():
+                    has_nan |= torch.isnan(param).any()
+                print("found nan in parameters: ", has_nan)
 
             # update params
             scaler.scale(loss).backward()
@@ -181,7 +187,11 @@ def main(args, config, force_cpu):
 
             scaler.step(optimizer)
             scaler.update()
-
+            if torch.isnan(loss):
+                has_nan = False
+                for param in model.parameters():
+                    has_nan |= torch.isnan(param).any()
+                print("found nan in parameters after update: ", has_nan)
             logger.push(metrics, SUM_FREQ)
             if total_steps % SUM_FREQ == SUM_FREQ - 1:
                 logger.flush()
