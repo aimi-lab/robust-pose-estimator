@@ -74,12 +74,12 @@ class PoseN(nn.Module):
 
         # set confidence weights to zero where the mask is False
         if mask1 is not None:
-            conf1 = conf1 * mask1
+            mask1.requires_grad = False
         if mask2 is not None:
-            conf2 = conf2 * mask2
+            mask2.requires_grad = False
 
         n = image1l.shape[0]
-        pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2, conf1, conf2, self.loss_weight.repeat(n, 1), intrinsics)
+        pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2, conf1, conf2, mask1, mask2, self.loss_weight.repeat(n, 1), intrinsics)
         if ret_confmap:
             return flow_predictions, pose_se3.float() / self.pose_scale, depth1, depth2, conf1, conf2
         return flow_predictions, pose_se3.float()/self.pose_scale, depth1, depth2

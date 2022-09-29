@@ -4,7 +4,7 @@ import torch.nn as nn
 from alley_oop.geometry.pinhole_transforms import create_img_coords_t, transform, homogenous, project
 from alley_oop.geometry.absolute_pose_quarternion import align_torch
 from alley_oop.ddn.ddn.pytorch.node import *
-from alley_oop.network_core.raft.core.utils.flow_utils import remap_from_flow
+from alley_oop.network_core.raft.core.utils.flow_utils import remap_from_flow, remap_from_flow_nearest
 from alley_oop.geometry.lie_3d_pseudo import pseudo_lie_se3_to_SE3_batch_small
 
 
@@ -47,7 +47,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
     def __init__(self):
         super(DeclarativePoseHead3DNode, self).__init__(eps=1e-3)
 
-    def reprojection_objective(self, flow, pcl1, pcl2, weights1, intrinsics, y, ret_res=False):
+    def reprojection_objective(self, flow, pcl1, pcl2, weights1, mask1, intrinsics, y, ret_res=False):
         # this is generally better for rotation
         n, _, h, w = flow.shape
         img_coordinates = create_img_coords_t(y=pcl1.shape[-2], x=pcl1.shape[-1]).to(pcl1.device)
@@ -57,7 +57,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         flow_off = img_coordinates[None, :2] + flow.view(n, 2, -1)
         residuals = torch.sum((flow_off - warped_pts)**2, dim=1)
         valid = (flow_off[:, 0] > 0) & (flow_off[:, 1] > 0) & (flow_off[:, 0] < w) & (flow_off[:, 1] < h)
-        valid = torch.isinf(residuals) | torch.isnan(residuals) | ~valid.view(n,-1)
+        valid = torch.isinf(residuals) | torch.isnan(residuals) | ~valid.view(n,-1) | ~mask1.view(n,-1)
         # weight residuals by confidences
         residuals *= weights1.view(n,-1)
         residuals[valid] = 0.0
@@ -67,7 +67,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
             return loss, residuals, flow
         return loss
 
-    def depth_objective(self, flow, pcl1, pcl2, weights1, weights2, y, ret_res=False):
+    def depth_objective(self, flow, pcl1, pcl2, weights1, weights2, mask1, mask2, y, ret_res=False):
         # this is generally better for translation (essentially in z-direction)
         # 3D geometric L2 loss
         n, _, h, w = pcl1.shape
@@ -77,42 +77,36 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         pcl2_aligned = transform(homogenous(pcl2.view(n, 3, -1)), pose).reshape(n, 4, h, w)[:, :3]
         # resample point clouds given the optical flow
         pcl2_aligned, _ = remap_from_flow(pcl2_aligned, flow)
-        weights2_aligned, valid = remap_from_flow(weights2, flow)
+        weights2_aligned, _ = remap_from_flow(weights2, flow)
+        mask2_aligned, valid = remap_from_flow_nearest(mask2, flow)
+        valid &= mask1 & mask2_aligned
         # define objective loss function
         residuals = torch.sum((pcl2_aligned.view(n, 3, -1) - pcl1.view(n, 3, -1)) ** 2, dim=1)
         # reweighing residuals
         residuals *= torch.sqrt(weights2_aligned.view(n,-1)*weights1.view(n,-1))
-        residuals[~valid[:, 0]] = 0.0
+        residuals[~valid.view(n, -1)] = 0.0
         if ret_res:
             return torch.mean(residuals, dim=-1), residuals
         return torch.mean(residuals, dim=-1)
 
     def objective(self, *xs, y):
-        flow, pcl1, pcl2, weights1, weights2, loss_weight, intrinsics= xs
-        loss3d = self.depth_objective(flow, pcl1, pcl2, weights1, weights2, y)
-        loss2d = self.reprojection_objective(flow, pcl1, pcl2, weights1,intrinsics, y)
+        flow, pcl1, pcl2, weights1, weights2, mask1, mask2, loss_weight, intrinsics= xs
+        loss3d = self.depth_objective(flow, pcl1, pcl2, weights1, weights2, mask1, mask2, y)
+        loss2d = self.reprojection_objective(flow, pcl1, pcl2, weights1,mask1, intrinsics, y)
         return loss_weight[:, 1]*loss2d + loss_weight[:, 0]*loss3d
 
     def solve(self, *xs):
-        flow, pcl1, pcl2, weights1, weights2, loss_weight, intrinsics= xs
-        # solve using method of Horn
-        flow = flow.detach()
-        pcl1 = pcl1.detach().clone()
-        pcl2 = pcl2.detach().clone()
-        weights1 = weights1.detach().clone()
-        weights2 = weights2.detach().clone()
-        loss_weight = loss_weight.detach()
-        intrinsics = intrinsics.detach()
+        xs = [x.detach().clone() for x in xs]
         with torch.enable_grad():
-            n = pcl1.shape[0]
+            n = xs[0].shape[0]
             # Solve using LBFGS optimizer:
-            y = torch.zeros((n,6), device=flow.device, requires_grad=True)
+            y = torch.zeros((n,6), device=xs[0].device, requires_grad=True)
             torch.backends.cuda.matmul.allow_tf32 = False
             optimizer = torch.optim.LBFGS([y], lr=1.0, max_iter=100, line_search_fn="strong_wolfe", )
 
             def fun():
                 optimizer.zero_grad()
-                loss = self.objective(flow, pcl1, pcl2, weights1, weights2, loss_weight, intrinsics, y=y).sum()
+                loss = self.objective(*xs, y=y).sum()
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(y, 100)
                 return loss
@@ -185,6 +179,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
                 for Bi in fXY(x_split):
                     gradient.append(torch.einsum('bmc,bm->bc', (Bi, u)))
                 gradient = torch.cat(gradient, dim=-1)  # bxn
+                gradient[torch.isnan(gradient)] = 0.0  # nan values may occur due to zero-weights
                 gradients.append(gradient.reshape(x_size))
             else:
                 gradients.append(None)

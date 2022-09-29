@@ -139,8 +139,8 @@ def main(args, config, force_cpu):
                                                                                                intrinsics.float(), baseline.float(),
                                                                                                image1r=trg_img_r,
                                                                                                image2r=ref_img_r,
-                                                                                               mask1=trg_mask,
-                                                                                               mask2=ref_mask,
+                                                                                               mask1=trg_mask.to(torch.bool),
+                                                                                               mask2=ref_mask.to(torch.bool),
                                                                                                iters=config['model'][
                                                                                                    'iters'],
                                                                                                ret_confmap=True)  # ToDo add mask if necessary
