@@ -62,13 +62,13 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fo
             if isinstance(dataset, StereoVideoDataset):
                 limg, rimg, pose_kinematics, img_number = data
                 mask, semantics = seg_model.get_mask(limg.to(device))
-                depth, flow = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
+                depth, flow, _ = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
             elif isinstance(dataset, RGBDDataset) | isinstance(dataset, TUMDataset):
                 limg, depth, depth_noise, mask, semantics, img_number = data
                 flow = torch.zeros_like(depth).repeat(1,2,1,1)
             else:
                 limg, rimg, mask, semantics, img_number = data
-                depth, flow = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
+                depth, flow, _ = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
             limg, depth, mask = slam.pre_process(limg, depth, mask, semantics)
             pose, scene, pose_relscale = slam.processFrame(limg.to(device), depth.to(device), mask.to(device), flow.to(device))
 

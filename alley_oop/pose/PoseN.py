@@ -43,16 +43,20 @@ class PoseN(nn.Module):
         n, _, h, w = imagel.shape
         flow = self.flow(imagel, imager)[0][-1]
         depth = baseline[:, None, None] / -flow[:, 0]
-        return depth.unsqueeze(1), flow
+        valid = (depth > 0) & (depth <= 1.0)
+        depth[~valid] = 1.0
+        return depth.unsqueeze(1), flow, valid.unsqueeze(1)
 
     def forward(self, image1l, image2l, intrinsics, baseline, image1r=None, image2r=None, depth1=None, depth2=None, mask1=None, mask2=None, flow1=None, flow2=None, iters=12, flow_init=None, pose_init=None, ret_confmap=False):
         intrinsics.requires_grad = False
         baseline.requires_grad = False
         """ estimate optical flow from stereo pair to get disparity map"""
         if depth1 is None:
-            depth1, flow1 = self.flow2depth(image1l, image1r, baseline)
+            depth1, flow1, valid1 = self.flow2depth(image1l, image1r, baseline)
+            mask1 = mask1 & valid1 if mask1 is not None else valid1
         if depth2 is None:
-            depth2, flow2 = self.flow2depth(image2l, image2r, baseline)
+            depth2, flow2, valid2 = self.flow2depth(image2l, image2r, baseline)
+            mask2 = mask2 & valid2 if mask2 is not None else valid2
         """ Estimate optical flow and rigid pose between pair of frames """
 
         pcl1 = self.proj(depth1, intrinsics)
