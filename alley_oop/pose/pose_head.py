@@ -57,7 +57,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         flow_off = img_coordinates[None, :2] + flow.view(n, 2, -1)
         residuals = torch.sum((flow_off - warped_pts)**2, dim=1)
         valid = (flow_off[:, 0] > 0) & (flow_off[:, 1] > 0) & (flow_off[:, 0] < w) & (flow_off[:, 1] < h)
-        valid = torch.isnan(residuals) | ~valid.view(n,-1)
+        valid = torch.isinf(residuals) | torch.isnan(residuals) | ~valid.view(n,-1)
         # weight residuals by confidences
         residuals *= weights1.view(n,-1)
         residuals[valid] = 0.0
@@ -116,6 +116,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
                 torch.nn.utils.clip_grad_norm_(y, 100)
                 return loss
             optimizer.step(fun)
+        torch.backends.cuda.matmul.allow_tf32 = True
         return y.detach(), None
 
     def gradient(self, *xs, y=None, v=None, ctx=None):
