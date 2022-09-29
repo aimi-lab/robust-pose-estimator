@@ -134,6 +134,7 @@ def main(args, config, force_cpu):
 
             # forward pass
             if infer_depth:
+                torch.cuda.set_sync_debug_mode(1 if args.dbg else 0)
                 flow_predictions, pose_predictions, trg_depth, ref_depth, conf1, conf2 = model(trg_img, ref_img,
                                                                                                intrinsics.float(), baseline.float(),
                                                                                                image1r=trg_img_r,
