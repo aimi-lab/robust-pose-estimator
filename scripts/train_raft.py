@@ -143,13 +143,13 @@ def main(args, config, force_cpu):
                                                                                                mask2=ref_mask.to(torch.bool),
                                                                                                iters=config['model'][
                                                                                                    'iters'],
-                                                                                               ret_confmap=True)  # ToDo add mask if necessary
+                                                                                               ret_confmap=True)
             else:
                 flow_predictions, pose_predictions, *_, conf1, conf2 = model(trg_img, ref_img, intrinsics.float(), baseline.float(),
                                                                              depth1=trg_depth,
                                                                              depth2=ref_depth,
                                                                              iters=config['model']['iters'],
-                                                                             ret_confmap=True)  # ToDo add mask if necessary
+                                                                             ret_confmap=True)
             # loss computations
             loss_pose = supervised_pose_loss(pose_predictions, gt_pose)
             loss = torch.mean(loss_pose)
