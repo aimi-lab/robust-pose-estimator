@@ -1,22 +1,12 @@
-import torch
-import torch.nn as nn
-from collections import OrderedDict
-
-from alley_oop.geometry.pinhole_transforms import create_img_coords_t
-from alley_oop.network_core.raft.core.raft import RAFT
-from alley_oop.ddn.ddn.pytorch.node import DeclarativeLayer
-from alley_oop.pose.pose_head import MLPPoseHead, HornPoseHead, DeclarativePoseHead3DNode
-from alley_oop.pose.PoseN import PoseN
+from alley_oop.pose.PoseN import *
 
 
 class DefPoseN(PoseN):
     def __init__(self, config):
         super(DefPoseN, self).__init__(config)
-        self.conf_head1 = nn.Sequential(nn.Conv2d(128+128+3+3+2+1, out_channels=32, kernel_size=(5,5), padding="same"), nn.BatchNorm2d(32),
-                                       nn.Conv2d(32, out_channels=1, kernel_size=(3,3), padding="same"), nn.Sigmoid())
-        self.conf_head2 = nn.Sequential(
-            nn.Conv2d(128 + 128 + 3 + 3 + 2+1, out_channels=32, kernel_size=(5, 5), padding="same"), nn.BatchNorm2d(32),
-            nn.Conv2d(32, out_channels=1, kernel_size=(3, 3), padding="same"), nn.Sigmoid())
+        H, W = config["image_shape"]
+        self.conf_head1 = nn.Sequential(TinyUNet(in_channels=128 + 128 + 3 + 3 + 2+1, output_size=(H, W)), nn.Sigmoid())
+        self.conf_head2 = nn.Sequential(TinyUNet(in_channels=128 + 128 + 3 + 3 + 2+1, output_size=(H, W)), nn.Sigmoid())
 
 
     def forward(self, image1l, image2l, intrinsics, baseline, image1r=None, image2r=None, depth1=None, depth2=None, mask1=None, mask2=None, toolmask1=None, toolmask2=None, iters=12, flow_init=None, pose_init=None, ret_confmap=False):
@@ -24,13 +14,11 @@ class DefPoseN(PoseN):
         baseline.requires_grad = False
         """ estimate optical flow from stereo pair to get disparity map"""
         if depth1 is None:
-            depth1, flow1 = self.flow2depth(image1l, image1r, baseline)
+            depth1, flow1, valid1 = self.flow2depth(image1l, image1r, baseline)
+            mask1 = mask1 & valid1 if mask1 is not None else valid1
         if depth2 is None:
-            depth2, flow2 = self.flow2depth(image2l, image2r, baseline)
-
-        toolmask1 = torch.zeros_like(depth1) if toolmask1 is None else toolmask1
-        toolmask2 = torch.zeros_like(depth2) if toolmask2 is None else toolmask2
-
+            depth2, flow2, valid2 = self.flow2depth(image2l, image2r, baseline)
+            mask2 = mask2 & valid2 if mask2 is not None else valid2
         """ Estimate optical flow and rigid pose between pair of frames """
 
         pcl1 = self.proj(depth1, intrinsics)
@@ -38,21 +26,22 @@ class DefPoseN(PoseN):
 
         flow_predictions, gru_hidden_state, context = self.flow(image1l, image2l, iters, flow_init)
         if self.use_weights:
-            context_up = self.up(torch.cat((gru_hidden_state, context), dim=1))
-            conf1 = self.conf_head1(torch.cat((toolmask1, flow1, image1l, pcl1, context_up), dim=1))
-            conf2 = self.conf_head2(torch.cat((toolmask2, flow2, image2l, pcl2, context_up), dim=1))
+            inp1 = torch.nn.functional.interpolate(torch.cat((toolmask1, flow1, image1l, pcl1), dim=1), scale_factor=0.125, mode='bilinear')
+            inp2 = torch.nn.functional.interpolate(torch.cat((toolmask2, flow2, image2l, pcl2), dim=1), scale_factor=0.125, mode='bilinear')
+            conf1 = self.conf_head1(torch.cat((inp1, gru_hidden_state, context), dim=1))
+            conf2 = self.conf_head2(torch.cat((inp2, gru_hidden_state, context), dim=1))
         else:
             conf1 = torch.ones_like(depth1)
             conf2 = torch.ones_like(depth2)
 
         # set confidence weights to zero where the mask is False
         if mask1 is not None:
-            conf1 = conf1 * mask1
+            mask1.requires_grad = False
         if mask2 is not None:
-            conf2 = conf2 * mask2
+            mask2.requires_grad = False
 
         n = image1l.shape[0]
-        pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2, conf1, conf2, self.loss_weight.repeat(n, 1), intrinsics)
+        pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2, conf1, conf2, mask1, mask2, self.loss_weight.repeat(n, 1), intrinsics)
         if ret_confmap:
             return flow_predictions, pose_se3.float() / self.pose_scale, depth1, depth2, conf1, conf2
         return flow_predictions, pose_se3.float()/self.pose_scale, depth1, depth2
