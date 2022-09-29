@@ -151,7 +151,7 @@ def main(args, config, force_cpu):
                                                                              ret_confmap=True)  # ToDo add mask if necessary
             # loss computations
             loss_pose = supervised_pose_loss(pose_predictions, gt_pose)
-            loss = loss_weights['pose']*loss_pose.mean()
+            loss = torch.nanmean(loss_pose)
 
             # debug
             if args.dbg & (i_batch%SUM_FREQ == 0):
