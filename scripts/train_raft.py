@@ -48,7 +48,7 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger, infer_depth
                                                                                                mask2=ref_mask,
                                                                                                iters=config['model'][
                                                                                                    'iters'],
-                                                                                               ret_confmap=True)  # ToDo add mask if necessary
+                                                                                               ret_confmap=True)
             else:
                 ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, gt_pose, intrinsics, baseline  = [x.to(device) for x in
                                                                                               data_blob]
@@ -56,14 +56,14 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger, infer_depth
                                                                              depth1=trg_depth,
                                                                          depth2=ref_depth,
                                                                          iters=config['model']['iters'],
-                                                                         ret_confmap=True)  # ToDo add mask if necessary
+                                                                         ret_confmap=True)
 
             loss_pose = supervised_pose_loss(pose_predictions, gt_pose)
-            loss = loss_weights['pose'] * loss_pose
-
-            metrics = {"val/loss_rot": loss_pose[:, :3].detach().mean().cpu().item(),
-                       "val/loss_trans": loss_pose[:, 3:].detach().mean().cpu().item(),
-                       "val/loss_total": loss.detach().mean().cpu().item()}
+            loss = torch.nanmean(loss_pose)
+            loss_cpu = loss_pose.detach().cpu()
+            metrics = {"val/loss_rot": loss_cpu[:, :3].nanmean().item(),
+                       "val/loss_trans": loss_cpu[:, 3:].nanmean().item(),
+                       "val/loss_total": loss_cpu.nanmean().item()}
             logger.push(metrics, len(dataloader))
         logger.flush()
         logger.log_plot(plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth, pseudo_lie_se3_to_SE3_batch(-pose_predictions), conf1, conf2, intrinsics)[0])
@@ -154,28 +154,30 @@ def main(args, config, force_cpu):
             loss_pose = supervised_pose_loss(pose_predictions, gt_pose)
             loss = torch.nanmean(loss_pose)
 
-            # debug
-            if args.dbg & (i_batch%SUM_FREQ == 0):
-                print("\n se3 pose")
-                print(f"gt_pose: {gt_pose[0].detach().cpu().numpy()}\npred_pose: {pose_predictions[0].detach().cpu().numpy()}")
-                print(" SE3 pose")
-                print(f"gt_pose: {pseudo_lie_se3_to_SE3(gt_pose[0]).detach().cpu().numpy()}\npred_pose: {pseudo_lie_se3_to_SE3(pose_predictions[0]).detach().cpu().numpy()}\n")
-                print(" trans loss: ", loss_pose[:, 3:].detach().mean().cpu().item())
-                print(" rot loss: ", loss_pose[:, :3].detach().mean().cpu().item())
-                if device == torch.device('cpu'):
-                    pose = pose_predictions.clone()
-                    pose[:,3:] *= config['depth_scale']
-                    fig, ax = plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth*config['depth_scale'], pseudo_lie_se3_to_SE3_batch(-pose), conf1, conf2, intrinsics)
-                    import matplotlib.pyplot as plt
-                    plt.show()
-                    plot_3d(ref_img, trg_img, ref_depth*config['depth_scale'], trg_depth*config['depth_scale'], pseudo_lie_se3_to_SE3_batch(pose).detach(), intrinsics)
             # update params
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)                
             torch.nn.utils.clip_grad_norm_(model.parameters(), config['train']['grad_clip'])
-            metrics = {"train/loss_rot": loss_pose[:,:3].detach().mean().cpu().item(),
-                      "train/loss_trans": loss_pose[:, 3:].detach().mean().cpu().item(),
-                      "train/loss_total": loss.detach().mean().cpu().item()}
+            loss_cpu = loss_pose.detach().cpu()
+            # debug
+            if args.dbg & (i_batch % SUM_FREQ == 0):
+                print("\n se3 pose")
+                print(f"gt_pose: {gt_pose[0].detach().cpu().numpy()}\npred_pose: {pose_predictions[0].detach().cpu().numpy()}")
+                print(" trans loss: ", loss_cpu[:, 3:].mean().item())
+                print(" rot loss: ", loss_cpu[:, :3].mean().item())
+                if device == torch.device('cpu'):
+                    pose = pose_predictions.clone()
+                    pose[:, 3:] *= config['depth_scale']
+                    fig, ax = plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth * config['depth_scale'],
+                                       pseudo_lie_se3_to_SE3_batch(-pose), conf1, conf2, intrinsics)
+                    import matplotlib.pyplot as plt
+                    plt.show()
+                    plot_3d(ref_img, trg_img, ref_depth * config['depth_scale'], trg_depth * config['depth_scale'],
+                            pseudo_lie_se3_to_SE3_batch(pose).detach(), intrinsics)
+
+            metrics = {"train/loss_rot": loss_cpu[:,:3].mean().item(),
+                      "train/loss_trans": loss_cpu[:, 3:].mean().item(),
+                      "train/loss_total": loss_cpu.mean().item()}
 
             scaler.step(optimizer)
             scaler.update()
