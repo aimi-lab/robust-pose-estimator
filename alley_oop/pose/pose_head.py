@@ -107,6 +107,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
             n = pcl1.shape[0]
             # Solve using LBFGS optimizer:
             y = torch.zeros((n,6), device=flow.device, requires_grad=True)
+            torch.backends.cuda.matmul.allow_tf32 = False
             optimizer = torch.optim.LBFGS([y], lr=1.0, max_iter=100, line_search_fn="strong_wolfe", )
 
             def fun():
