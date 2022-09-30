@@ -68,15 +68,22 @@ def read_freiburg(path: str, ret_stamps=False, no_stamp=False):
     return pose_list
 
 
-def read_json_intuitive(path: str):
+def read_json_intuitive(path: str, with_stamp=True):
     with open(os.path.join(path), 'r') as f:
         raw = json.load(f)
-    time_stamps = np.asarray([r["timestamp"] for r in raw])
     poses = []
-
+    if with_stamp:
+        time_stamps = np.asarray([r["timestamp"] for r in raw])
     for i, r in enumerate(raw):
-        pose = np.eye(4)
-        pose[:3,:3] = np.asarray(r["camera_pose"][3:]).reshape(3,3)
-        pose[:3,3] = np.asarray(r["camera_pose"][:3])
+        if with_stamp:
+            pose = np.eye(4)
+            pose[:3,:3] = np.asarray(r["camera_pose"][3:]).reshape(3,3)
+            pose[:3,3] = np.asarray(r["camera_pose"][:3])
+        else:
+            if isinstance(r, dict):
+                r = r['camera-pose']
+            pose = np.asarray(r)
         poses.append(pose)
-    return poses, time_stamps
+    if with_stamp:
+        return poses, time_stamps
+    return poses
