@@ -37,8 +37,6 @@ class PreProcess(object):
         # need to go back to numpy to use opencv functions
         depth = depth.cpu().numpy().squeeze()
         mask = mask.cpu().numpy().squeeze()
-        # normalize depth for numerical stability
-        depth = depth * self.depth_scale
 
         # filter depth to smooth out noisy points
         #depth = cv2.bilateralFilter(depth, d=-1, sigmaColor=0.01, sigmaSpace=10)

@@ -10,7 +10,8 @@ from typing import Tuple
 
 
 class RAFTPoseEstimator(torch.nn.Module):
-    def __init__(self, intrinsics: torch.Tensor, baseline: float, checkpoint: str, img_shape: Tuple, frame2frame: bool=False, init_pose: torch.tensor=torch.eye(4)):
+    def __init__(self, intrinsics: torch.Tensor, baseline: float, checkpoint: str, img_shape: Tuple,
+                 frame2frame: bool=False, init_pose: torch.tensor=torch.eye(4), scale: float=1.0):
         """
 
         """
@@ -32,6 +33,7 @@ class RAFTPoseEstimator(torch.nn.Module):
         self.last_frame = None
         self.frame2frame = frame2frame
         self.baseline = torch.tensor(baseline).unsqueeze(0).float().to(intrinsics.device)
+        self.scale = scale
 
     def estimate(self, frame: FrameClass, scene: SurfelMap):
         success = True
@@ -75,5 +77,5 @@ class RAFTPoseEstimator(torch.nn.Module):
         return self.last_pose.device
 
     def estimate_depth(self, img_l, img_r):
-        return self.model.flow2depth(255*img_l, 255*img_r, self.baseline)
+        return self.model.flow2depth(255*img_l, 255*img_r, self.baseline*self.scale)
 
