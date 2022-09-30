@@ -62,14 +62,13 @@ def main(input_path, output_path, device_sel, step, log, match_color):
         wandb.init(project='Alley-OOP-dataextraction', group=log)
 
 
-    dataset, calib = get_data(input_path, (1280, 1024), force_video=True)
+    dataset, calib = get_data(input_path, (1280, 1024), force_video=True, sample_video=step)
     assert isinstance(dataset, StereoVideoDataset)
     if match_color:
         cmatcher = ColorMatcher()
         dataset.transform = cmatcher
 
-    sampler = None
-    loader = DataLoader(dataset, num_workers=1, pin_memory=True, sampler=sampler)
+    loader = DataLoader(dataset, num_workers=1, pin_memory=True)
 
     seg_model = SemanticSegmentationModel('../dataset/preprocess/segmentation_network/trained/deepLabv3plus_trained_intuitive.pth',
                                           device, (1280, 1024))
@@ -102,7 +101,7 @@ def main(input_path, output_path, device_sel, step, log, match_color):
 if __name__ == '__main__':
     import argparse
     import yaml
-    parser = argparse.ArgumentParser(description='script to run EMDQ SLAM re-implementation')
+    parser = argparse.ArgumentParser(description='script to extract stereo data')
 
     parser.add_argument(
         'input',
