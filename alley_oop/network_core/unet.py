@@ -4,21 +4,26 @@ import torch.nn.functional as F
 import torchvision
 
 
-class Block(nn.Module):
+class DownBlock(nn.Module):
     def __init__(self, in_ch, out_ch):
         super().__init__()
         self.conv1 = nn.Conv2d(in_ch, out_ch, 3)
+        self.norm = nn.BatchNorm2d(out_ch)
         self.relu = nn.ReLU()
         self.conv2 = nn.Conv2d(out_ch, out_ch, 3)
 
     def forward(self, x):
-        return self.conv2(self.relu(self.conv1(x)))
+        return self.conv2(self.relu(self.norm(self.conv1(x))))
+
+class UpBlock(DownBlock):
+    def forward(self, x):
+        return self.conv2(self.norm(self.relu(self.conv1(x))))
 
 
 class Encoder(nn.Module):
     def __init__(self, chs=(3, 64, 128, 256, 512, 1024)):
         super().__init__()
-        self.enc_blocks = nn.ModuleList([Block(chs[i], chs[i + 1]) for i in range(len(chs) - 1)])
+        self.enc_blocks = nn.ModuleList([DownBlock(chs[i], chs[i + 1]) for i in range(len(chs) - 1)])
         self.pool = nn.MaxPool2d(2)
 
     def forward(self, x):
@@ -35,7 +40,7 @@ class Decoder(nn.Module):
         super().__init__()
         self.chs = chs
         self.upconvs = nn.ModuleList([nn.ConvTranspose2d(chs[i], chs[i + 1], 2, 2) for i in range(len(chs) - 1)])
-        self.dec_blocks = nn.ModuleList([Block(chs[i], chs[i + 1]) for i in range(len(chs) - 1)])
+        self.dec_blocks = nn.ModuleList([UpBlock(chs[i], chs[i + 1]) for i in range(len(chs) - 1)])
 
     def forward(self, x, encoder_features):
         for i in range(len(self.chs) - 1):
