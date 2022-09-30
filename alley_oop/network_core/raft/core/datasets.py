@@ -15,25 +15,24 @@ from dataset.rectification import StereoRectifier
 from dataset.semantic_dataset import RGBDecoder
 
 
-def get_data(dataset_type: str, input_path: str, sequences: str, img_size: Tuple, step: int, depth_cutoff: float):
-
+def get_data(config, img_size: Tuple, depth_cutoff: float):
     # check the format of the calibration file
     img_size = tuple(img_size)
     infer_depth = True
-    if dataset_type == 'TUM':
-        dataset = TUMDataset(root=input_path, step=step, img_size=img_size, depth_cutoff=depth_cutoff)
+    if config['type'] == 'TUM':
+        dataset = TUMDataset(root=config['basepath'], step=config['step'], img_size=img_size, depth_cutoff=depth_cutoff)
         intrinsics = torch.tensor([[525.0, 0, 319.5], [0, 525.0, 239.5], [0.0, 0.0, 1.0]]).float()
         infer_depth = False
         baseline= 1.0
-    elif dataset_type == 'TartanAir':
-        dataset = TartainAir(root=input_path, seqs=sequences, step=step, img_size=img_size, depth_cutoff=depth_cutoff)
-    elif dataset_type == 'Intuitive':
+    elif config['type'] == 'TartanAir':
+        dataset = TartainAir(root=config['basepath'], seqs=config['sequences'], step=config['step'], img_size=img_size, depth_cutoff=depth_cutoff)
+    elif config['type'] == 'Intuitive':
         baseline = []
         intrinsics = []
-        for i in range(len(sequences)):
-            calib_path = os.path.join(input_path, sequences[i], 'keyframe_1')
+        for i in range(len(config['sequences'])):
+            calib_path = os.path.join(config['basepath'], config['sequences'][i], 'keyframe_1')
             if not os.path.exists(calib_path):
-                calib_path = os.path.join(input_path, sequences[i])
+                calib_path = os.path.join(config['basepath'], config['sequences'][i])
             if os.path.isfile(os.path.join(calib_path, 'camcal.json')):
                 calib_file = os.path.join(calib_path, 'camcal.json')
             elif os.path.isfile(os.path.join(calib_path, 'camera_calibration.json')):
@@ -48,8 +47,8 @@ def get_data(dataset_type: str, input_path: str, sequences: str, img_size: Tuple
             calib = rect.get_rectified_calib()
             baseline.append(calib['bf'].astype(np.float32))
             intrinsics.append(calib['intrinsics']['left'].astype(np.float32))
-        dataset = MultiSeqPoseDataset(root=input_path, seqs=sequences, baseline=baseline, intrinsics=intrinsics,conf_thr=0.0, step=step,
-                                  img_size=img_size, depth_cutoff=depth_cutoff)
+        dataset = MultiSeqPoseDataset(root=config['basepath'], seqs=config['sequences'], baseline=baseline, intrinsics=intrinsics,conf_thr=0.0, step=config['step'],
+                                  img_size=img_size, depth_cutoff=depth_cutoff, samples=config['samples'])
 
     else:
         raise NotImplementedError
@@ -58,7 +57,7 @@ def get_data(dataset_type: str, input_path: str, sequences: str, img_size: Tuple
 
 
 class PoseDataset(Dataset):
-    def __init__(self, root, baseline, intrinsics, depth_cutoff=300.0,conf_thr=0.0, step=(1,10), img_size=(512, 640)):
+    def __init__(self, root, baseline, intrinsics, depth_cutoff=300.0,conf_thr=0.0, step=(1,10), img_size=(512, 640), samples=-1):
         super(PoseDataset, self).__init__()
         images_l = sorted(glob(os.path.join(root, 'video_frames', '*l.png')))
         images_r = sorted(glob(os.path.join(root, 'video_frames', '*r.png')))
@@ -68,6 +67,14 @@ class PoseDataset(Dataset):
         assert len(images_l) == len(images_r)
         assert len(images_l) > 0 , f'no images in {root}'
         assert len(semantics) == len(images_l)
+        if isinstance(step, int):
+            step = (step, step)
+        # randomly sample n-frames
+        if samples > 0:
+            sample_list = sorted(np.random.choice(len(images_l)-step[1], size=(samples,), replace=False))
+        else:
+            sample_list = np.arange(len(images_l)-step[1])
+
         self.conf_thr = conf_thr
         self.depth_cutoff = depth_cutoff
         self.image_list = []
@@ -76,9 +83,7 @@ class PoseDataset(Dataset):
         self.rel_pose_list = []
         self.rgb_decoder = RGBDecoder()
 
-        if isinstance(step, int):
-            step = (step, step)
-        for i in range(len(images_l)-step[1]):
+        for i in sample_list:
             s = np.random.randint(*step) if step[0] < step[1] else step[0]  # select a random step in given range
             self.image_list.append([images_l[i], images_l[i+s]])
             self.rel_pose_list.append(np.linalg.inv(poses[i+s].astype(np.float64)) @ poses[i].astype(np.float64))
@@ -124,7 +129,7 @@ class DummyDataset(PoseDataset):
         return super().__getitem__(0)
 
 class MultiSeqPoseDataset(PoseDataset):
-    def __init__(self, root, seqs, baseline, intrinsics, depth_cutoff=300.0, conf_thr=0.0, step=1, img_size=(512, 640)):
+    def __init__(self, root, seqs, baseline, intrinsics, depth_cutoff=300.0, conf_thr=0.0, step=1, img_size=(512, 640), samples=-1):
         # for nested scared dataset
         datasets = [sorted(glob(os.path.join(root, s, 'keyframe_*'))) for s in seqs]
         # others
@@ -142,7 +147,7 @@ class MultiSeqPoseDataset(PoseDataset):
             for d in datasets[i]:
                 if os.path.isfile(os.path.join(d, 'groundtruth.txt')):
                     try:
-                        super().__init__(d, b, intr, depth_cutoff, conf_thr, step, img_size)
+                        super().__init__(d, b, intr, depth_cutoff, conf_thr, step, img_size, samples)
                         image_list1 += self.image_list
                         image_list_r1 += self.image_list_r
                         mask_list += self.mask_list
