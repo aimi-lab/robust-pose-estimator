@@ -37,10 +37,12 @@ class RAFTPoseEstimator(torch.nn.Module):
 
     def estimate(self, frame: FrameClass, scene: SurfelMap):
         success = True
+        flow, crsp_list = None, None
         if self.frame2frame:
             if self.last_frame is not None:
-                rel_pose_se3 = self.model(255*self.last_frame.img, 255*frame.img, self.intrinsics, self.baseline, depth1=self.last_frame.depth, depth2=frame.depth,
-                                          mask1=self.last_frame.mask, mask2=frame.mask, flow1=self.last_frame.flow, flow2=frame.flow)[1].squeeze(0)
+                flow, rel_pose_se3, *_ = self.model(255*self.last_frame.img, 255*frame.img, self.intrinsics, self.baseline, depth1=self.last_frame.depth, depth2=frame.depth,
+                                          mask1=self.last_frame.mask, mask2=frame.mask, flow1=self.last_frame.flow, flow2=frame.flow)
+                rel_pose_se3 = rel_pose_se3.squeeze(0)
                 if (torch.isnan(rel_pose_se3).any()) | (torch.abs(rel_pose_se3) > 1.0e-1).any():
                     # pose estimation failed, keep last image as reference and skip this one
                     warnings.warn('pose estimation not converged, skip.', RuntimeWarning)
@@ -56,11 +58,12 @@ class RAFTPoseEstimator(torch.nn.Module):
         else:
             # transform scene to last camera pose coordinates
             scene_tlast = scene.transform_cpy(inv_transform(self.last_pose.float()))
-            model_frame = scene_tlast.render(self.intrinsics.squeeze())
-            rel_pose_se3 = self.model(255*model_frame.img, 255*frame.img, self.intrinsics, self.baseline,
+            model_frame, crsp_list = scene_tlast.render(self.intrinsics.squeeze())
+            flow, rel_pose_se3, *_  = self.model(255*model_frame.img, 255*frame.img, self.intrinsics, self.baseline,
                                       depth1=model_frame.depth, depth2=frame.depth,
                                       mask1=model_frame.mask, mask2=frame.mask,
-                                      flow1=model_frame.flow, flow2=frame.flow)[1].squeeze(0)
+                                      flow1=model_frame.flow, flow2=frame.flow)
+            rel_pose_se3 = rel_pose_se3.squeeze(0)
             if (torch.isnan(rel_pose_se3).any()) | (torch.abs(rel_pose_se3) > 1.0e-1).any():
                 # pose estimation failed, keep last image as reference and skip this one
                 warnings.warn('pose estimation not converged, skip.', RuntimeWarning)
@@ -70,7 +73,7 @@ class RAFTPoseEstimator(torch.nn.Module):
                 rel_pose = pseudo_lie_se3_to_SE3(rel_pose_se3.double())
             ret_frame = model_frame
         self.last_pose.data = self.last_pose.data @ rel_pose
-        return self.last_pose.float(), ret_frame, success
+        return self.last_pose.float(), ret_frame, success, flow[-1], crsp_list
 
     @property
     def device(self):

@@ -79,7 +79,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         pcl2_aligned, _ = remap_from_flow(pcl2_aligned, flow)
         weights2_aligned, _ = remap_from_flow(weights2, flow)
         mask2_aligned, valid = remap_from_flow_nearest(mask2, flow)
-        valid &= mask1 & mask2_aligned
+        valid &= mask1 & mask2_aligned.to(bool)
         # define objective loss function
         residuals = torch.sum((pcl2_aligned.view(n, 3, -1) - pcl1.view(n, 3, -1)) ** 2, dim=1)
         # reweighing residuals

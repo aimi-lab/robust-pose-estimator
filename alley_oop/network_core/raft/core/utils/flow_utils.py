@@ -21,6 +21,6 @@ def remap_from_flow_nearest(x, flow):
     flow_off = torch.empty_like(flow)
     flow_off[:, 1] = 2 * (flow[:, 1] + row_coords.to(flow.device)) / (h - 1) - 1
     flow_off[:, 0] = 2 * (flow[:, 0] + col_coords.to(flow.device)) / (w - 1) - 1
-    x = torch.nn.functional.grid_sample(x.float(), flow_off.permute(0, 2, 3, 1), align_corners=True, mode='nearest').to(bool)
+    x = torch.nn.functional.grid_sample(x.float(), flow_off.permute(0, 2, 3, 1), align_corners=True, mode='nearest')
     valid = (x > 0).any(dim=1).unsqueeze(1)
     return x, valid

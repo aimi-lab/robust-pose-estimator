@@ -321,7 +321,7 @@ class SurfelMap(object):
         assert transform.shape == (4, 4)
         opts = transform[:3,:3]@self.opts + transform[:3,3,None]
         normals = transform[:3,:3] @ self.nrml
-        return SurfelMap(opts=opts, normals=normals, kmat=self.kmat, rgb=self.rgb, img_shape=self.img_shape,
+        return self._constructor()(opts=opts, normals=normals, kmat=self.kmat, rgb=self.rgb, img_shape=self.img_shape,
                          depth_scale=self.depth_scale, conf=self.conf).to(self.device)
 
     @property
@@ -419,5 +419,9 @@ class SurfelMap(object):
         return self
 
     def __getitem__(self, item):
-        return SurfelMap(opts=self.opts[:, item], normals=self.nrml[:, item], kmat=self.kmat, gray=self.gray[:, item], img_shape=self.img_shape,
+        return self._constructor()(opts=self.opts[:, item], normals=self.nrml[:, item], kmat=self.kmat, gray=self.gray[:, item], img_shape=self.img_shape,
                          depth_scale=self.depth_scale, conf=self.conf[:, item]).to(self.device)
+
+    @property
+    def _constructor(self):
+        return SurfelMap
