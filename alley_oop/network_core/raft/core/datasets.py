@@ -72,7 +72,7 @@ class PoseDataset(Dataset):
         if isinstance(step, int):
             step = (step, step)
         # randomly sample n-frames
-        if samples > 0:
+        if (samples > 0) & (samples < len(images_l)):
             sample_list = sorted(np.random.choice(len(images_l)-step[1], size=(samples,), replace=False))
         else:
             sample_list = np.arange(len(images_l)-step[1])
