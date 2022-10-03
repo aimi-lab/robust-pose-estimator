@@ -9,6 +9,7 @@ model:
   use_weights: True
 
 data:
+  train:
     type: Intuitive
     basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_human
     sequences:
