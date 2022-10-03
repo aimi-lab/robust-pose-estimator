@@ -44,7 +44,7 @@ def get_data(config, img_size: Tuple, depth_cutoff: float):
             elif os.path.isfile(os.path.join(calib_path, 'endoscope_calibration.yaml')):
                 calib_file = os.path.join(calib_path, 'endoscope_calibration.yaml')
             else:
-                raise ValueError("no calibration file found")
+                raise ValueError(f"no calibration file found in {calib_path}")
             rect = StereoRectifier(calib_file, img_size_new=(img_size[1], img_size[0]), mode='conventional')
             calib = rect.get_rectified_calib()
             baseline.append(calib['bf'].astype(np.float32))
