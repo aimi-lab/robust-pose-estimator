@@ -5,8 +5,19 @@ import matplotlib.pyplot as plt
 import os
 
 api = wandb.Api()
+import argparse
 
-METHODS = ['orbslam2_raftdepth', 'scared_raftslam_f2f', 'scared_raftslam_f2f_w', 'scared_raftslam_f2m', 'scared_raftslam_f2m_w']
+parser = argparse.ArgumentParser(description='Inspect WandB results')
+
+parser.add_argument(
+    '--methods',
+    nargs='+',
+    type=str,
+    default=['orbslam2_raftdepth', 'scared_unet_f2m_w', 'scared_raftslam_f2m', 'scared_raftslam_f2m_w'],
+    help='Path to input folder.'
+)
+args = parser.parse_args()
+METHODS = args.methods
 
 # Download data from WANDB
 
