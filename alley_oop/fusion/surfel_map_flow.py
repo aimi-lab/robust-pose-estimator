@@ -9,6 +9,7 @@ class SurfelMapFlow(SurfelMap):
         # prepare parameters
         self.img_shape = frame.shape
         kmat = self.kmat.clone()
+        pmat_inv = torch.linalg.inv(pmat)
 
         rgb = frame.img
         depth = frame.depth
@@ -21,43 +22,37 @@ class SurfelMapFlow(SurfelMap):
 
         # project depth to 3d-points in world coordinates
         opts = reverse_project(ipts=ipts, dpth=depth, rmat=pmat[:3, :3], tvec=pmat[:3, -1][..., None], kmat=kmat)
+        # project surfel map to current image plane
+        global_ipts = forward_project(self.opts, kmat=kmat, rmat=pmat_inv[:3, :3], tvec=pmat_inv[:3, -1][:, None])
 
         # consider masked surfels and enforce channel x samples shape
         rgb = rgb.view(3, -1)
 
         # use optical flow to get correspondences (2D to 3D flow)
-        vidx = render_csp.view(-1)
-        n, _, h, w = flow.shape
-        row_coords, col_coords = torch.meshgrid(torch.arange(h), torch.arange(w), indexing='ij')
-        flow_off_w = torch.round(flow[:, 0] + col_coords.to(flow.device))
-        flow_off_h = torch.round(flow[:, 1] + row_coords.to(flow.device))
-        midx = (w*flow_off_h + flow_off_w).long()
-
-        valid = frame.mask & (flow_off_w >= 0) & (flow_off_w < w) & (flow_off_h >= 0) & (flow_off_h < h)
-        vidx = vidx[valid.view(-1)]
-        midx.view(-1)[~valid.view(-1)] = -1
-        midx = (midx.view(-1)[valid.view(-1)]).long()
-
+        flow_trg_idx, flow_ref_idx = self.get_flow_correspondences(frame, flow, render_csp)
+        proj_trg_idx = self.get_match_indices(global_ipts)
         # filter with respect to 3d distance
-        dists = torch.sum((opts[:, midx] - self.opts[:, vidx])**2, dim=0)
+        dists = torch.sum((opts[:, flow_trg_idx] - self.opts[:, flow_ref_idx])**2, dim=0)
         valid = dists < self.d_thresh**2
-        bidx = midx[valid]
-        vidx = vidx[valid]
+        bidx = flow_trg_idx[valid]
+        flow_ref_idx = flow_ref_idx[valid]
 
         # pre-select confidence elements
         conf = frame.confidence.view(1, -1) / self.conf_thr
-        ccor = conf[:, bidx]
-        conf_idx = self.conf[:, vidx]
 
         # update existing points, intensities, normals, radii and confidences
+        ccor = conf[:, bidx]
+        conf_idx = self.conf[:, flow_ref_idx]
         if self.average_points:
-            self.opts[:, vidx] = (conf_idx * self.opts[:, vidx] + ccor * opts[:, bidx]) / (conf_idx + ccor)
-            self.rgb[:, vidx] = (conf_idx * self.rgb[:, vidx] + ccor * rgb[:, bidx]) / (conf_idx + ccor)
-        self.conf[:, vidx] = torch.clamp(conf_idx + ccor, 0.0, 1.0)  # saturate confidence to 1
+            self.opts[:, flow_ref_idx] = (conf_idx * self.opts[:, flow_ref_idx] + ccor * opts[:, bidx]) / (conf_idx + ccor)
+            self.rgb[:, flow_ref_idx] = (conf_idx * self.rgb[:, flow_ref_idx] + ccor * rgb[:, bidx]) / (conf_idx + ccor)
+        self.conf[:, flow_ref_idx] = torch.clamp(conf_idx + ccor, 0.0, 1.0)  # saturate confidence to 1
 
         # create mask identifying unmatched indices
         mask = torch.ones(opts.shape[1], device=opts.device, dtype=torch.bool)
-        mask[midx] = False
+
+        mask[flow_trg_idx] = False  # mask points with optical flow matches
+        mask[proj_trg_idx] = False  # mask points with projective associations
         # avoid fusion with invalid pixels
         mask &= frame.mask.view(-1)
         if self.dbug_opt:
@@ -66,15 +61,29 @@ class SurfelMapFlow(SurfelMap):
             print(ratio)
 
         # concatenate unmatched points, intensities, normals, radii and confidences
-        self.opts = torch.cat((self.opts, self._downsample(opts)[:, mask]), dim=-1)
-        self.rgb = torch.cat((self.rgb, self._downsample(rgb)[:, mask]), dim=-1)
-        self.conf = torch.cat((self.conf, self._downsample(conf)[:, mask]), dim=-1)
+        self.opts = torch.cat((self.opts, opts[:, mask]), dim=-1)
+        self.rgb = torch.cat((self.rgb, rgb[:, mask]), dim=-1)
+        self.conf = torch.cat((self.conf, conf[:, mask]), dim=-1)
         self.t_created = torch.cat((self.t_created, self.tick * torch.ones(1, mask.sum()).to(self.device)), dim=-1)
 
         self.tick = self.tick + 1
 
         # remove surfels
         self.remove_surfels_by_confidence_and_time()
+
+    def get_flow_correspondences(self, frame, flow, render_csp):
+        n, _, h, w = flow.shape
+        vidx = render_csp.view(-1)
+        row_coords, col_coords = torch.meshgrid(torch.arange(h), torch.arange(w), indexing='ij')
+        flow_off_w = torch.round(flow[:, 0] + col_coords.to(flow.device))
+        flow_off_h = torch.round(flow[:, 1] + row_coords.to(flow.device))
+        midx = (w * flow_off_h + flow_off_w).long()
+
+        valid = frame.mask & (flow_off_w >= 0) & (flow_off_w < w) & (flow_off_h >= 0) & (flow_off_h < h)
+        vidx = vidx[valid.view(-1)]
+        midx.view(-1)[~valid.view(-1)] = -1
+        midx = (midx.view(-1)[valid.view(-1)]).long()
+        return midx, vidx
 
     def render(self, intrinsics: torch.tensor=None, extrinsics: torch.tensor=None):
         """
