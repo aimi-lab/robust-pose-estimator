@@ -24,7 +24,8 @@ def main(input_path):
             df_s = df_d[df_d.sequence.eq(s)]
             start_time = df_s['start_time'].min()
             end_time = df_s['end_time'].max()
-            df_acc.append({"dataset": d, "sequence": s, "start_time": start_time, "end_time": end_time})
+            files = sorted(glob.glob(os.path.join(input_path, d, 'semantic_predictions', '*.png')))
+            df_acc.append({"dataset": d, "sequence": s, "start_time": start_time, "end_time": end_time, "files": files})
 
     df_acc = pd.DataFrame(df_acc)
 
@@ -33,8 +34,7 @@ def main(input_path):
         print(outpath)
         os.makedirs(os.path.join(outpath, 'semantic_predictions'), exist_ok=True)
         os.makedirs(os.path.join(outpath, 'video_frames'), exist_ok=True)
-        files = sorted(glob.glob(os.path.join(input_path, row["dataset"], 'semantic_predictions', '*.png')))
-
+        files = row["files"]
         shutil.copy(os.path.join(input_path, row["dataset"], "StereoCalibration.ini"), os.path.join(outpath, "StereoCalibration.ini"))
 
         with open(os.path.join(input_path, row["dataset"], "groundtruth.txt"), "r") as f:
@@ -50,11 +50,11 @@ def main(input_path):
             except IndexError:
                 print(f"{i} > {len(files)}. skip")
                 break
-            shutil.copy(files[i], os.path.join(outpath, 'semantic_predictions', filename))
-            shutil.copy(os.path.join(input_path, row["dataset"],'video_frames', filename),
+            shutil.move(files[i], os.path.join(outpath, 'semantic_predictions', filename))
+            shutil.move(os.path.join(input_path, row["dataset"],'video_frames', filename),
                         os.path.join(outpath, 'video_frames', filename))
             filename_r = filename.replace("l", "r")
-            shutil.copy(os.path.join(input_path, row["dataset"],'video_frames', filename_r),
+            shutil.move(os.path.join(input_path, row["dataset"],'video_frames', filename_r),
                         os.path.join(outpath, 'video_frames', filename_r))
 
         print('finished')
