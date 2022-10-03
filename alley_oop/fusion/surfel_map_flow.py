@@ -30,7 +30,10 @@ class SurfelMapFlow(SurfelMap):
 
         # use optical flow to get correspondences (2D to 3D flow)
         flow_trg_idx, flow_ref_idx = self.get_flow_correspondences(frame, flow, render_csp)
-        proj_trg_idx = self.get_match_indices(global_ipts)
+        bidx = (global_ipts[0, :] >= 0) & (global_ipts[1, :] >= 0) & \
+               (global_ipts[0, :] < self.img_shape[1]-1) & (global_ipts[1, :] < self.img_shape[0]-1)
+        proj_trg_idx = self.get_match_indices(global_ipts[:, bidx])
+
         # filter with respect to 3d distance
         dists = torch.sum((opts[:, flow_trg_idx] - self.opts[:, flow_ref_idx])**2, dim=0)
         valid = dists < self.d_thresh**2
