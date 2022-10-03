@@ -80,14 +80,11 @@ def main(args, config, force_cpu):
     device = torch.device('cuda') if (torch.cuda.is_available() & (not force_cpu)) else torch.device('cpu')
 
     # get data
-    data_train, *_ = datasets.get_data(config['data']['train']['type'], config['data']['train']['basepath'],config['data']['train']['sequences'],
-                                               config['image_shape'], config['data']['train']['step'], config['depth_scale'])
-    data_val, infer_depth = datasets.get_data(config['data']['val']['type'], config['data']['val']['basepath'],config['data']['val']['sequences'],
-                                             config['image_shape'], config['data']['val']['step'], config['depth_scale'])
+    data_train, *_ = datasets.get_data(config['data']['train'], config['image_shape'], config['depth_scale'])
+    data_val, infer_depth = datasets.get_data(config['data']['val'], config['image_shape'], config['depth_scale'])
     print(f"train: {len(data_train)} samples, val: {len(data_val)} samples")
     train_loader = DataLoader(data_train, num_workers=4, pin_memory=True, batch_size=config['train']['batch_size'], shuffle=True)
-    val_loader = DataLoader(data_val, num_workers=4, pin_memory=True, batch_size=config['val']['batch_size'],
-                            sampler=SubsetRandomSampler(torch.from_numpy(np.random.choice(len(data_val), size=(400,), replace=False))))
+    val_loader = DataLoader(data_val, num_workers=4, pin_memory=True, batch_size=config['val']['batch_size'])
 
     # get model
     model = DefPoseN(config['model'])
