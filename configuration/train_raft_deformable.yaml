@@ -12,8 +12,17 @@ data:
     type: Intuitive
     basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_human
     sequences:
-      - dataset_1 #ToDo downsample these datasets!
-      - dataset_3
+      - dataset_1_0
+      - dataset_1_1
+      - dataset_1_2
+      - dataset_1_3
+      - dataset_1_4
+      - dataset_1_5
+      - dataset_1_6
+      - dataset_3_0
+      - dataset_3_1
+      - dataset_3_2
+      - dataset_3_3
       - scared_dataset_1
       - scared_dataset_2
       - scared_dataset_3
@@ -21,7 +30,7 @@ data:
     step:
       - 1
       - 60
-    samples:
+    samples: 1000
 
   val:
     type: Intuitive
@@ -30,13 +39,13 @@ data:
       - scared_dataset_7
       - scared_dataset_8
       - scared_dataset_9
-      - dataset_2
-      - dataset_4_0
-      - dataset_4_1
-      - dataset_4_2
-      - dataset_5
+      - dataset_6_0
+      - dataset_4_0_0
+      - dataset_4_1_0
+      - dataset_4_2_0
+      - dataset_5_0
     step: 3
-    samples:
+    samples: 20
 
 train:
   batch_size: 8
