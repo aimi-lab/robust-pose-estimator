@@ -38,15 +38,21 @@ class SurfelMapFlow(SurfelMap):
         midx.view(-1)[~valid.view(-1)] = -1
         midx = (midx.view(-1)[valid.view(-1)]).long()
 
+        # filter with respect to 3d distance
+        dists = torch.sum((opts[:, midx] - self.opts[:, vidx])**2, dim=0)
+        valid = dists < self.d_thresh**2
+        bidx = midx[valid]
+        vidx = vidx[valid]
+
         # pre-select confidence elements
         conf = frame.confidence.view(1, -1) / self.conf_thr
-        ccor = conf[:, midx]
+        ccor = conf[:, bidx]
         conf_idx = self.conf[:, vidx]
 
         # update existing points, intensities, normals, radii and confidences
         if self.average_points:
-            self.opts[:, vidx] = (conf_idx * self.opts[:, vidx] + ccor * opts[:, midx]) / (conf_idx + ccor)
-            self.rgb[:, vidx] = (conf_idx * self.rgb[:, vidx] + ccor * rgb[:, midx]) / (conf_idx + ccor)
+            self.opts[:, vidx] = (conf_idx * self.opts[:, vidx] + ccor * opts[:, bidx]) / (conf_idx + ccor)
+            self.rgb[:, vidx] = (conf_idx * self.rgb[:, vidx] + ccor * rgb[:, bidx]) / (conf_idx + ccor)
         self.conf[:, vidx] = torch.clamp(conf_idx + ccor, 0.0, 1.0)  # saturate confidence to 1
 
         # create mask identifying unmatched indices
