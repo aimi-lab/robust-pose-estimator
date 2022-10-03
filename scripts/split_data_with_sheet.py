@@ -50,12 +50,12 @@ def main(input_path):
             except IndexError:
                 print(f"{i} > {len(files)}. skip")
                 break
-            shutil.move(files[i], os.path.join(outpath, 'semantic_predictions', filename))
-            shutil.move(os.path.join(input_path, row["dataset"],'video_frames', filename),
+            shutil.copy(files[i], os.path.join(outpath, 'semantic_predictions', filename))
+            shutil.copy(os.path.join(input_path, row["dataset"],'video_frames', filename),
                         os.path.join(outpath, 'video_frames', filename))
             filename_r = filename.replace("l", "r")
-            shutil.move(os.path.join(input_path, row["dataset"],'video_frames', filename_r),
-                        os.path.join(outpath, 'semantic_predictions', filename_r))
+            shutil.copy(os.path.join(input_path, row["dataset"],'video_frames', filename_r),
+                        os.path.join(outpath, 'video_frames', filename_r))
 
         print('finished')
 
