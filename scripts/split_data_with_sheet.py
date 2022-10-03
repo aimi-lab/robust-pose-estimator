@@ -35,8 +35,21 @@ def main(input_path):
         os.makedirs(os.path.join(outpath, 'video_frames'), exist_ok=True)
         files = sorted(glob.glob(os.path.join(input_path, row["dataset"], 'semantic_predictions', '*.png')))
 
+        shutil.copy(os.path.join(input_path, row["dataset"], "StereoCalibration.ini"), os.path.join(outpath, "StereoCalibration.ini"))
+
+        with open(os.path.join(input_path, row["dataset"], "groundtruth.txt"), "r") as f:
+            lines = f.readlines()
+            end = min(row["end_time"], len(lines))
+            lines = lines[row["start_time"]: end]
+        with open(os.path.join(outpath, "groundtruth.txt"), "w") as f:
+            f.writelines(lines)
+
         for i in range(row["start_time"], row["end_time"]):
-            filename = os.path.basename(files[i])
+            try:
+                filename = os.path.basename(files[i])
+            except IndexError:
+                print(f"{i} > {len(files)}. skip")
+                break
             shutil.move(files[i], os.path.join(outpath, 'semantic_predictions', filename))
             shutil.move(os.path.join(input_path, row["dataset"],'video_frames', filename),
                         os.path.join(outpath, 'video_frames', filename))
