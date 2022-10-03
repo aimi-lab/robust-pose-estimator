@@ -17,6 +17,8 @@ from dataset.semantic_dataset import RGBDecoder
 
 def get_data(config, img_size: Tuple, depth_cutoff: float):
     # check the format of the calibration file
+    torch.manual_seed(1234)
+    np.random.seed(1234)
     img_size = tuple(img_size)
     infer_depth = True
     if config['type'] == 'TUM':
