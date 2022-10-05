@@ -178,9 +178,13 @@ def main(args, config, force_cpu):
                     plot_3d(ref_img, trg_img, ref_depth * config['depth_scale'], trg_depth * config['depth_scale'],
                             pseudo_lie_se3_to_SE3_batch(pose).detach(), intrinsics)
 
-            metrics = {"train/loss_rot": loss_cpu[:,:3].mean().item(),
-                      "train/loss_trans": loss_cpu[:, 3:].mean().item(),
-                      "train/loss_total": loss_cpu.mean().item()}
+            pose_change = torch.abs(gt_pose).sum(dim=-1) + 1e-12
+            metrics = {"train/loss_rot": loss_cpu[:, :3].mean().item(),
+                       "train/loss_rot_rel": (loss_cpu[:, :3] / pose_change).mean().item(),
+                       "train/loss_trans_rel": (loss_cpu[:, 3:] / pose_change).mean().item(),
+                       "train/loss_rel": (loss_cpu / pose_change).mean().item(),
+                       "train/loss_trans": loss_cpu[:, 3:].mean().item(),
+                       "train/loss_total": loss_cpu.mean().item()}
 
             scaler.step(optimizer)
             scaler.update()
@@ -201,6 +205,8 @@ def main(args, config, force_cpu):
                     path = os.path.join(args.outpath, f'{args.name}.pth')
                     torch.save({"state_dict": model.state_dict(), "config": config}, path)
                     logger.save_model(path)
+                path = os.path.join(args.outpath, f'{args.name}_last.pth')
+                torch.save({"state_dict": model.state_dict(), "config": config}, path)
             total_steps += 1
 
             if total_steps > config['train']['epochs']:
