@@ -174,7 +174,7 @@ def main(args, config, force_cpu):
                     plot_3d(ref_img, trg_img, ref_depth * config['depth_scale'], trg_depth * config['depth_scale'],
                             pseudo_lie_se3_to_SE3_batch(pose).detach(), intrinsics)
 
-            pose_change = torch.abs(gt_pose).sum(dim=-1, keepdim=True) + 1e-12
+            pose_change = (torch.abs(gt_pose).sum(dim=-1, keepdim=True) + 1e-12).detach().cpu()
             metrics = {"train/loss_rot": loss_cpu[:,:3].mean().item(),
                        "train/loss_rot_rel": (loss_cpu[:, :3] / pose_change).mean().item(),
                        "train/loss_trans_rel": (loss_cpu[:, 3:] / pose_change).mean().item(),
