@@ -48,7 +48,7 @@ class SurfelMapDeformable(SurfelMapFlow):
 
         # update warp-field (this is a very naive approach simply taking the residuals as the new warp-field)
         self.warp_field = torch.zeros_like(self.opts)
-        self.warp_field[:, flow_ref_idx] = dists
+        self.warp_field[:, flow_ref_idx] = dists[:, valid]
         # pre-select confidence elements
         conf = frame.confidence.view(1, -1) / self.conf_thr
 
@@ -76,8 +76,8 @@ class SurfelMapDeformable(SurfelMapFlow):
         self.opts = torch.cat((self.opts, opts[:, mask]), dim=-1)
         self.rgb = torch.cat((self.rgb, rgb[:, mask]), dim=-1)
         self.conf = torch.cat((self.conf, conf[:, mask]), dim=-1)
-        self.t_created = torch.cat((self.t_created, self.tick * torch.ones(1, mask.sum()).to(self.device)), dim=-1)
-
+        self.t_created = torch.cat((self.t_created, self.tick * torch.ones((1, mask.sum()), device=self.device)), dim=-1)
+        self.warp_field = torch.cat((self.warp_field,  torch.ones((3, mask.sum()), device=self.device)), dim=-1)
         self.tick = self.tick + 1
 
         # remove surfels
@@ -104,7 +104,7 @@ class SurfelMapDeformable(SurfelMapFlow):
         return self.deform_cpy(-warp_field)
 
     def _deform(self, opts, warp_field: torch.Tensor = None):
-        return opts + warp_field.T
+        return opts + warp_field
 
     def deform(self, warp_field: torch.Tensor = None):
         """
@@ -123,9 +123,9 @@ class SurfelMapDeformable(SurfelMapFlow):
         warp_field = self.warp_field if warp_field is None else warp_field
         opts = self.opts.clone()
         opts = self._deform(opts, warp_field)
-        map = self._constructor(opts=opts, kmat=self.kmat, gray=self.gray, img_shape=self.img_shape,
+        map = self._constructor(opts=opts, kmat=self.kmat, rgb=self.rgb, img_shape=self.img_shape,
                                   depth_scale=self.depth_scale, conf=self.conf, warp_field=warp_field,
-                                  active=self.active).to(self.device)
+                                  normals=self.normals).to(self.device)
 
         return map
 
@@ -137,11 +137,12 @@ class SurfelMapDeformable(SurfelMapFlow):
         opts = transform[:3, :3] @ self.opts + transform[:3, 3, None]
         warp_field = transform[:3, :3] @ self.warp_field + transform[:3, 3, None]
         return self._constructor(opts=opts, kmat=self.kmat, rgb=self.rgb, img_shape=self.img_shape,
-                                 depth_scale=self.depth_scale, conf=self.conf, warp_field=warp_field).to(self.device)
+                                 depth_scale=self.depth_scale, conf=self.conf, warp_field=warp_field,
+                                 normals=self.normals).to(self.device)
 
-    def render(self, intrinsics: torch.tensor=None, extrinsics: torch.tensor=None, deform: bool=False):
+    def render(self, intrinsics: torch.tensor=None, extrinsics: torch.tensor=None, deform: bool=True):
         if deform:
             d = self.deform_cpy()
+            return d.render(intrinsics, extrinsics, deform=False)
         else:
-            d = self
-        return d.render(intrinsics, extrinsics)
+            return super().render(intrinsics, extrinsics)

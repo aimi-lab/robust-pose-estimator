@@ -1,5 +1,5 @@
 import torch
-from alley_oop.fusion.surfel_map_flow import SurfelMapFlow, SurfelMap
+from alley_oop.fusion.surfel_map_deformable import SurfelMapFlow, SurfelMap, SurfelMapDeformable
 from alley_oop.pose.raft_pose_estimator import RAFTPoseEstimator
 from alley_oop.pose.frame_class import FrameClass
 from typing import Union, Tuple
@@ -41,6 +41,8 @@ class SLAM(object):
             self.map = SurfelMap
         elif config['fuse_mode'] == 'flow':
             self.map = SurfelMapFlow
+        elif config['fuse_mode'] == 'deformable':
+            self.map = SurfelMapDeformable
 
     def processFrame(self, img: tensor, depth:tensor, mask:tensor=None, flow:tensor=None):
         """
