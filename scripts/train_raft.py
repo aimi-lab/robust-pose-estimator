@@ -33,7 +33,7 @@ def fetch_optimizer(config, model):
     return optimizer
     
 
-def val(model, dataloader, device, loss_weights, intrinsics, logger, infer_depth):
+def val(model, dataloader, device, intrinsics, logger, infer_depth, key):
     model.eval()
     with torch.no_grad():
         for i_batch, data_blob in enumerate(dataloader):
@@ -61,9 +61,9 @@ def val(model, dataloader, device, loss_weights, intrinsics, logger, infer_depth
             loss_pose = supervised_pose_loss(pose_predictions, gt_pose)
             loss = torch.nanmean(loss_pose)
             loss_cpu = loss_pose.detach().cpu()
-            metrics = {"val/loss_rot": loss_cpu[:, :3].nanmean().item(),
-                       "val/loss_trans": loss_cpu[:, 3:].nanmean().item(),
-                       "val/loss_total": loss_cpu.nanmean().item()}
+            metrics = {f"{key}/loss_rot": loss_cpu[:, :3].nanmean().item(),
+                       f"{key}/loss_trans": loss_cpu[:, 3:].nanmean().item(),
+                       f"{key}/loss_total": loss_cpu.nanmean().item()}
             logger.push(metrics, len(dataloader))
         logger.flush()
         logger.log_plot(plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth, pseudo_lie_se3_to_SE3_batch(-pose_predictions), conf1, conf2, intrinsics)[0])
@@ -80,9 +80,11 @@ def main(args, config, force_cpu):
     # get data
     data_train, *_ = datasets.get_data(config['data']['train'], config['image_shape'], config['depth_scale'])
     data_val, infer_depth = datasets.get_data(config['data']['val'], config['image_shape'], config['depth_scale'])
+    data_val2, infer_depth = datasets.get_data(config['data']['val2'], config['image_shape'], config['depth_scale'])
     print(f"train: {len(data_train)} samples, val: {len(data_val)} samples")
     train_loader = DataLoader(data_train, num_workers=4, pin_memory=True, batch_size=config['train']['batch_size'], shuffle=True)
     val_loader = DataLoader(data_val, num_workers=4, pin_memory=True, batch_size=config['val']['batch_size'])
+    val2_loader = DataLoader(data_val2, num_workers=4, pin_memory=True, batch_size=config['val']['batch_size'])
 
     # get model
     model = PoseN(config['model'])
@@ -183,8 +185,10 @@ def main(args, config, force_cpu):
             if total_steps % SUM_FREQ == SUM_FREQ - 1:
                 logger.flush()
 
-            if total_steps % VAL_FREQ == VAL_FREQ - 1:
-                val_loss = val(model, val_loader, device, loss_weights, intrinsics, logger, infer_depth)
+            if (total_steps % VAL_FREQ) == 0:
+                val_loss = val(model, val_loader, device, intrinsics, logger, infer_depth, 'val')
+                val_loss2 = val(model, val2_loader, device, intrinsics, logger, infer_depth, 'val2')
+                val_loss += val_loss2
                 if torch.isnan(torch.tensor(val_loss)):
                     should_keep_training = False
                     break
