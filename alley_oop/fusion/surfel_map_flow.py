@@ -3,7 +3,11 @@ from alley_oop.network_core.raft.core.utils.flow_utils import remap_from_flow_ne
 
 
 class SurfelMapFlow(SurfelMap):
-    def fuse(self, frame: FrameClass, pmat: torch.Tensor, flow: torch.Tensor, render_csp: torch.Tensor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def fuse(self, *args):
+        frame, pmat, flow, render_csp = args
         assert pmat.shape == (4, 4)
 
         # prepare parameters
@@ -128,6 +132,7 @@ class SurfelMapFlow(SurfelMap):
 
         return FrameClass(colors, depth, intrinsics=intrinsics, mask=mask, confidence=confidence[None,None,...]).to(intrinsics.device), render_csp
 
+    @property
     def _constructor(self):
         return SurfelMapFlow
 

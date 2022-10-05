@@ -1,5 +1,5 @@
 import torch
-from alley_oop.fusion.surfel_map_flow import SurfelMapFlow
+from alley_oop.fusion.surfel_map_flow import SurfelMapFlow, SurfelMap
 from alley_oop.pose.raft_pose_estimator import RAFTPoseEstimator
 from alley_oop.pose.frame_class import FrameClass
 from typing import Union, Tuple
@@ -37,6 +37,10 @@ class SLAM(object):
         self.pose_estimator = RAFTPoseEstimator(self.intrinsics, baseline, checkpoint, (img_shape[1], img_shape[0]), config['frame2frame'],
                                                 self.init_pose, self.depth_scale)
         self.pose_estimator.model.use_weights = config['conf_weighing']
+        if config['fuse_mode'] == 'projective':
+            self.map = SurfelMap
+        elif config['fuse_mode'] == 'flow':
+            self.map = SurfelMapFlow
 
     def processFrame(self, img: tensor, depth:tensor, mask:tensor=None, flow:tensor=None):
         """
@@ -50,7 +54,7 @@ class SLAM(object):
             self.frame = FrameClass(img, depth, intrinsics=self.intrinsics, mask=mask, flow=flow)
             if self.scene is None:
                 # initialize scene with first frame
-                self.scene = SurfelMapFlow(frame=self.frame, kmat=self.intrinsics.squeeze(), upscale=1,
+                self.scene = self.map(frame=self.frame, kmat=self.intrinsics.squeeze(), upscale=1,
                                        d_thresh=self.config['dist_thr'], depth_scale=self.depth_scale,
                                        pmat=self.init_pose, average_pts=self.config['average_pts']).to(self.device)
             pose, self.rendered_frame, success, flow, crsp_list = self.pose_estimator.estimate(self.frame, self.scene)

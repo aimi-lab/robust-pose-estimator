@@ -10,6 +10,7 @@ slam:
   conf_weighing: True
   compensate_illumination: False  # do not use this with noisy depth estimates
   average_pts: False
+  fuse_mode: projective
 
 img_size:
   - 640

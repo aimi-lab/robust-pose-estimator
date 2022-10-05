@@ -74,7 +74,8 @@ class SurfelMap(object):
         self.tick = 0
         self.t_created = torch.zeros(1,self.opts.shape[1]).to(self.device)
 
-    def fuse(self, frame: FrameClass, pmat: torch.Tensor):
+    def fuse(self, *args):
+        frame, pmat = args[:2]
         assert pmat.shape == (4,4)
 
         # prepare parameters
@@ -321,7 +322,7 @@ class SurfelMap(object):
         assert transform.shape == (4, 4)
         opts = transform[:3,:3]@self.opts + transform[:3,3,None]
         normals = transform[:3,:3] @ self.nrml
-        return self._constructor()(opts=opts, normals=normals, kmat=self.kmat, rgb=self.rgb, img_shape=self.img_shape,
+        return self._constructor(opts=opts, normals=normals, kmat=self.kmat, rgb=self.rgb, img_shape=self.img_shape,
                          depth_scale=self.depth_scale, conf=self.conf).to(self.device)
 
     @property
@@ -371,7 +372,7 @@ class SurfelMap(object):
         colors[2][img_coords] = self.rgb[2, sort_idx][valid]
         colors = self.interpolate(colors[None,...])
 
-        return FrameClass(colors, depth, intrinsics=intrinsics, mask=mask, confidence=confidence[None,None,...]).to(intrinsics.device)
+        return FrameClass(colors, depth, intrinsics=intrinsics, mask=mask, confidence=confidence[None,None,...]).to(intrinsics.device), None
 
     def pcl2open3d(self, stable: bool=True, filter: torch.Tensor=None):
         """
@@ -419,7 +420,7 @@ class SurfelMap(object):
         return self
 
     def __getitem__(self, item):
-        return self._constructor()(opts=self.opts[:, item], normals=self.nrml[:, item], kmat=self.kmat, gray=self.gray[:, item], img_shape=self.img_shape,
+        return self._constructor(opts=self.opts[:, item], normals=self.nrml[:, item], kmat=self.kmat, gray=self.gray[:, item], img_shape=self.img_shape,
                          depth_scale=self.depth_scale, conf=self.conf[:, item]).to(self.device)
 
     @property
