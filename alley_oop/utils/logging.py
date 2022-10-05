@@ -29,7 +29,13 @@ class OptimizationRecordings():
                 log_dict.update({'error/x': tr_err[0],
                                  'error/y': tr_err[1],
                                  'error/z': tr_err[2],
-                                 'error/rot': rot_err_deg})
+                                 'error/rot': rot_err_deg,
+                                 'error/x_pred': self.trajectory[-1][0, 3],
+                                 'error/y_pred': self.trajectory[-1][1, 3],
+                                 'error/z_pred': self.trajectory[-1][2, 3],
+                                 'error/x_gt': self.gt_trajectory[step][0,3],
+                                 'error/y_gt': self.gt_trajectory[step][1,3],
+                                 'error/z_gt':self.gt_trajectory[step][2,3]})
         wandb.log(log_dict, step=step)
 
     def set_gt(self, gt_trajectory):
