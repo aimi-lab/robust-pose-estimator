@@ -9,13 +9,13 @@ import glob
 def main(input_path):
     df = pd.read_excel(os.path.join(input_path, "selection_dataset.ods"), squeeze=True)
 
-    def time2frames(t, fps=60):
+    def time2frames(t, fps):
         min, sec = t.split(":")
         frames = fps*(60*int(min)+int(sec))
         return frames
 
-    df['start_time'] = df['start_time'].apply(time2frames)
-    df['end_time'] = df['end_time'].apply(time2frames)
+    df['start_time'] = df.apply(lambda x: time2frames(x.start_time, x.fps), axis=1)
+    df['end_time'] = df.apply(lambda x: time2frames(x.end_time, x.fps), axis=1)
 
     df_acc = []
     for d in df['dataset'].unique():
