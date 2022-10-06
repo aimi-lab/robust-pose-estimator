@@ -114,6 +114,31 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         torch.backends.cuda.matmul.allow_tf32 = True
         return y.detach(), None
 
+    def residuals3d(self, *xs, y):
+        flow, pcl1, pcl2, weights1, weights2, mask1, mask2, loss_weight, intrinsics= xs
+        # this is generally better for translation (essentially in z-direction)
+        # 3D geometric L2 loss
+        n, _, h, w = pcl1.shape
+        # se(3) to SE(3)
+        pose = pseudo_lie_se3_to_SE3_batch_small(y)
+        # # transform point cloud given the pose
+        pcl2_aligned = transform(homogenous(pcl2.view(n, 3, -1)), pose).reshape(n, 4, h, w)[:, :3]
+        # resample point clouds given the optical flow
+        pcl2_aligned, _ = remap_from_flow(pcl2_aligned, flow)
+        weights2_aligned, _ = remap_from_flow(weights2, flow)
+        mask2_aligned, valid = remap_from_flow_nearest(mask2, flow)
+        valid &= mask1 & mask2_aligned.to(bool)
+        # define objective loss function
+        dists = pcl2_aligned- pcl1
+
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots(1,4)
+        ax[0].imshow(dists[0,0].numpy())
+        ax[1].imshow(dists[0, 1].numpy())
+        ax[2].imshow(dists[0, 2].numpy())
+        ax[3].imshow((torch.sum(dists[0, :]**2, dim=0) > 0.01**2).numpy())
+        plt.show()
+
     def gradient(self, *xs, y=None, v=None, ctx=None):
         """Computes the vector--Jacobian product, that is, the gradient of the
         loss function with respect to the problem parameters. The returned
