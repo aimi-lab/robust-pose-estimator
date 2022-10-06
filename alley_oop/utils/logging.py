@@ -6,8 +6,8 @@ import numpy as np
 class OptimizationRecordings():
     def __init__(self):
         self.trajectory = []
-        self.surfels_total = []
-        self.surfels_stable = []
+        self.surfels_total = [0]
+        self.surfels_stable = [0]
         self.gt_trajectory = None
 
     def __call__(self, scene, pose):
