@@ -51,45 +51,36 @@ class Viewer3D(object):
         self.viewer.add_geometry(self.pcd)
         self.control.convert_from_pinhole_camera_parameters(self.pose)
 
-    def __call__(self, pose, pcd=None, add_pcd=None, zoom=0.5, frame=None, synth_frame=None, optim_results=None, def_pcd=None):
+    def __call__(self, pose, pcd=None, add_pcd=None, zoom=0.5, frame=None, synth_frame=None, def_pcd=None):
         # plot input frame and synthesized frame
         self.pose = self.pose2view(pose)
         self.is_deformed = False
         self.def_pcd = def_pcd
-        if (optim_results is not None) | (frame is not None):
-            if optim_results is not None:
-                fig, ax = plt.subplots(len(optim_results) + 2, 1, num=1, clear=True, figsize=(8,16))
-            else:
-                fig, ax = plt.subplots(2, 1, num=1, clear=True, figsize=(8,16))
+        if (frame is not None):
+            fig, ax = plt.subplots(2, 3, num=1, clear=True, figsize=(10,8))
             if (frame is not None) & (synth_frame is not None):
-                _, img, depth, *_, conf = frame.to_numpy()
-                _, img_synth, depth_synth,_, conf_synth = synth_frame.to_numpy()
-                img_view = np.concatenate((img, depth, conf), axis=1)
-                ax[0].imshow(img_view, vmin=0, vmax=1)
-                ax[0].axis('off')
-                ax[0].set_title('input (img | depth | conf)')
-                img_view = np.concatenate((img_synth, depth_synth, conf_synth), axis=1)
-                ax[1].imshow(img_view, vmin=0, vmax=1)
-                ax[1].axis('off')
-                ax[1].set_title('rendered (img | depth | conf )')
-            # plot optimization results
-            if optim_results is not None:
-                if len(optim_results[0]) > 0:
-                    for lv, i in enumerate(range(len(optim_results), 0, -1)):
-                        ax[i+1].set_title(f'Optimization Cost at Pyramid Lv {lv}')
-                        ax[i+1].plot(optim_results[lv]['combined'], marker='.')
-                        ax[i+1].plot(optim_results[lv]['icp'], marker='.')
-                        ax[i+1].plot(optim_results[lv]['rgb'], marker='.')
-                        ax[i+1].plot(optim_results[lv]['dx'], marker='.')
-                        ax2 = ax[i+1].twinx()
-                        ax2.plot(optim_results[lv]['cond'], 'r--', marker='*')
-                        ax2.legend(['# cond'])
-                        ax[i+1].grid()
-                        ax[i+1].axvline(optim_results[lv]['best_iter'])
-                    ax[2].legend(['combined', 'icp', 'rgb', '|dx|'])
-                    ax[-1].set_xlabel('iterations')
-                    plt.tight_layout()
+                img, _, depth, *_, conf = frame.to_numpy()
+                ax[0,0].imshow(img)
+                ax[0, 0].axis('off')
+                ax[0, 0].set_title('I_t')
+                ax[0, 1].imshow(depth, vmin=0, vmax=1)
+                ax[0, 1].axis('off')
+                ax[0, 1].set_title('depth_t')
+                ax[0, 2].imshow(conf, vmin=0, vmax=1)
+                ax[0, 2].axis('off')
+                ax[0, 2].set_title('weights_t')
+                img, _, depth, *_, conf = synth_frame.to_numpy()
+                ax[1, 0].imshow(img)
+                ax[1, 0].axis('off')
+                ax[1, 0].set_title('I_t-1')
+                ax[1, 1].imshow(depth, vmin=0, vmax=1)
+                ax[1, 1].axis('off')
+                ax[1, 1].set_title('depth_t-1')
+                ax[1, 2].imshow(conf, vmin=0, vmax=1)
+                ax[1, 2].axis('off')
+                ax[1, 2].set_title('weights_t-1')
             plt.draw()
+            plt.savefig('dummy.png')
             plt.pause(0.0001)
 
         self.exit_loop = not self.blocking
