@@ -7,7 +7,7 @@ import numpy as np
 from tqdm import tqdm
 from dataset.preprocess.segmentation_network.seg_model import SemanticSegmentationModel
 import matplotlib.pyplot as plt
-from alley_oop.fusion.surfel_map import SurfelMap
+from alley_oop.fusion.surfel_map_deformable import *
 from alley_oop.utils.trajectory import save_trajectory, read_freiburg
 from dataset.dataset_utils import get_data, StereoVideoDataset, SequentialSubSampler, RGBDDataset, TUMDataset
 from dataset.transforms import Compose
@@ -77,9 +77,11 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fo
                                      pmat=pose_relscale, depth_scale=scene.depth_scale).pcl2open3d(stable=False)
 
                 canonical_scene = scene.pcl2open3d(stable=config['viewer']['stable'])
+                deformed_scene = scene.deform_cpy().pcl2open3d(stable=config['viewer']['stable']) if isinstance(scene, SurfelMapDeformable) else None
                 print('Current Frame vs Scene (Canonical/Deformed)')
                 viewer(pose.cpu(), canonical_scene, add_pcd=curr_pcl,
-                       frame=slam.get_frame(), synth_frame=slam.get_rendered_frame())
+                       frame=slam.get_frame(), synth_frame=slam.get_rendered_frame(),
+                       def_pcd=deformed_scene)
 
             trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
             if (log is not None) & (i > 0):
