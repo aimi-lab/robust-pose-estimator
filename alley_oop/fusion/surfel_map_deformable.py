@@ -1,4 +1,5 @@
 from alley_oop.fusion.surfel_map_flow import *
+from alley_oop.interpol.gp_warpfield import GP_WarpFieldEstimator
 
 
 class SurfelMapDeformable(SurfelMapFlow):
@@ -6,6 +7,9 @@ class SurfelMapDeformable(SurfelMapFlow):
         super().__init__(*args, **kwargs)
         self.warp_field = kwargs["warp_field"] if "warp_field" in kwargs else torch.zeros_like(self.opts)  # translational warp-field
         assert self.opts.shape == self.warp_field.shape
+        self.warp_field_estimator = GP_WarpFieldEstimator(length_scale=0.1,
+                                                          noise_level=0.001)
+        self.n_samples = 256
 
     def fuse(self, *args):
         frame, pmat, flow, render_csp = args
@@ -35,7 +39,7 @@ class SurfelMapDeformable(SurfelMapFlow):
         rgb = rgb.view(3, -1)
 
         # use optical flow to get correspondences (2D to 3D flow)
-        flow_trg_idx, flow_ref_idx = self.get_flow_correspondences(frame, flow, render_csp)
+        flow_trg_idx, flow_ref_idx, flow_trg_idx_lr, flow_ref_idx_lr = self.get_flow_correspondences(frame, flow, render_csp)
         bidx = (global_ipts[0, :] >= 0) & (global_ipts[1, :] >= 0) & \
                (global_ipts[0, :] < self.img_shape[1]-1) & (global_ipts[1, :] < self.img_shape[0]-1)
         proj_trg_idx = self.get_match_indices(global_ipts[:, bidx])
@@ -46,12 +50,16 @@ class SurfelMapDeformable(SurfelMapFlow):
         # 2: large residuals are mainly due to deformations
         # -> no accumulation of small drift errors, but update of scene when deformations are significant
 
-        dists = opts[:, flow_trg_idx] - self.opts[:, flow_ref_idx]
-        deformed = torch.sum(dists**2, dim=0) > self.d_thresh**2
+        # fit and predict warp-field for canonical model to current frame
+        # we need to subsample to condition the GP for computational reasons, then we can evaluate it on all points.
+        self.warp_field_estimator.fit(self.opts[:, flow_ref_idx_lr], opts[:, flow_trg_idx_lr])
 
-        # update warp-field (this is a very naive approach simply taking the residuals as the new warp-field)
-        self.warp_field = torch.zeros_like(self.opts)
-        self.warp_field[:, flow_ref_idx[deformed]] = dists[:, deformed]
+        # estimate warp-field from canonical to current frame (with extrapolation), we only deform active points for computational reasons
+        self.warp_field = self.warp_field_estimator.predict(self.opts)
+        # threshold warp-field for small deformations to avoid drift
+        not_deformed = torch.sum(self.warp_field ** 2, dim=0) <= self.d_thresh ** 2
+        self.warp_field[:, not_deformed] = 0.0
+
         # pre-select confidence elements
         conf = frame.confidence.view(1, -1) / self.conf_thr
 
@@ -71,7 +79,7 @@ class SurfelMapDeformable(SurfelMapFlow):
             print(ratio)
 
         # concatenate unmatched points, intensities, normals, radii and confidences
-        self.opts = torch.cat((self.opts, opts[:, mask]), dim=-1)
+        self.opts = torch.cat((self.opts, opts[:, mask]), dim=-1) #We should deform points before adding locations
         self.rgb = torch.cat((self.rgb, rgb[:, mask]), dim=-1)
         self.conf = torch.cat((self.conf, conf[:, mask]), dim=-1)
         self.t_created = torch.cat((self.t_created, self.tick * torch.ones((1, mask.sum()), device=self.device)), dim=-1)
@@ -144,3 +152,21 @@ class SurfelMapDeformable(SurfelMapFlow):
             return d.render(intrinsics, extrinsics, deform=False)
         else:
             return super().render(intrinsics, extrinsics)
+
+    def get_flow_correspondences(self, frame, flow, render_csp, step=32):
+        n, _, h, w = flow.shape
+        vidx = render_csp.view(-1)
+        row_coords, col_coords = torch.meshgrid(torch.arange(h), torch.arange(w), indexing='ij')
+        flow_off_w = torch.round(flow.squeeze()[0] + col_coords.to(flow.device))
+        flow_off_h = torch.round(flow.squeeze()[1] + row_coords.to(flow.device))
+        midx = (w * flow_off_h + flow_off_w).long()
+        valid = frame.mask.squeeze() & (flow_off_w >= 0) & (flow_off_w < w) & (flow_off_h >= 0) & (flow_off_h < h)
+
+        midx_lowres = midx[::step, ::step]
+        midx_lowres = midx_lowres[valid[::step, ::step]].view(-1).long()
+        vidx_lowres = render_csp[::step, ::step]
+        vidx_lowres = vidx_lowres[valid[::step, ::step]].view(-1)
+
+        vidx = vidx[valid.view(-1)]
+        midx = (midx.view(-1)[valid.view(-1)]).long()
+        return midx, vidx ,midx_lowres, vidx_lowres

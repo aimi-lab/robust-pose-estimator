@@ -88,7 +88,6 @@ class SurfelMapFlow(SurfelMap):
 
         valid = frame.mask & (flow_off_w >= 0) & (flow_off_w < w) & (flow_off_h >= 0) & (flow_off_h < h)
         vidx = vidx[valid.view(-1)]
-        midx.view(-1)[~valid.view(-1)] = -1
         midx = (midx.view(-1)[valid.view(-1)]).long()
         return midx, vidx
 
