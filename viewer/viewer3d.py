@@ -99,25 +99,8 @@ class Viewer3D(object):
             self.viewer.add_geometry(add_pcd)
         if pcd is not None:
             self.viewer.remove_geometry(self.pcd, reset_bounding_box=True)
-            if add_pcd is not None:
-                # colorize by closest point distance
-                try:
-                    dists = np.asarray(pcd.compute_point_cloud_distance(add_pcd))
-                    cmap = cm.hot
-                    #pcd.colors = o3d.utility.Vector3dVector(cmap(dists)[:, :3])
-                except AttributeError:
-                    pass
             self.pcd = pcd
             self.viewer.add_geometry(self.pcd)
-        if self.def_pcd is not None:
-            # colorize by closest point distance
-            if add_pcd is not None:
-                try:
-                    dists = 5 * np.asarray(self.def_pcd.compute_point_cloud_distance(add_pcd))
-                    cmap = cm.hot
-                    self.def_pcd.colors = o3d.utility.Vector3dVector(cmap(dists)[:, :3])
-                except AttributeError:
-                    pass
         self.control.convert_from_pinhole_camera_parameters(self.pose2view(pose))
         #self.control.set_zoom(zoom)
         self.viewer.poll_events()
