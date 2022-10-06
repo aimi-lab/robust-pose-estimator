@@ -40,25 +40,23 @@ class SurfelMapDeformable(SurfelMapFlow):
                (global_ipts[0, :] < self.img_shape[1]-1) & (global_ipts[1, :] < self.img_shape[0]-1)
         proj_trg_idx = self.get_match_indices(global_ipts[:, bidx])
 
-        # filter with respect to 3d distance
+        # use the residuals as a 3d translational warp-field
+        # the assumptions are:
+        # 1: small residuals are due to depth, flow or pose estimation errors and should be ignored
+        # 2: large residuals are mainly due to deformations
+        # -> no accumulation of small drift errors, but update of scene when deformations are significant
+
         dists = opts[:, flow_trg_idx] - self.opts[:, flow_ref_idx]
-        valid = torch.sum(dists**2, dim=0) < self.d_thresh**2
-        bidx = flow_trg_idx[valid]
-        flow_ref_idx = flow_ref_idx[valid]
+        deformed = torch.sum(dists**2, dim=0) > self.d_thresh**2
 
         # update warp-field (this is a very naive approach simply taking the residuals as the new warp-field)
         self.warp_field = torch.zeros_like(self.opts)
-        self.warp_field[:, flow_ref_idx] = dists[:, valid]
+        self.warp_field[:, flow_ref_idx[deformed]] = dists[:, deformed]
         # pre-select confidence elements
         conf = frame.confidence.view(1, -1) / self.conf_thr
 
-        # update existing points, intensities, normals, radii and confidences
-        ccor = conf[:, bidx]
-        conf_idx = self.conf[:, flow_ref_idx]
-        if self.average_points:
-            self.opts[:, flow_ref_idx] = (conf_idx * self.opts[:, flow_ref_idx] + ccor * opts[:, bidx]) / (conf_idx + ccor)
-            self.rgb[:, flow_ref_idx] = (conf_idx * self.rgb[:, flow_ref_idx] + ccor * rgb[:, bidx]) / (conf_idx + ccor)
-        self.conf[:, flow_ref_idx] = torch.clamp(conf_idx + ccor, 0.0, 1.0)  # saturate confidence to 1
+        # update confidences
+        self.conf[:, flow_ref_idx] = torch.clamp(self.conf[:, flow_ref_idx] + conf[:, flow_trg_idx], 0.0, 1.0)  # saturate confidence to 1
 
         # create mask identifying unmatched indices
         mask = torch.ones(opts.shape[1], device=opts.device, dtype=torch.bool)
@@ -77,7 +75,7 @@ class SurfelMapDeformable(SurfelMapFlow):
         self.rgb = torch.cat((self.rgb, rgb[:, mask]), dim=-1)
         self.conf = torch.cat((self.conf, conf[:, mask]), dim=-1)
         self.t_created = torch.cat((self.t_created, self.tick * torch.ones((1, mask.sum()), device=self.device)), dim=-1)
-        self.warp_field = torch.cat((self.warp_field,  torch.ones((3, mask.sum()), device=self.device)), dim=-1)
+        self.warp_field = torch.cat((self.warp_field,  torch.zeros((3, mask.sum()), device=self.device)), dim=-1)
         self.tick = self.tick + 1
 
         # remove surfels
