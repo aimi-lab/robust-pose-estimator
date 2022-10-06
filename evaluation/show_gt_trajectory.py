@@ -62,11 +62,13 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fi
             else:
                 limg, rimg, mask, semantics, img_number = data
                 depth, *_ = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
+            depth *= config['slam']['depth_clipping'][1]
             frame = FrameClass(limg, depth, intrinsics=torch.tensor(calib['intrinsics']['left']).float())
+
             pose_gt = torch.tensor(gt_trajectory[int(img_number[0])]).float()
-            print(depth.median(), pose_gt[2, 3], depth.median()+pose_gt[2, 3])
+
+            print(pose_gt)
             if i == 0:
-                frame_gt = FrameClass(limg, torch.tensor(gt_depth)[None,None,...], intrinsics=torch.tensor(calib['intrinsics']['left']).float())
                 first_pcl = SurfelMap(frame=frame, kmat=torch.tensor(calib['intrinsics']['left']).float(),
                                       pmat=pose_gt, depth_scale=1).pcl2open3d(stable=False)
                 if gt_depth is not None:
