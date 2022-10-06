@@ -6,13 +6,17 @@ import numpy as np
 class OptimizationRecordings():
     def __init__(self):
         self.trajectory = []
-        self.surfels_total = [0]
-        self.surfels_stable = [0]
+        self.surfels_total = []
+        self.surfels_stable = []
         self.gt_trajectory = None
 
     def __call__(self, scene, pose):
-        self.surfels_total.append(scene.opts.shape[1])
-        self.surfels_stable.append((scene.conf >= 1.0).sum().item())
+        if scene is not None:
+            self.surfels_total.append(scene.opts.shape[1])
+            self.surfels_stable.append((scene.conf >= 1.0).sum().item())
+        else:
+            self.surfels_total.append(0)
+            self.surfels_stable.append(0)
         self.trajectory.append(pose.cpu().numpy())
 
 

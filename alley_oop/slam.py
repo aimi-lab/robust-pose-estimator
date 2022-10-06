@@ -66,7 +66,7 @@ class SLAM(object):
                 self.scene.fuse(self.frame, pose, flow, crsp_list)
                 if self.dbg_opt:
                     print(f"number of surfels: {self.scene.opts.shape[1]}, stable: {(self.scene.conf >= 1.0).sum().item()}")
-                self.recorder(self.scene, pose_scaled)
+            self.recorder(self.scene, pose_scaled)
             self.cnt += 1
 
             return pose_scaled, self.scene, pose
