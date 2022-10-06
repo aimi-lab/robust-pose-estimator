@@ -38,6 +38,7 @@ class Viewer3D(object):
         self.exit_loop = True
 
     def deform_callback(self, dummy):
+        self.pose = self.control.convert_to_pinhole_camera_parameters()
         self.is_deformed = ~self.is_deformed
         if self.is_deformed:
             print("deformed/current")
@@ -48,9 +49,11 @@ class Viewer3D(object):
         self.def_pcd = self.pcd
         self.pcd = def_pcd
         self.viewer.add_geometry(self.pcd)
+        self.control.convert_from_pinhole_camera_parameters(self.pose)
 
     def __call__(self, pose, pcd=None, add_pcd=None, zoom=0.5, frame=None, synth_frame=None, optim_results=None, def_pcd=None):
         # plot input frame and synthesized frame
+        self.pose = self.pose2view(pose)
         self.is_deformed = False
         self.def_pcd = def_pcd
         if (optim_results is not None) | (frame is not None):
