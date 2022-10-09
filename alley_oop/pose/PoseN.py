@@ -26,8 +26,8 @@ class PoseN(nn.Module):
         self.pose_scale = config['pose_scale']
 
         self.register_buffer("img_coords", create_img_coords_t(y=H, x=W), persistent=False)
-        self.conf_head1 = nn.Sequential(TinyUNet(in_channels=128+128+3+3+2, output_size=(H,W)), nn.ReLU())
-        self.conf_head2 = nn.Sequential(TinyUNet(in_channels=128+128+3+3+2, output_size=(H,W)), nn.ReLU())
+        self.conf_head1 = nn.Sequential(TinyUNet(in_channels=128+128+3+3+2, output_size=(H,W)), nn.Sigmoid())
+        self.conf_head2 = nn.Sequential(TinyUNet(in_channels=128+128+3+3+2, output_size=(H,W)), nn.Sigmoid())
         self.use_weights = config["use_weights"]
         self.flow = RAFT(config)
         self.flow.freeze_bn()
