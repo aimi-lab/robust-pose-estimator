@@ -43,5 +43,6 @@ class SparseImgInterpolator(torch.nn.Module):
 
         gkern1d = self.gauss_1d(size=size, std=std)
         gkern2d = torch.outer(gkern1d, gkern1d)[None, None, ...]
-
-        return gkern2d / gkern2d.sum()
+        gkern2d /= gkern2d.sum()
+        gkern2d[:, :,size//2, size//2] = 0
+        return gkern2d

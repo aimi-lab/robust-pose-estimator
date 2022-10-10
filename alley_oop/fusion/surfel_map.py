@@ -361,7 +361,7 @@ class SurfelMap(object):
         confidence[img_coords] = self.conf[0, sort_idx][valid]
 
         depth = torch.zeros(self.img_shape, dtype=self.opts.dtype, device=self.device)
-        # confidence aware rendering. If multiple points project into the same pixel, we take a weighted sum of the values
+        # confidence aware rendering.
         depth[img_coords] = self.opts[2, sort_idx][valid]
         mask = confidence[None,None,...] != 0.0
         depth = self.interpolate(depth[None,None,...])
