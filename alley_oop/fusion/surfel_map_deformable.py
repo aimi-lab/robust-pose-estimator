@@ -185,3 +185,11 @@ class SurfelMapDeformable(SurfelMapFlow):
         valid = frame.mask.squeeze() & (flow_off_w >= 0) & (flow_off_w < w) & (flow_off_h >= 0) & (flow_off_h < h)
         midx[~valid] = 0
         return midx.long().view(-1), render_csp.view(-1), valid.view(-1)
+
+
+    def remove_surfels_by_confidence_and_time(self):
+        """ remove unstable points that have been created long time ago """
+
+        ok_pts = super().remove_surfels_by_confidence_and_time()
+        self.warp_field = self.warp_field[:, ok_pts]
+        return ok_pts
