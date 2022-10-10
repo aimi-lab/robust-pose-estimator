@@ -45,7 +45,7 @@ class SurfelMapFlow(SurfelMap):
         flow_ref_idx = flow_ref_idx[valid]
 
         # pre-select confidence elements
-        conf = frame.confidence.view(1, -1) / self.conf_thr
+        conf = torch.ones_like(frame.confidence.view(1, -1)) / self.conf_thr
 
         # update existing points, intensities, normals, radii and confidences
         ccor = conf[:, bidx]
