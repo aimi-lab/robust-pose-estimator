@@ -44,8 +44,6 @@ def val(model, dataloader, device, intrinsics, logger, infer_depth, key):
                                                                                                intrinsics.float(), baseline.float(),
                                                                                                image1r=trg_img_r,
                                                                                                image2r=ref_img_r,
-                                                                                               mask1=trg_mask.to(torch.bool),
-                                                                                               mask2=ref_mask.to(torch.bool),
                                                                                                toolmask1=trg_mask,
                                                                                                toolmask2=ref_mask,
                                                                                                iters=config['model'][
@@ -140,8 +138,6 @@ def main(args, config, force_cpu):
                                                                                                intrinsics.float(), baseline.float(),
                                                                                                image1r=trg_img_r,
                                                                                                image2r=ref_img_r,
-                                                                                               mask1=trg_mask.to(torch.bool),
-                                                                                               mask2=ref_mask.to(torch.bool),
                                                                                                toolmask1=trg_mask,
                                                                                                toolmask2=ref_mask,
                                                                                                iters=config['model'][

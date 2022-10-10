@@ -9,16 +9,14 @@ class DefPoseN(PoseN):
         self.conf_head2 = nn.Sequential(TinyUNet(in_channels=128 + 128 + 3 + 3 + 2+1, output_size=(H, W)), nn.Sigmoid())
 
 
-    def forward(self, image1l, image2l, intrinsics, baseline, image1r=None, image2r=None, depth1=None, depth2=None, mask1=None, mask2=None, toolmask1=None, toolmask2=None, iters=12, flow_init=None, pose_init=None, ret_confmap=False):
+    def forward(self, image1l, image2l, intrinsics, baseline, image1r=None, image2r=None, depth1=None, depth2=None, toolmask1=None, toolmask2=None, iters=12, flow_init=None, pose_init=None, ret_confmap=False):
         intrinsics.requires_grad = False
         baseline.requires_grad = False
         """ estimate optical flow from stereo pair to get disparity map"""
         if depth1 is None:
             depth1, flow1, valid1 = self.flow2depth(image1l, image1r, baseline)
-            mask1 = mask1 & valid1 if mask1 is not None else valid1
         if depth2 is None:
             depth2, flow2, valid2 = self.flow2depth(image2l, image2r, baseline)
-            mask2 = mask2 & valid2 if mask2 is not None else valid2
         """ Estimate optical flow and rigid pose between pair of frames """
 
         pcl1 = self.proj(depth1, intrinsics)
@@ -34,14 +32,8 @@ class DefPoseN(PoseN):
             conf1 = torch.ones_like(depth1)
             conf2 = torch.ones_like(depth2)
 
-        # set confidence weights to zero where the mask is False
-        if mask1 is not None:
-            mask1.requires_grad = False
-        if mask2 is not None:
-            mask2.requires_grad = False
-
         n = image1l.shape[0]
-        pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2, conf1, conf2, mask1, mask2, self.loss_weight.repeat(n, 1), intrinsics)
+        pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2, conf1, conf2, valid1, valid2, self.loss_weight.repeat(n, 1), intrinsics)
         if ret_confmap:
             return flow_predictions, pose_se3.float() / self.pose_scale, depth1, depth2, conf1, conf2
         return flow_predictions, pose_se3.float()/self.pose_scale, depth1, depth2
