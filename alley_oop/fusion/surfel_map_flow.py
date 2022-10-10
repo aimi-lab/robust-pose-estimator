@@ -80,16 +80,12 @@ class SurfelMapFlow(SurfelMap):
 
     def get_flow_correspondences(self, frame, flow, render_csp):
         n, _, h, w = flow.shape
-        vidx = render_csp.view(-1)
         row_coords, col_coords = torch.meshgrid(torch.arange(h), torch.arange(w), indexing='ij')
-        flow_off_w = torch.round(flow[:, 0] + col_coords.to(flow.device))
-        flow_off_h = torch.round(flow[:, 1] + row_coords.to(flow.device))
+        flow_off_w = torch.round(flow.squeeze()[0] + col_coords.to(flow.device))
+        flow_off_h = torch.round(flow.squeeze()[1] + row_coords.to(flow.device))
         midx = (w * flow_off_h + flow_off_w).long()
-
-        valid = frame.mask & (flow_off_w >= 0) & (flow_off_w < w) & (flow_off_h >= 0) & (flow_off_h < h)
-        vidx = vidx[valid.view(-1)]
-        midx = (midx.view(-1)[valid.view(-1)]).long()
-        return midx, vidx
+        valid = frame.mask.squeeze() & (flow_off_w >= 0) & (flow_off_w < w) & (flow_off_h >= 0) & (flow_off_h < h)
+        return midx.long().view(-1)[valid.view(-1)], render_csp.view(-1)[valid.view(-1)]
 
     def render(self, intrinsics: torch.tensor=None, extrinsics: torch.tensor=None):
         """

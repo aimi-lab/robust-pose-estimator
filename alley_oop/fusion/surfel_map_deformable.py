@@ -1,5 +1,6 @@
 from alley_oop.fusion.surfel_map_flow import *
 from alley_oop.interpol.gp_warpfield import GP_WarpFieldEstimator
+from alley_oop.geometry.knn import ball_query
 
 
 class SurfelMapDeformable(SurfelMapFlow):
@@ -39,7 +40,7 @@ class SurfelMapDeformable(SurfelMapFlow):
         rgb = rgb.view(3, -1)
 
         # use optical flow to get correspondences (2D to 3D flow)
-        flow_trg_idx, flow_ref_idx, flow_trg_idx_lr, flow_ref_idx_lr = self.get_flow_correspondences(frame, flow, render_csp)
+        flow_trg_idx, flow_ref_idx= self.get_flow_correspondences(frame, flow, render_csp)
         bidx = (global_ipts[0, :] >= 0) & (global_ipts[1, :] >= 0) & \
                (global_ipts[0, :] < self.img_shape[1]-1) & (global_ipts[1, :] < self.img_shape[0]-1)
         proj_trg_idx = self.get_match_indices(global_ipts[:, bidx])
@@ -51,20 +52,15 @@ class SurfelMapDeformable(SurfelMapFlow):
         # -> no accumulation of small drift errors, but update of scene when deformations are significant
 
         # fit and predict warp-field for canonical model to current frame
-        # we need to subsample to condition the GP for computational reasons, then we can evaluate it on all points.
-        self.warp_field_estimator.fit(self.opts[:, flow_ref_idx_lr], opts[:, flow_trg_idx_lr])
-
-        # estimate warp-field from canonical to current frame (with extrapolation), we only deform active points for computational reasons
-        self.warp_field = self.warp_field_estimator.predict(self.opts)
-        # threshold warp-field for small deformations to avoid drift
-        not_deformed = torch.sum(self.warp_field ** 2, dim=0) <= self.d_thresh ** 2
-        self.warp_field[:, not_deformed] = 0.0
+        self.estimate_warpfield(opts, flow_ref_idx, flow_trg_idx)
 
         # pre-select confidence elements
         conf = frame.confidence.view(1, -1) / self.conf_thr
 
         # update confidences
         self.conf[:, flow_ref_idx] = torch.clamp(self.conf[:, flow_ref_idx] + conf[:, flow_trg_idx], 0.0, 1.0)  # saturate confidence to 1
+
+        self.remove_redundant_surfels(bidx, render_csp)
 
         # create mask identifying unmatched indices
         mask = torch.ones(opts.shape[1], device=opts.device, dtype=torch.bool)
@@ -153,20 +149,22 @@ class SurfelMapDeformable(SurfelMapFlow):
         else:
             return super().render(intrinsics, extrinsics)
 
-    def get_flow_correspondences(self, frame, flow, render_csp, step=32):
-        n, _, h, w = flow.shape
-        vidx = render_csp.view(-1)
-        row_coords, col_coords = torch.meshgrid(torch.arange(h), torch.arange(w), indexing='ij')
-        flow_off_w = torch.round(flow.squeeze()[0] + col_coords.to(flow.device))
-        flow_off_h = torch.round(flow.squeeze()[1] + row_coords.to(flow.device))
-        midx = (w * flow_off_h + flow_off_w).long()
-        valid = frame.mask.squeeze() & (flow_off_w >= 0) & (flow_off_w < w) & (flow_off_h >= 0) & (flow_off_h < h)
+    def estimate_warpfield(self, opts, flow_ref_idx, flow_trg_idx):
+        self.warp_field = torch.zeros_like(self.opts)
+        # estimate translational warp-field on low resolution to get smooth interpolations
+        warp = self.opts[:, flow_ref_idx] - opts[:, flow_trg_idx]
+        self.warp_field[:, flow_ref_idx] = warp
+        not_deformed = torch.sum(self.warp_field ** 2, dim=0) <= self.d_thresh ** 2
+        self.warp_field[:, not_deformed] = 0.0
+        return self.warp_field
 
-        midx_lowres = midx[::step, ::step]
-        midx_lowres = midx_lowres[valid[::step, ::step]].view(-1).long()
-        vidx_lowres = render_csp[::step, ::step]
-        vidx_lowres = vidx_lowres[valid[::step, ::step]].view(-1)
-
-        vidx = vidx[valid.view(-1)]
-        midx = (midx.view(-1)[valid.view(-1)]).long()
-        return midx, vidx ,midx_lowres, vidx_lowres
+    def remove_redundant_surfels(self, in_fov, rendered):
+        # remove points that are in the FOV but not rendered
+        mask = torch.zeros(self.opts.shape[1], dtype=torch.bool, device=self.opts.device)
+        mask[~in_fov] = True
+        mask[rendered] = True
+        self.opts = self.opts[:, mask]
+        self.rgb = self.rgb[:, mask]
+        self.conf = self.conf[:, mask]
+        self.t_created = self.t_created[:, mask]
+        self.warp_field = self.warp_field[:, mask]
