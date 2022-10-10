@@ -109,13 +109,13 @@ class SurfelMapFlow(SurfelMap):
         confidence = torch.zeros(self.img_shape, dtype=self.opts.dtype, device=self.device)
         confidence[img_coords] = self.conf[0, sort_idx][valid]
 
-        depth = torch.zeros(self.img_shape, dtype=self.opts.dtype, device=self.device)
+        depth = torch.ones(self.img_shape, dtype=self.opts.dtype, device=self.device)*torch.nan
         # confidence aware rendering. If multiple points project into the same pixel, we take a weighted sum of the values
         depth[img_coords] = self.opts[2, sort_idx][valid]
         mask = confidence[None,None,...] != 0.0
         depth = self.interpolate(depth[None,None,...])
 
-        colors = torch.zeros((3, *self.img_shape), dtype=self.opts.dtype, device=self.device)
+        colors = torch.ones((3, *self.img_shape), dtype=self.opts.dtype, device=self.device)*torch.nan
         colors[0][img_coords] = self.rgb[0, sort_idx][valid]
         colors[1][img_coords] = self.rgb[1, sort_idx][valid]
         colors[2][img_coords] = self.rgb[2, sort_idx][valid]
@@ -125,7 +125,7 @@ class SurfelMapFlow(SurfelMap):
         render_csp = -torch.ones(self.img_shape, dtype=torch.long, device=self.device)
         render_csp[img_coords] = sort_idx[valid]
 
-        return FrameClass(colors, depth, intrinsics=intrinsics, confidence=confidence[None,None,...]).to(intrinsics.device), render_csp
+        return FrameClass(colors, depth, intrinsics=intrinsics, mask=mask, confidence=confidence[None,None,...]).to(intrinsics.device), render_csp
 
     @property
     def _constructor(self):

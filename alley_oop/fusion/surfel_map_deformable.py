@@ -1,6 +1,7 @@
 from alley_oop.fusion.surfel_map_flow import *
 from alley_oop.interpol.gp_warpfield import GP_WarpFieldEstimator
 from alley_oop.utils.pytorch import MedianPool2d
+from alley_oop.interpol.sparse_img_interpolation import SparseMedianInterpolator
 
 
 class SurfelMapDeformable(SurfelMapFlow):
@@ -12,6 +13,7 @@ class SurfelMapDeformable(SurfelMapFlow):
                                                           noise_level=0.001)
         self.n_samples = 256
         self.median_filt = MedianPool2d(15, same=True, stride=1)
+        self.interpolate = SparseMedianInterpolator(5)
 
     def fuse(self, *args):
         frame, pmat, flow, render_csp = args
@@ -54,7 +56,6 @@ class SurfelMapDeformable(SurfelMapFlow):
 
         # fit and predict warp-field for canonical model to current frame
         self.estimate_warpfield(opts, flow_ref_idx, flow_trg_idx, valid, global_ipts, bidx)
-
         # pre-select confidence elements
         conf = frame.confidence.view(1, -1) / self.conf_thr
 
@@ -185,7 +186,6 @@ class SurfelMapDeformable(SurfelMapFlow):
         valid = frame.mask.squeeze() & (flow_off_w >= 0) & (flow_off_w < w) & (flow_off_h >= 0) & (flow_off_h < h)
         midx[~valid] = 0
         return midx.long().view(-1), render_csp.view(-1), valid.view(-1)
-
 
     def remove_surfels_by_confidence_and_time(self):
         """ remove unstable points that have been created long time ago """

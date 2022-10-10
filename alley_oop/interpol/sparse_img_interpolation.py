@@ -1,5 +1,6 @@
 import torch
 from torch.nn.functional import conv2d, pad
+from alley_oop.utils.pytorch import MedianPool2d
 
 
 class SparseImgInterpolator(torch.nn.Module):
@@ -46,3 +47,27 @@ class SparseImgInterpolator(torch.nn.Module):
         gkern2d /= gkern2d.sum()
         gkern2d[:, :,size//2, size//2] = 0
         return gkern2d
+
+
+class SparseMedianInterpolator(torch.nn.Module):
+    """ Interpolate 2D tensor with sparse missing values"""
+    def __init__(self, kernel_size: int, prior_val: float=0.0):
+        """
+        :param kernel_size: size of interpolation kernel
+        :param sigma: sigma of Gauss interpolation kernel
+        :param prior_val: prior value to fill missing values prior to interpolation
+        """
+        super().__init__()
+        self.prior_val = prior_val
+        self.median = MedianPool2d(kernel_size=kernel_size, same=True)
+
+    def forward(self, x:torch.tensor):
+        """
+
+        :param x: 2D tensor shape NxCxHxW with nan as missing values
+        """
+        mask = torch.isnan(x)
+        x[mask] = self.prior_val
+        gsconv = self.median(x)
+        x[mask] = gsconv[mask]
+        return x
