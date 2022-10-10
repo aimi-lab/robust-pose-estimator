@@ -57,7 +57,7 @@ class SurfelMapDeformable(SurfelMapFlow):
         # fit and predict warp-field for canonical model to current frame
         self.estimate_warpfield(opts, flow_ref_idx, flow_trg_idx, valid, global_ipts, bidx)
         # pre-select confidence elements
-        conf = frame.confidence.view(1, -1) / self.conf_thr
+        conf = torch.ones_like(frame.confidence.view(1, -1)) / self.conf_thr
 
         # update confidences
         self.conf[:, flow_ref_idx[valid]] = torch.clamp(self.conf[:, flow_ref_idx[valid]] + conf[:, flow_trg_idx[valid]], 0.0, 1.0)  # saturate confidence to 1
