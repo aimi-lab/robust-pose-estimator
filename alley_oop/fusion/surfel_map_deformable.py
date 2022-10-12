@@ -2,6 +2,7 @@ from alley_oop.fusion.surfel_map_flow import *
 from alley_oop.utils.pytorch import MedianPool2d, image_gradient
 from alley_oop.interpol.sparse_img_interpolation import SparseMedianInterpolator
 from alley_oop.interpol.gp_warpfield import GP_WarpFieldEstimator
+from torch.cuda.amp import autocast
 
 
 class SurfelMapDeformable(SurfelMapFlow):
@@ -11,7 +12,6 @@ class SurfelMapDeformable(SurfelMapFlow):
         assert self.opts.shape == self.warp_field.shape
         self.warp_field_estimator = GP_WarpFieldEstimator(length_scale=0.1,
                                                           noise_level=0.001)
-        self.n_samples = 256
         self.interpolate = SparseMedianInterpolator(5)
         self.to(self.opts.device)
 
@@ -143,7 +143,7 @@ class SurfelMapDeformable(SurfelMapFlow):
         else:
             return super().render(intrinsics, extrinsics)
 
-    def estimate_warpfield(self, opts, flow_ref_idx, flow_trg_idx, valid, step=32):
+    def estimate_warpfield(self, opts, flow_ref_idx, flow_trg_idx, valid, step=40):
         # use the residuals as a 3d translational warp-field
         # the assumptions are:
         # 1: small residuals are due to depth, flow or pose estimation errors and should be ignored
@@ -157,9 +157,9 @@ class SurfelMapDeformable(SurfelMapFlow):
         # we expect large noise in depth and flow estimations when the depth has a large gradient -> assign large noise
         noise = torch.clamp(1e7*(image_gradient(opts[2].view(1,1,*self.img_shape))**2).sum(dim=-1).squeeze(), 1.0, 1.0e7)
         noise = noise[flow_trg_idx].view(*self.img_shape)[::step, ::step][valid.view(*self.img_shape)[::step, ::step]]
-
         self.warp_field_estimator.fit(ref, trg, noise)
-        self.warp_field = self.warp_field_estimator.predict(self.opts)
+        with autocast():
+            self.warp_field = self.warp_field_estimator.predict(self.opts)
         diff = torch.sum(self.warp_field ** 2, dim=0)
         not_deformed = diff <= self.d_thresh ** 2
         self.warp_field[:, not_deformed] = 0.0

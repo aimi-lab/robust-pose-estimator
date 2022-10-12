@@ -1,5 +1,5 @@
 slam:
-  frame2frame: True
+  frame2frame: False
   checkpoint:
   dist_thr: 0.05 # relative distance threshold for data association
   depth_clipping:
