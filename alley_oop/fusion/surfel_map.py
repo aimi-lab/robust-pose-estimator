@@ -214,7 +214,7 @@ class SurfelMap(object):
 
         # parameter init
         vidx = torch.ones(self.opts.shape[1], dtype=bool) if vidx is None else vidx
-        normals = torch.ones_like(self.opts) if normals is None else normals
+        normals = torch.ones_like(opts) if normals is None else normals
         angle_threshold = torch.cos(torch.tensor(n_thresh)/180*torch.pi)
 
         # 1. depth distance constraint
