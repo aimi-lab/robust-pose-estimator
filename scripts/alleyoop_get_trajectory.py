@@ -64,13 +64,12 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fo
                 mask, semantics = seg_model.get_mask(limg.to(device))
                 depth, flow, _ = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
             elif isinstance(dataset, RGBDDataset) | isinstance(dataset, TUMDataset):
-                limg, depth, depth_noise, mask, semantics, img_number = data
-                flow = torch.zeros_like(depth).repeat(1,2,1,1)
+                raise NotImplementedError
             else:
                 limg, rimg, mask, semantics, img_number = data
                 depth, flow, _ = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
-            limg, depth, mask = slam.pre_process(limg, depth, mask, semantics)
-            pose, scene, pose_relscale = slam.processFrame(limg.to(device), depth.to(device), mask.to(device), flow.to(device))
+            limg,rimg, depth, mask = slam.pre_process(limg, rimg, depth, mask, semantics)
+            pose, scene, pose_relscale = slam.processFrame(limg.to(device), rimg.to(device), depth.to(device), mask.to(device), flow.to(device))
 
             if viewer is not None:
                 curr_pcl = SurfelMap(frame=slam.get_frame(), kmat=torch.tensor(calib['intrinsics']['left']).float(),

@@ -31,7 +31,7 @@ class PreProcess(object):
         self.cmp_illumination = compensate_illumination
         self.conf_thr = conf_thr
 
-    def __call__(self, img:torch.tensor, depth:torch.tensor, mask:torch.tensor=None, semantics:torch.tensor=None):
+    def __call__(self, img:torch.tensor, rimg: torch.tensor, depth:torch.tensor, mask:torch.tensor=None, semantics:torch.tensor=None):
         assert torch.is_tensor(img)
 
         # need to go back to numpy to use opencv functions
@@ -55,7 +55,7 @@ class PreProcess(object):
         if self.cmp_illumination:
             img = self.compensate_illumination(rgb2gray_t(img.cpu(), ax0=0), depth, self.intrinsics)
 
-        return img, depth, mask
+        return img,rimg, depth, mask
 
     def specularity_mask(self, img, spec_thr=0.96):
         """ specularities can cause issues in the photometric pose estimation.

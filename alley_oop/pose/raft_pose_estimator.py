@@ -1,4 +1,4 @@
-from alley_oop.pose.PoseN import PoseN
+from alley_oop.pose.defPoseN import *
 from alley_oop.geometry.pinhole_transforms import inv_transform
 import torch
 from alley_oop.fusion.surfel_map import SurfelMap, FrameClass
@@ -18,13 +18,19 @@ class RAFTPoseEstimator(torch.nn.Module):
         super(RAFTPoseEstimator, self).__init__()
         checkp = torch.load(checkpoint)
         checkp['config']['model']['image_shape'] = img_shape
-        model = PoseN(checkp['config']['model'])
-        new_state_dict = OrderedDict()
-        state_dict = checkp['state_dict']
-        for k, v in state_dict.items():
-            name = k.replace('module.', '')  # remove `module.`
-            new_state_dict[name] = v
-        model.load_state_dict(new_state_dict)
+        def load():
+            new_state_dict = OrderedDict()
+            state_dict = checkp['state_dict']
+            for k, v in state_dict.items():
+                name = k.replace('module.', '')  # remove `module.`
+                new_state_dict[name] = v
+            model.load_state_dict(new_state_dict)
+        try:
+            model = PoseN(checkp['config']['model'])
+            load()
+        except RuntimeError:
+            model = DefPoseN(checkp['config']['model'])
+            load()
         model.eval()
         self.model = model
         self.intrinsics = intrinsics.unsqueeze(0).float()
@@ -40,8 +46,22 @@ class RAFTPoseEstimator(torch.nn.Module):
         flow, crsp_list = None, None
         if self.frame2frame:
             if self.last_frame is not None:
-                flow, rel_pose_se3, *_, conf_1, conf_2 = self.model(255*self.last_frame.img, 255*frame.img, self.intrinsics, self.baseline, depth1=self.last_frame.depth, depth2=frame.depth,
-                                          mask1=self.last_frame.mask, mask2=frame.mask, flow1=self.last_frame.flow, flow2=frame.flow, ret_confmap=True)
+                if isinstance(self.model, DefPoseN):
+                    # we should not mask tools but provide a tool-mask to the conf-head.
+                    # ToDo we consider the mask as tools but it can also be invalid depth or similar.
+                    flow, rel_pose_se3, *_, conf_1, conf_2 = self.model(255*self.last_frame.img, 255*frame.img,
+                                                                        self.intrinsics, self.baseline,
+                                                                        image1r=self.last_frame.rimg, image2r=frame.rimg,
+                                                                        toolmask1=self.last_frame.mask, toolmask2=frame.mask,
+                                                                        ret_confmap=True)
+                else:
+                    flow, rel_pose_se3, *_, conf_1, conf_2 = self.model(255 * self.last_frame.img, 255 * frame.img,
+                                                                        self.intrinsics, self.baseline,
+                                                                        depth1=self.last_frame.depth,
+                                                                        depth2=frame.depth,
+                                                                        mask1=self.last_frame.mask, mask2=frame.mask,
+                                                                        flow1=self.last_frame.flow, flow2=frame.flow,
+                                                                        ret_confmap=True)
                 rel_pose_se3 = rel_pose_se3.squeeze(0)
                 frame.confidence = conf_2
                 self.last_frame.confidence = conf_1
@@ -60,6 +80,8 @@ class RAFTPoseEstimator(torch.nn.Module):
             self.last_frame = frame
         else:
             # transform scene to last camera pose coordinates
+            if isinstance(self.model, DefPoseN):
+                raise NotImplementedError
             scene_tlast = scene.transform_cpy(inv_transform(self.last_pose.float()))
             model_frame, crsp_list = scene_tlast.render(self.intrinsics.squeeze())
             flow, rel_pose_se3, *_, conf_1, conf_2  = self.model(255*model_frame.img, 255*frame.img, self.intrinsics, self.baseline,

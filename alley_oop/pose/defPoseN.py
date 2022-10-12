@@ -9,14 +9,12 @@ class DefPoseN(PoseN):
         self.conf_head2 = nn.Sequential(TinyUNet(in_channels=128 + 128 + 3 + 3 + 2+1, output_size=(H, W)), nn.ReLU())
 
 
-    def forward(self, image1l, image2l, intrinsics, baseline, image1r=None, image2r=None, depth1=None, depth2=None, toolmask1=None, toolmask2=None, iters=12, flow_init=None, pose_init=None, ret_confmap=False):
+    def forward(self, image1l, image2l, intrinsics, baseline, image1r, image2r, toolmask1=None, toolmask2=None, iters=12, flow_init=None, pose_init=None, ret_confmap=False):
         intrinsics.requires_grad = False
         baseline.requires_grad = False
         """ estimate optical flow from stereo pair to get disparity map"""
-        if depth1 is None:
-            depth1, flow1, valid1 = self.flow2depth(image1l, image1r, baseline)
-        if depth2 is None:
-            depth2, flow2, valid2 = self.flow2depth(image2l, image2r, baseline)
+        depth1, flow1, valid1 = self.flow2depth(image1l, image1r, baseline)
+        depth2, flow2, valid2 = self.flow2depth(image2l, image2r, baseline)
         """ Estimate optical flow and rigid pose between pair of frames """
 
         pcl1 = self.proj(depth1, intrinsics)

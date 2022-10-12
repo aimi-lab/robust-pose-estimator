@@ -59,7 +59,7 @@ class Viewer3D(object):
         if (frame is not None):
             fig, ax = plt.subplots(2, 3, num=1, clear=True, figsize=(10,8))
             if (frame is not None) & (synth_frame is not None):
-                img, _, depth, *_, conf = frame.to_numpy()
+                img, _,_, depth, *_, conf = frame.to_numpy()
                 ax[0,0].imshow(img)
                 ax[0, 0].axis('off')
                 ax[0, 0].set_title('I_t')
@@ -69,7 +69,7 @@ class Viewer3D(object):
                 ax[0, 2].imshow(conf, vmin=0, vmax=1)
                 ax[0, 2].axis('off')
                 ax[0, 2].set_title('weights_t')
-                img, _, depth, *_, conf = synth_frame.to_numpy()
+                img, _,_, depth, *_, conf = synth_frame.to_numpy()
                 ax[1, 0].imshow(img)
                 ax[1, 0].axis('off')
                 ax[1, 0].set_title('I_t-1')

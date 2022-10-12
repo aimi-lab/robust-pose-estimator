@@ -9,7 +9,7 @@ class FrameClass:
     """
         Class containing image, depth and normals
     """
-    def __init__(self, img: torch.Tensor, depth: torch.Tensor, normals: torch.Tensor=None,
+    def __init__(self, img: torch.Tensor, rimg: torch.Tensor=None, depth: torch.Tensor=None, normals: torch.Tensor=None,
                  intrinsics: torch.Tensor=None, mask: torch.Tensor=None, confidence: torch.Tensor=None, flow: torch.Tensor=None):
         """
 
@@ -21,8 +21,12 @@ class FrameClass:
         :param confidence: depth confidence map (0 to 1) with shape Nx1xHxW (optional)
         """
         assert img.ndim == 4
-        assert depth.ndim == 4
+        assert rimg.ndim == 4
         self.img = img.contiguous()
+        if rimg is None:
+            self.rimg = img.contiguous()
+        else:
+            self.rimg = rimg.contiguous()
 
         if img.shape[1] == 3:
             self.img_gray = rgb2gray_t(self.img, ax0=1).contiguous()
@@ -32,7 +36,10 @@ class FrameClass:
         if mask is None:
             mask = torch.ones_like(self.img_gray, dtype=torch.bool)
         self.mask = mask
-        self.depth = depth.contiguous()
+        if depth is None:
+            self.depth = torch.ones_like(self.img_gray)
+        else:
+            self.depth = depth.contiguous()
 
         if normals is not None:
             assert normals.ndim == 4
@@ -52,6 +59,7 @@ class FrameClass:
         self.flow = flow.contiguous() if flow is not None else torch.ones_like(self.img_gray).repeat(1,2,1,1)
 
         assert self.img.shape[-2:] == self.img_gray.shape[-2:]
+        assert self.rimg.shape == self.img.shape
         assert self.img_gray.shape == self.depth.shape
         assert self.img_gray.shape == self.mask.shape
         assert self.img.shape[-2:] == self.normals.shape[-2:]
@@ -60,6 +68,7 @@ class FrameClass:
 
     def to(self, dev_or_type: Union[torch.device, torch.dtype]):
         self.img = self.img.to(dev_or_type)
+        self.rimg = self.rimg.to(dev_or_type)
         self.img_gray = self.img_gray.to(dev_or_type)
         self.depth = self.depth.to(dev_or_type)
         self.normals = self.normals.to(dev_or_type)
@@ -91,8 +100,9 @@ class FrameClass:
 
     def to_numpy(self):
         img = self.img.detach().cpu().permute(0,2,3,1).squeeze().numpy()
+        rimg = self.rimg.detach().cpu().permute(0, 2, 3, 1).squeeze().numpy()
         img_gray = self.img_gray.detach().cpu().squeeze().numpy()
         depth = self.depth.detach().cpu().squeeze().numpy()
         mask = self.mask.detach().cpu().squeeze().numpy()
         confidence = self.confidence.detach().cpu().squeeze().numpy()
-        return img, img_gray, depth, mask, confidence
+        return img, rimg, img_gray, depth, mask, confidence

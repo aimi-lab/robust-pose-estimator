@@ -44,7 +44,7 @@ class SLAM(object):
         elif config['fuse_mode'] == 'deformable':
             self.map = SurfelMapDeformable
 
-    def processFrame(self, img: tensor, depth:tensor, mask:tensor=None, flow:tensor=None):
+    def processFrame(self, img: tensor, rimg:tensor, depth:tensor, mask:tensor=None, flow:tensor=None):
         """
         track frame and fuse points to SurfelMap
         :param img: RGB input image
@@ -53,7 +53,7 @@ class SLAM(object):
         :param confidence: depth confidence value between 0 and 1
         """
         with torch.no_grad():
-            self.frame = FrameClass(img, depth, intrinsics=self.intrinsics, mask=mask, flow=flow)
+            self.frame = FrameClass(img, rimg, depth, intrinsics=self.intrinsics, mask=mask, flow=flow)
             if self.scene is None:
                 # initialize scene with first frame
                 self.scene = self.map(frame=self.frame, kmat=self.intrinsics.squeeze(), upscale=1,
