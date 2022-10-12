@@ -14,6 +14,7 @@ class SurfelMapDeformable(SurfelMapFlow):
         self.n_samples = 256
         self.median_filt = MedianPool2d(15, same=True, stride=1)
         self.interpolate = SparseMedianInterpolator(5)
+        self.to(self.opts.device)
 
     def fuse(self, *args):
         frame, pmat, flow, render_csp = args
@@ -195,3 +196,8 @@ class SurfelMapDeformable(SurfelMapFlow):
         ok_pts = super().remove_surfels_by_confidence_and_time()
         self.warp_field = self.warp_field[:, ok_pts]
         return ok_pts
+
+    def to(self, d: Union[torch.device, torch.dtype]):
+        super().to(d)
+        self.warp_field_estimator.to(d)
+        return self
