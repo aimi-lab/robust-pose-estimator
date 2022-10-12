@@ -1,6 +1,7 @@
 from alley_oop.fusion.surfel_map_flow import *
-from alley_oop.utils.pytorch import MedianPool2d
+from alley_oop.utils.pytorch import MedianPool2d, image_gradient
 from alley_oop.interpol.sparse_img_interpolation import SparseMedianInterpolator
+from alley_oop.interpol.gp_warpfield import GP_WarpFieldEstimator
 
 
 class SurfelMapDeformable(SurfelMapFlow):
@@ -8,6 +9,9 @@ class SurfelMapDeformable(SurfelMapFlow):
         super().__init__(*args, **kwargs)
         self.warp_field = kwargs["warp_field"] if "warp_field" in kwargs else torch.zeros_like(self.opts)  # translational warp-field
         assert self.opts.shape == self.warp_field.shape
+        self.warp_field_estimator = GP_WarpFieldEstimator(length_scale=0.1,
+                                                          noise_level=0.001)
+        self.n_samples = 256
         self.median_filt = MedianPool2d(15, same=True, stride=1)
         self.interpolate = SparseMedianInterpolator(5)
 
@@ -40,11 +44,12 @@ class SurfelMapDeformable(SurfelMapFlow):
 
         # use optical flow to get correspondences (2D to 3D flow)
         flow_trg_idx, flow_ref_idx, valid = self.get_flow_correspondences(frame, flow, render_csp)
+        valid &= frame.mask.view(-1)
         bidx = (global_ipts[0, :] >= 0) & (global_ipts[1, :] >= 0) & \
                (global_ipts[0, :] < self.img_shape[1]-1) & (global_ipts[1, :] < self.img_shape[0]-1)
         proj_trg_idx = self.get_match_indices(global_ipts[:, bidx])
 
-        self.estimate_warpfield(opts, flow_ref_idx, flow_trg_idx, valid, global_ipts, bidx)
+        self.estimate_warpfield(opts, flow_ref_idx, flow_trg_idx, valid)
         # pre-select confidence elements
         conf = torch.ones_like(frame.confidence.view(1, -1)) / self.conf_thr
 
@@ -139,23 +144,29 @@ class SurfelMapDeformable(SurfelMapFlow):
         else:
             return super().render(intrinsics, extrinsics)
 
-    def estimate_warpfield(self, opts, flow_ref_idx, flow_trg_idx, valid, ipts, bidx):
+    def estimate_warpfield(self, opts, flow_ref_idx, flow_trg_idx, valid, step=32):
         # use the residuals as a 3d translational warp-field
         # the assumptions are:
         # 1: small residuals are due to depth, flow or pose estimation errors and should be ignored
         # 2: large residuals are mainly due to deformations
         # -> no accumulation of small drift errors, but update of scene when deformations are significant
-        warp = opts[:, flow_trg_idx].view(3,*self.img_shape) - self.opts[:, flow_ref_idx].view(3,*self.img_shape)
-        warp[:, ~valid.view(self.img_shape)] = 0.0
-        warp = self.median_filt(warp.unsqueeze(0)).squeeze()
 
-        self.warp_field = torch.zeros_like(self.opts)
-        # use projective association to interpolate warp-field for not rendered points
-        self.warp_field[0, bidx] = warp[0][(ipts[1, bidx].long(), ipts[0, bidx].long())]
-        self.warp_field[1, bidx] = warp[1][(ipts[1, bidx].long(), ipts[0, bidx].long())]
-        self.warp_field[2, bidx] = warp[2][(ipts[1, bidx].long(), ipts[0, bidx].long())]
-        not_deformed = torch.sum(self.warp_field ** 2, dim=0) <= self.d_thresh ** 2
+        # fit and predict warp-field for canonical model to current frame
+        # we need to subsample to condition the GP for computational reasons, then we can evaluate it on all points.
+        trg = opts[:, flow_trg_idx].view(3,*self.img_shape)[:, ::32, ::32][:, valid.view(*self.img_shape)[::32, ::32]]
+        ref = self.opts[:, flow_ref_idx].view(3,*self.img_shape)[:, ::32, ::32][:, valid.view(*self.img_shape)[::32, ::32]]
+        # we expect large noise in depth and flow estimations when the depth has a large gradient -> assign large noise
+        noise = torch.exp(1e7*(image_gradient(opts[2].view(1,1,*self.img_shape))**2).sum(dim=-1).squeeze())
+        noise = noise[flow_trg_idx].view(*self.img_shape)[::32, ::32][valid.view(*self.img_shape)[::32, ::32]]
+
+        self.warp_field_estimator.fit(ref, trg, noise)
+        self.warp_field = self.warp_field_estimator.predict(self.opts)
+        diff = torch.sum(self.warp_field ** 2, dim=0)
+        not_deformed = diff <= self.d_thresh ** 2
+        not_valid = diff >= (10*self.d_thresh) ** 2 # ToDo we should detect large residuals from opts - self.opts
         self.warp_field[:, not_deformed] = 0.0
+        self.warp_field[:, not_valid] = 0.0
+
         return self.warp_field
 
     def remove_redundant_surfels(self, in_fov, rendered):

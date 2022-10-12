@@ -57,7 +57,7 @@ class GP_WarpFieldEstimator(torch.nn.Module):
         self.gp_regressor = ExactGP(length_scale)
         self.noise_level = noise_level
 
-    def fit(self, ref_opts: torch.tensor, target_opts: torch.tensor):
+    def fit(self, ref_opts: torch.tensor, target_opts: torch.tensor, noise: torch.tensor=None):
         """
         :param ref_opts: reference 3d points, shape 3xN
         :param target_opts: target 3d points, shape 3xN
@@ -68,7 +68,8 @@ class GP_WarpFieldEstimator(torch.nn.Module):
         def_field_se3 = target_opts - ref_opts
 
         # map the depth confidence to a noise prior
-        self.gp_regressor.fit(ref_opts.T, def_field_se3, noise_level=torch.ones_like(def_field_se3)*self.noise_level)
+        noise = torch.ones_like(def_field_se3) if noise is None else noise
+        self.gp_regressor.fit(ref_opts.T, def_field_se3, noise_level=noise*self.noise_level)
 
     def predict(self, ref_opts: torch.tensor):
         """
