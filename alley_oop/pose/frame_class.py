@@ -21,7 +21,6 @@ class FrameClass:
         :param confidence: depth confidence map (0 to 1) with shape Nx1xHxW (optional)
         """
         assert img.ndim == 4
-        assert rimg.ndim == 4
         self.img = img.contiguous()
         if rimg is None:
             self.rimg = img.contiguous()

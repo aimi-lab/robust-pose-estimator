@@ -372,7 +372,7 @@ class SurfelMap(object):
         colors[2][img_coords] = self.rgb[2, sort_idx][valid]
         colors = self.interpolate(colors[None,...])
 
-        return FrameClass(colors, depth, intrinsics=intrinsics, mask=mask, confidence=confidence[None,None,...]).to(intrinsics.device), None
+        return FrameClass(colors, depth=depth, intrinsics=intrinsics, mask=mask, confidence=confidence[None,None,...]).to(intrinsics.device), None
 
     def pcl2open3d(self, stable: bool=True, filter: torch.Tensor=None):
         """
