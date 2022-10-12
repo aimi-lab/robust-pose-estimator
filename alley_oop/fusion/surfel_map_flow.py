@@ -85,6 +85,7 @@ class SurfelMapFlow(SurfelMap):
         flow_off_h = torch.round(flow.squeeze()[1] + row_coords.to(flow.device))
         midx = (w * flow_off_h + flow_off_w).long()
         valid = frame.mask.squeeze() & (flow_off_w >= 0) & (flow_off_w < w) & (flow_off_h >= 0) & (flow_off_h < h)
+        valid &= (render_csp != -1)
         return midx.long().view(-1)[valid.view(-1)], render_csp.view(-1)[valid.view(-1)]
 
     def render(self, intrinsics: torch.tensor=None, extrinsics: torch.tensor=None):

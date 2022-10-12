@@ -12,7 +12,6 @@ class SurfelMapDeformable(SurfelMapFlow):
         self.warp_field_estimator = GP_WarpFieldEstimator(length_scale=0.1,
                                                           noise_level=0.001)
         self.n_samples = 256
-        self.median_filt = MedianPool2d(15, same=True, stride=1)
         self.interpolate = SparseMedianInterpolator(5)
         self.to(self.opts.device)
 
@@ -45,7 +44,6 @@ class SurfelMapDeformable(SurfelMapFlow):
 
         # use optical flow to get correspondences (2D to 3D flow)
         flow_trg_idx, flow_ref_idx, valid = self.get_flow_correspondences(frame, flow, render_csp)
-        valid &= frame.mask.view(-1)
         bidx = (global_ipts[0, :] >= 0) & (global_ipts[1, :] >= 0) & \
                (global_ipts[0, :] < self.img_shape[1]-1) & (global_ipts[1, :] < self.img_shape[0]-1)
         proj_trg_idx = self.get_match_indices(global_ipts[:, bidx])
@@ -154,20 +152,23 @@ class SurfelMapDeformable(SurfelMapFlow):
 
         # fit and predict warp-field for canonical model to current frame
         # we need to subsample to condition the GP for computational reasons, then we can evaluate it on all points.
-        trg = opts[:, flow_trg_idx].view(3,*self.img_shape)[:, ::32, ::32][:, valid.view(*self.img_shape)[::32, ::32]]
-        ref = self.opts[:, flow_ref_idx].view(3,*self.img_shape)[:, ::32, ::32][:, valid.view(*self.img_shape)[::32, ::32]]
+        trg = opts[:, flow_trg_idx].view(3,*self.img_shape)[:, ::step, ::step][:, valid.view(*self.img_shape)[::step, ::step]]
+        ref = self.opts[:, flow_ref_idx].view(3,*self.img_shape)[:, ::step, ::step][:, valid.view(*self.img_shape)[::step, ::step]]
         # we expect large noise in depth and flow estimations when the depth has a large gradient -> assign large noise
         noise = torch.exp(1e7*(image_gradient(opts[2].view(1,1,*self.img_shape))**2).sum(dim=-1).squeeze())
-        noise = noise[flow_trg_idx].view(*self.img_shape)[::32, ::32][valid.view(*self.img_shape)[::32, ::32]]
+        noise = noise[flow_trg_idx].view(*self.img_shape)[::step, ::step][valid.view(*self.img_shape)[::step, ::step]]
 
         self.warp_field_estimator.fit(ref, trg, noise)
         self.warp_field = self.warp_field_estimator.predict(self.opts)
         diff = torch.sum(self.warp_field ** 2, dim=0)
         not_deformed = diff <= self.d_thresh ** 2
-        not_valid = diff >= (10*self.d_thresh) ** 2 # ToDo we should detect large residuals from opts - self.opts
         self.warp_field[:, not_deformed] = 0.0
-        self.warp_field[:, not_valid] = 0.0
 
+        # # detect deformations that are far from residuals
+        # res = torch.quantile((opts[:, flow_trg_idx] - self.opts[:, flow_ref_idx] - self.warp_field[:, flow_ref_idx])**2, 0.99)
+        # if res > (10*self.d_thresh)**2:
+        #     self.warp_field[...] = 0.0
+        #     print("oops")
         return self.warp_field
 
     def remove_redundant_surfels(self, in_fov, rendered):
@@ -188,6 +189,7 @@ class SurfelMapDeformable(SurfelMapFlow):
         flow_off_h = torch.round(flow.squeeze()[1] + row_coords.to(flow.device))
         midx = (w * flow_off_h + flow_off_w).long()
         valid = frame.mask.squeeze() & (flow_off_w >= 0) & (flow_off_w < w) & (flow_off_h >= 0) & (flow_off_h < h)
+        valid &= (render_csp != -1)
         midx[~valid] = 0
         return midx.long().view(-1), render_csp.view(-1), valid.view(-1)
 
