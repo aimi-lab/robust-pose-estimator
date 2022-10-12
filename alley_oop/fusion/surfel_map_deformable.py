@@ -155,7 +155,7 @@ class SurfelMapDeformable(SurfelMapFlow):
         trg = opts[:, flow_trg_idx].view(3,*self.img_shape)[:, ::step, ::step][:, valid.view(*self.img_shape)[::step, ::step]]
         ref = self.opts[:, flow_ref_idx].view(3,*self.img_shape)[:, ::step, ::step][:, valid.view(*self.img_shape)[::step, ::step]]
         # we expect large noise in depth and flow estimations when the depth has a large gradient -> assign large noise
-        noise = torch.exp(1e7*(image_gradient(opts[2].view(1,1,*self.img_shape))**2).sum(dim=-1).squeeze())
+        noise = torch.clamp(1e7*(image_gradient(opts[2].view(1,1,*self.img_shape))**2).sum(dim=-1).squeeze(), 1.0, 1.0e7)
         noise = noise[flow_trg_idx].view(*self.img_shape)[::step, ::step][valid.view(*self.img_shape)[::step, ::step]]
 
         self.warp_field_estimator.fit(ref, trg, noise)
