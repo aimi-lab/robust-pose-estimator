@@ -173,14 +173,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
             warnings.warn(
                 "Non-zero objective function gradient at y:\n{}".format(
                     fY.detach().squeeze().cpu().numpy()))
-            # set gradients to zero, so we do not perform an update
-            gradients = []
-            for x in xs:
-                if x.requires_grad:
-                    gradients.append(torch.zeros_like(x, requires_grad=False))
-                else:
-                    gradients.append(None)
-            return tuple(gradients)
+            return self.zero_grad(*xs)
 
         # Form H:
         H = fYY
@@ -191,7 +184,12 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
 
         # Solve u = -H^-1 v:
         v = v.reshape(self.b, -1, 1)
-        u = self._solve_linear_system(H, -1.0 * v)  # bxmx1
+        try:
+            u = self._solve_linear_system(H, -1.0 * v)  # bxmx1
+        except: # torch._C._LinAlgError
+            warnings.warn("linear system is not positive definite ")
+            return self.zero_grad(*xs)
+
         u = u.squeeze(-1)  # bxm
 
         u[torch.isnan(u)] = 0.0  # check for nan values
@@ -206,6 +204,16 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
                 gradient = torch.cat(gradient, dim=-1)  # bxn
                 gradient[torch.isnan(gradient)] = 0.0  # nan values may occur due to zero-weights
                 gradients.append(gradient.reshape(x_size))
+            else:
+                gradients.append(None)
+        return tuple(gradients)
+
+    def zero_grad(self, *xs):
+        # set gradients to zero, so we do not perform an update
+        gradients = []
+        for x in xs:
+            if x.requires_grad:
+                gradients.append(torch.zeros_like(x, requires_grad=False))
             else:
                 gradients.append(None)
         return tuple(gradients)
