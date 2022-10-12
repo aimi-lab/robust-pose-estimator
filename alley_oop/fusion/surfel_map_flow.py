@@ -126,7 +126,7 @@ class SurfelMapFlow(SurfelMap):
         render_csp = -torch.ones(self.img_shape, dtype=torch.long, device=self.device)
         render_csp[img_coords] = sort_idx[valid]
 
-        return FrameClass(colors, depth, intrinsics=intrinsics, mask=mask, confidence=confidence[None,None,...]).to(intrinsics.device), render_csp
+        return FrameClass(colors, depth=depth, intrinsics=intrinsics, mask=mask, confidence=confidence[None,None,...]).to(intrinsics.device), render_csp
 
     @property
     def _constructor(self):
