@@ -50,13 +50,13 @@ class RAFTPoseEstimator(torch.nn.Module):
                     # we should not mask tools but provide a tool-mask to the conf-head.
                     # ToDo we consider the mask as tools but it can also be invalid depth or similar.
                     flow, rel_pose_se3, *_, conf_1, conf_2 = self.model(255*self.last_frame.img, 255*frame.img,
-                                                                        self.intrinsics, self.baseline,
+                                                                        self.intrinsics, self.baseline*self.scale,
                                                                         image1r=self.last_frame.rimg, image2r=frame.rimg,
                                                                         toolmask1=self.last_frame.mask, toolmask2=frame.mask,
                                                                         ret_confmap=True)
                 else:
                     flow, rel_pose_se3, *_, conf_1, conf_2 = self.model(255 * self.last_frame.img, 255 * frame.img,
-                                                                        self.intrinsics, self.baseline,
+                                                                        self.intrinsics, self.baseline*self.scale,
                                                                         depth1=self.last_frame.depth,
                                                                         depth2=frame.depth,
                                                                         mask1=self.last_frame.mask, mask2=frame.mask,
