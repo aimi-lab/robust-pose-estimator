@@ -8,10 +8,12 @@ import shutil
 
 PATH_REPLACEMENT = ['/home/mhayoz/research', '/storage/workspaces/artorg_aimi/ws_00000']
 if __name__ == '__main__':
-    with open(os.path.join('..', 'slam_cases.txt'), 'r') as f:
+    with open(os.path.join('..', 'intuitive_slam_test.txt'), 'r') as f:
         sequences = f.readlines()
     mp.set_start_method('spawn')
-    for sequence in sequences:
+    for s in sequences:
+        sequence, step = s.split(' ')
+        step = int(step)
         print(sequence)
         sequence = sequence.replace(PATH_REPLACEMENT[1], PATH_REPLACEMENT[0])
         sequence = sequence.replace('\n', '')
@@ -25,7 +27,7 @@ if __name__ == '__main__':
             if not os.path.isfile(os.path.join(sequence, 'data/orbslam2/trajectory.json')):
                 with open('configuration/orbslam2.yaml', 'r') as ymlfile:
                     config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
-                p = Process(target=orbslam, args=(sequence, os.path.join(sequence, 'data/orbslam2'), config, 'cpu', 0, 1000000000, 1, 'cases_orbslam2', False,))
+                p = Process(target=orbslam, args=(sequence, os.path.join(sequence, 'data/orbslam2'), config, 'cpu', 0, 1000000000, step, 'test_orbslam2', False,))
                 p.start()
                 p.join()
         except:

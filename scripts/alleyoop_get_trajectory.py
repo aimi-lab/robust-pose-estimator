@@ -84,7 +84,7 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fo
 
             trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
             if (log is not None) & (i > 0):
-                slam.recorder.log(step=i)
+                slam.recorder.log(step=i*step)
             if store_maps & ((i%50) == 49):
                 scene.save_ply(os.path.join(output_path, f'stable_map_{i}.ply'), stable=True)
                 scene.deform_cpy().save_ply(os.path.join(output_path, f'def_map_{i}.ply'), stable=True)
