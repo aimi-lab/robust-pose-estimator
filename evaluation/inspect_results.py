@@ -51,6 +51,7 @@ runs_df.method = runs_df.method.cat.set_categories(METHODS)
 runs_df.sort_values(['method'], inplace=True)
 runs_df.to_csv("project.csv")
 runs_df['dataset'] = [os.path.basename(d) for d in runs_df['dataset']]
+runs_df["ATE/RMSE"] *= 1000.0 #m to mm
 
 # Group into methods and datasets
 print('\n------------')
