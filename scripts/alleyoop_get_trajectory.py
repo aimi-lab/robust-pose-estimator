@@ -17,7 +17,7 @@ import wandb
 from evaluation.evaluate_ate_freiburg import main as evaluate
 
 
-def main(input_path, output_path, config, device_sel, stop, start, step, log, force_video, checkpoint):
+def main(input_path, output_path, config, device_sel, stop, start, step, log, force_video, checkpoint, store_maps):
     device = torch.device('cpu')
     if device_sel == 'gpu':
         if torch.cuda.is_available():
@@ -74,7 +74,7 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fo
             if viewer is not None:
                 curr_pcl = SurfelMap(frame=slam.get_frame(), kmat=torch.tensor(calib['intrinsics']['left']).float(),
                                      pmat=pose_relscale, depth_scale=scene.depth_scale).pcl2open3d(stable=False)
-
+                curr_pcl.paint_uniform_color([0.5, 0.5, 1.0])
                 canonical_scene = scene.pcl2open3d(stable=config['viewer']['stable'])
                 deformed_scene = scene.deform_cpy().pcl2open3d(stable=config['viewer']['stable']) if isinstance(scene, SurfelMapDeformable) else None
                 print('Current Frame vs Scene (Canonical/Deformed)')
@@ -85,6 +85,9 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fo
             trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
             if (log is not None) & (i > 0):
                 slam.recorder.log(step=i)
+            if store_maps & ((i%50) == 49):
+                scene.save_ply(os.path.join(output_path, f'stable_map_{i}.ply'), stable=True)
+                scene.deform_cpy().save_ply(os.path.join(output_path, f'def_map_{i}.ply'), stable=True)
 
         save_trajectory(trajectory, output_path)
 
@@ -167,6 +170,11 @@ if __name__ == '__main__':
         action="store_true",
         help='force to use video input and recompute depth'
     )
+    parser.add_argument(
+        '--store_map',
+        action="store_true",
+        help='store intermediate maps'
+    )
     args = parser.parse_args()
     with open(args.config, 'r') as ymlfile:
         config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
@@ -174,4 +182,4 @@ if __name__ == '__main__':
         args.outpath = os.path.join(args.input, 'data','alleyoop')
     assert os.path.isfile(args.checkpoint), 'no valid checkpoint file'
 
-    main(args.input, args.outpath, config, args.device, args.stop, args.start, args.step, args.log, args.force_video, args.checkpoint)
+    main(args.input, args.outpath, config, args.device, args.stop, args.start, args.step, args.log, args.force_video, args.checkpoint, args.store_map)
