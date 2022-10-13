@@ -48,7 +48,6 @@ class SurfelMapDeformable(SurfelMapFlow):
                (global_ipts[0, :] < self.img_shape[1]-1) & (global_ipts[1, :] < self.img_shape[0]-1)
         proj_trg_idx = self.get_match_indices(global_ipts[:, bidx])
 
-        self.estimate_warpfield(opts, flow_ref_idx, flow_trg_idx, valid)
         # pre-select confidence elements
         conf = torch.ones_like(frame.confidence.view(1, -1)) / self.conf_thr
 
@@ -68,13 +67,14 @@ class SurfelMapDeformable(SurfelMapFlow):
             # print ratio of added points vs frame resolution
             ratio = mask.float().mean()
             print(ratio)
+        new_opts, new_warp = self.estimate_warpfield(opts, flow_ref_idx, flow_trg_idx, valid, opts[:, mask])
 
         # concatenate unmatched points, intensities, normals, radii and confidences
-        self.opts = torch.cat((self.opts, opts[:, mask]), dim=-1) #We should deform points before adding locations
+        self.opts = torch.cat((self.opts, new_opts), dim=-1) #We should deform points before adding locations
         self.rgb = torch.cat((self.rgb, rgb[:, mask]), dim=-1)
         self.conf = torch.cat((self.conf, conf[:, mask]), dim=-1)
         self.t_created = torch.cat((self.t_created, self.tick * torch.ones((1, mask.sum()), device=self.device)), dim=-1)
-        self.warp_field = torch.cat((self.warp_field,  torch.zeros((3, mask.sum()), device=self.device)), dim=-1)
+        self.warp_field = torch.cat((self.warp_field,  new_warp), dim=-1)
         self.tick = self.tick + 1
 
         # remove surfels
@@ -143,7 +143,7 @@ class SurfelMapDeformable(SurfelMapFlow):
         else:
             return super().render(intrinsics, extrinsics)
 
-    def estimate_warpfield(self, opts, flow_ref_idx, flow_trg_idx, valid, step=40):
+    def estimate_warpfield(self, opts, flow_ref_idx, flow_trg_idx, valid, new_opts, step=40):
         # use the residuals as a 3d translational warp-field
         # the assumptions are:
         # 1: small residuals are due to depth, flow or pose estimation errors and should be ignored
@@ -152,6 +152,7 @@ class SurfelMapDeformable(SurfelMapFlow):
 
         # fit and predict warp-field for canonical model to current frame
         # we need to subsample to condition the GP for computational reasons, then we can evaluate it on all points.
+        #ToDo we could sample points where deformations are important
         trg = opts[:, flow_trg_idx].view(3,*self.img_shape)[:, ::step, ::step][:, valid.view(*self.img_shape)[::step, ::step]]
         ref = self.opts[:, flow_ref_idx].view(3,*self.img_shape)[:, ::step, ::step][:, valid.view(*self.img_shape)[::step, ::step]]
         # we expect large noise in depth and flow estimations when the depth has a large gradient -> assign large noise
@@ -164,12 +165,22 @@ class SurfelMapDeformable(SurfelMapFlow):
         not_deformed = diff <= self.d_thresh ** 2
         self.warp_field[:, not_deformed] = 0.0
 
+        # predict inverse warp-field for new opts to transform them in to the canonical space
+        inv_warp = -self.warp_field_estimator.predict(new_opts.cpu()).to(self.opts.device)
+        for i in range(6): # approximation to warp-field inversion #ToDo check if this is necessary
+            new_opts_canonical = self._deform(new_opts, inv_warp)
+            new_warp = self.warp_field_estimator.predict(new_opts_canonical.cpu()).to(self.opts.device)
+            e = self._deform(new_opts_canonical, new_warp) - new_opts
+            inv_warp -= e
         # # detect deformations that are far from residuals
         # res = torch.quantile((opts[:, flow_trg_idx] - self.opts[:, flow_ref_idx] - self.warp_field[:, flow_ref_idx])**2, 0.99)
         # if res > (10*self.d_thresh)**2:
         #     self.warp_field[...] = 0.0
         #     print("oops")
-        return self.warp_field
+        diff = torch.sum(new_warp ** 2, dim=0)
+        not_deformed = diff <= self.d_thresh ** 2
+        new_warp[:, not_deformed] = 0.0
+        return new_opts_canonical, new_warp
 
     def remove_redundant_surfels(self, in_fov, rendered):
         # remove points that are in the FOV but not rendered
