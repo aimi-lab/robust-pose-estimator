@@ -217,3 +217,27 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
             else:
                 gradients.append(None)
         return tuple(gradients)
+
+
+class DeclarativePoseHead3DNode2(DeclarativePoseHead3DNode):
+    def depth_objective(self, flow, pcl1, pcl2, weights1, weights2, mask1, mask2, y, ret_res=False):
+            # this is generally better for translation (essentially in z-direction)
+            # 3D geometric L2 loss
+            n, _, h, w = pcl1.shape
+            # se(3) to SE(3)
+            pose = pseudo_lie_se3_to_SE3_batch_small(y)
+            # # transform point cloud given the pose
+            pcl2_aligned = transform(homogenous(pcl2.view(n, 3, -1)), pose).reshape(n, 4, h, w)[:, :3]
+            # resample point clouds given the optical flow
+            pcl2_aligned, _ = remap_from_flow(pcl2_aligned, flow)
+            weights2_aligned, _ = remap_from_flow(weights2, flow)
+            mask2_aligned, valid = remap_from_flow_nearest(mask2, flow)
+            valid &= mask1 & mask2_aligned.to(bool)
+            # define objective loss function
+            residuals = torch.sum((pcl2_aligned.view(n, 3, -1) - pcl1.view(n, 3, -1)) ** 2, dim=1)
+            # reweighing residuals
+            residuals *= weights2_aligned.view(n,-1)*weights1.view(n,-1)
+            residuals[~valid.view(n, -1)] = 0.0
+            if ret_res:
+                return torch.mean(residuals, dim=-1), residuals
+            return torch.mean(residuals, dim=-1)
