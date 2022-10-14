@@ -13,6 +13,7 @@ from torchvision.transforms import Resize, InterpolationMode
 from torch.utils.data import Dataset
 from dataset.rectification import StereoRectifier
 from dataset.semantic_dataset import RGBDecoder
+import warnings
 
 
 def get_data(config, img_size: Tuple, depth_cutoff: float):
@@ -69,13 +70,7 @@ class PoseDataset(Dataset):
         assert len(images_l) == len(images_r)
         assert len(images_l) > 0 , f'no images in {root}'
         assert len(semantics) == len(images_l)
-        if isinstance(step, int):
-            step = (step, step)
-        # randomly sample n-frames
-        if (samples > 0) & (samples < len(images_l)):
-            sample_list = sorted(np.random.choice(len(images_l)-step[1], size=(samples,), replace=False))
-        else:
-            sample_list = np.arange(len(images_l)-step[1])
+        sample_list = self._random_sample(step, samples, len(images_l))
 
         self.conf_thr = conf_thr
         self.depth_cutoff = depth_cutoff
@@ -126,11 +121,56 @@ class PoseDataset(Dataset):
     def __len__(self):
         return len(self.image_list)
 
+    def _random_sample(self, step, samples, total_samples):
+        if isinstance(step, int):
+            step = (step, step)
+            # randomly sample n-frames
+        if (samples > 0) & (samples < total_samples):
+            sample_list = sorted(np.random.choice(total_samples - step[1], size=(samples,), replace=False))
+        else:
+            sample_list = np.arange(total_samples - step[1])
+        return sample_list
+
+
+class StratifiedPoseDataset(PoseDataset):
+    """
+        Stratified sampling based on tool presence and camera motion (and their combinations)
+    """
+    def __init__(self, root, baseline, intrinsics, depth_cutoff=300.0,conf_thr=0.0, step=(1,10), img_size=(512, 640), samples=-1):
+        #assert os.path.isfile(os.path.join(root, 'annotions.csv'))
+        if os.path.isfile(os.path.join(root, 'annotions.csv')):
+            with open(os.path.join(root, 'annotions.csv'), 'r') as f:
+                annotations = f.readlines()[1:]
+            annotations = np.genfromtxt(annotations, delimiter=',', dtype=bool).astype(int)
+            annotations[:, 1] *= 2
+            annotations = np.sum(annotations, axis=1)  # class 0, 1, 2, 3
+            probs = 1/(np.bincount(annotations, minlength=4) +1)
+            probs = probs/np.sum(probs)
+            self.probs = np.zeros_like(annotations, dtype=float)
+            for i, p in enumerate(probs):
+                self.probs[annotations == i] = p
+        else:
+            warnings.warn(f"{os.path.join(root, 'annotions.csv')} does not exist.",RuntimeWarning)
+            self.probs = np.ones(len(glob(os.path.join(root, 'video_frames', '*l.png'))))
+        super(StratifiedPoseDataset, self).__init__(root, baseline, intrinsics, depth_cutoff,conf_thr, step, img_size, samples)
+
+    def _random_sample(self, step, samples, total_samples):
+        if isinstance(step, int):
+            step = (step, step)
+            # randomly sample n-frames
+        if (samples > 0) & (samples < total_samples):
+            ids = np.arange(total_samples - step[1])
+            probs = self.probs[:len(ids)] / np.sum(self.probs[:len(ids)])
+            sample_list = sorted(np.random.choice(ids, size=(samples,), replace=False, p=probs))
+        else:
+            sample_list = np.arange(total_samples - step[1])
+        return sample_list
+
 class DummyDataset(PoseDataset):
     def __getitem__(self, index):
         return super().__getitem__(0)
 
-class MultiSeqPoseDataset(PoseDataset):
+class MultiSeqPoseDataset(StratifiedPoseDataset):
     def __init__(self, root, seqs, baseline, intrinsics, depth_cutoff=300.0, conf_thr=0.0, step=1, img_size=(512, 640), samples=-1):
         # for nested scared dataset
         datasets = [sorted(glob(os.path.join(root, s, 'keyframe_*'))) for s in seqs]

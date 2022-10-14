@@ -1,0 +1,11 @@
+/storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_human/dataset_3_0
+/storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_human/dataset_3_1
+/storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_human/dataset_3_2
+/storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_human/dataset_3_3
+/storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_human/dataset_1_0
+/storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_human/dataset_1_1
+/storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_human/dataset_1_2
+/storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_human/dataset_1_3
+/storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_human/dataset_1_4
+/storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_human/dataset_1_5
+/storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_human/dataset_1_6
