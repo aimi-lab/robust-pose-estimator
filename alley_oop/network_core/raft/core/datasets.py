@@ -79,7 +79,8 @@ class PoseDataset(Dataset):
         self.mask_list = []
         self.rel_pose_list = []
         self.rgb_decoder = RGBDecoder()
-
+        if isinstance(step, int):
+            step = (step, step)
         for i in sample_list:
             s = np.random.randint(*step) if step[0] < step[1] else step[0]  # select a random step in given range
             self.image_list.append([images_l[i], images_l[i+s]])
