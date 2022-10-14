@@ -36,25 +36,23 @@ data:
 
   val:
     type: Intuitive
-    basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_human
+    basepath: /home/mhayoz/research/innosuisse_surgical_robot/01_Datasets/05_slam/slam_benchmark_data
     sequences:
-      - dataset_6_0
-      - dataset_4_0_0
-      - dataset_4_1_0
-      - dataset_4_2_0
-      - dataset_5_0
+      - case_A
+      - case_B
+      - case_C
     step: 3
-    samples: 50
+    samples: 40
 
   val2:
     type: Intuitive
-    basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_human
+    basepath: /home/mhayoz/research/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_human
     sequences:
-      - scared_dataset_7
-      - scared_dataset_8
-      - scared_dataset_9
+      - case_D
+      - case_F
+      - case_G
     step: 1
-    samples: 50
+    samples: 40
 
 train:
   batch_size: 8
