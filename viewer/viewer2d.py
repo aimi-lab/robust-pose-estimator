@@ -23,9 +23,7 @@ class Viewer2D(object):
         if self.outpath is not None:
             os.makedirs(self.outpath, exist_ok=True)
 
-    def __call__(self, pose, pcd=None, add_pcd=None, zoom=0.5, frame=None, synth_frame=None, def_pcd=None, idx:int=0):
-        assert frame is not None
-        assert synth_frame is not None
+    def __call__(self, frame, synth_frame, idx:int=0):
         # plot input frame and synthesized frame
         fig, ax = plt.subplots(2, 3, num=1, clear=True, figsize=(10,8))
         img_t, _,_, depth_t, *_, conf_t = frame.to_numpy()
