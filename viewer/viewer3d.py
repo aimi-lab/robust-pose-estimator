@@ -51,7 +51,7 @@ class Viewer3D(object):
         self.viewer.add_geometry(self.pcd)
         self.control.convert_from_pinhole_camera_parameters(self.pose)
 
-    def __call__(self, pose, pcd=None, add_pcd=None, zoom=0.5, frame=None, synth_frame=None, def_pcd=None):
+    def __call__(self, pose, pcd=None, add_pcd=None, zoom=0.5, frame=None, synth_frame=None, def_pcd=None, idx:int=0):
         # plot input frame and synthesized frame
         self.pose = self.pose2view(pose)
         self.is_deformed = False
