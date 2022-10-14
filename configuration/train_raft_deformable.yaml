@@ -7,6 +7,7 @@ model:
   pose_scale: 1.0
   mode: lbgfs #mlp # horn
   use_weights: True
+  activation: sigmoid
 
 data:
   train:

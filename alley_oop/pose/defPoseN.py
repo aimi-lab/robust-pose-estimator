@@ -5,8 +5,14 @@ class DefPoseN(PoseN):
     def __init__(self, config):
         super(DefPoseN, self).__init__(config)
         H, W = config["image_shape"]
-        self.conf_head1 = nn.Sequential(TinyUNet(in_channels=128 + 128 + 3 + 3 + 2+1, output_size=(H, W)), nn.Sigmoid())
-        self.conf_head2 = nn.Sequential(TinyUNet(in_channels=128 + 128 + 3 + 3 + 2+1, output_size=(H, W)), nn.Sigmoid())
+        if config['activation'] == 'relu':
+            activation = nn.ReLU
+        elif config['activation'] == 'sigmoid':
+            activation = nn.Sigmoid
+        else:
+            raise NotImplementedError
+        self.conf_head1 = nn.Sequential(TinyUNet(in_channels=128 + 128 + 3 + 3 + 2+1, output_size=(H, W)), activation())
+        self.conf_head2 = nn.Sequential(TinyUNet(in_channels=128 + 128 + 3 + 3 + 2+1, output_size=(H, W)), activation())
 
 
     def forward(self, image1l, image2l, intrinsics, baseline, image1r, image2r, toolmask1=None, toolmask2=None, iters=12, flow_init=None, pose_init=None, ret_confmap=False):
