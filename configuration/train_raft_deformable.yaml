@@ -38,11 +38,7 @@ data:
     type: Intuitive
     basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_human
     sequences:
-      - dataset_6_0
-      - dataset_4_0_0
-      - dataset_4_1_0
-      - dataset_4_2_0
-      - dataset_5_0
+
     step: 3
     samples: 50
 
