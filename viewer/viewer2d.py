@@ -1,9 +1,12 @@
 try:
     import matplotlib.pyplot as plt
+    SHOW = True
 except ImportError:
     import matplotlib as mpl
     mpl.use('Agg')
     import matplotlib.pyplot as plt
+
+    SHOW = False
 import os
 
 
@@ -47,12 +50,14 @@ class Viewer2D(object):
         ax[1, 2].axis('off')
         ax[1, 2].set_title('weights_t-1')
         plt.tight_layout()
-        if not self.blocking:
+        if not self.blocking & SHOW:
             plt.draw()
         if self.outpath is not None:
             plt.savefig(os.path.join(self.outpath, f'vis_{idx:06d}.png'))
-        if self.blocking:
+        if self.blocking & SHOW:
             plt.show()
-        if not self.blocking:
+        if not self.blocking & SHOW:
             plt.pause(0.0001)
+        if not SHOW:
+            plt.close()
 
