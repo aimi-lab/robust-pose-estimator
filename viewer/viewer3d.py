@@ -1,9 +1,10 @@
-import open3d as o3d
-import numpy as np
-import cv2
-import matplotlib.pyplot as plt
+try:
+    import open3d as o3d
+    import numpy as np
+    import matplotlib.pyplot as plt
+except:
+    pass
 from alley_oop.geometry.pinhole_transforms import inv_transform
-import matplotlib.cm as cm
 
 
 class Viewer3D(object):

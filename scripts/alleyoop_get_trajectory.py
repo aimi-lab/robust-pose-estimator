@@ -11,6 +11,8 @@ import warnings
 from torch.utils.data import DataLoader
 import wandb
 from evaluation.evaluate_ate_freiburg import main as evaluate
+from viewer.viewer3d import Viewer3D
+from viewer.viewer2d import Viewer2D
 
 
 def main(args, config):
@@ -48,10 +50,8 @@ def main(args, config):
     with torch.no_grad():
         viewer = None
         if args.viewer == '3d':
-            from viewer.viewer3d import Viewer3D
             viewer = Viewer3D((2 * config['img_size'][0], 2 * config['img_size'][1]),blocking=args.block_viewer)
         elif args.viewer == '2d':
-            from viewer.viewer2d import Viewer2D
             viewer = Viewer2D(outpath=args.outpath, blocking=args.block_viewer)
 
         trajectory = []
@@ -69,7 +69,7 @@ def main(args, config):
             limg,rimg, depth, mask = slam.pre_process(limg, rimg, depth, mask, semantics)
             pose, scene, pose_relscale = slam.processFrame(limg.to(device), rimg.to(device), depth.to(device), mask.to(device), flow.to(device))
 
-            if viewer is not None:
+            if isinstance(viewer, Viewer3D):
                 curr_pcl = SurfelMap(frame=slam.get_frame(), kmat=torch.tensor(calib['intrinsics']['left']).float(),
                                      pmat=pose_relscale, depth_scale=scene.depth_scale).pcl2open3d(stable=False)
                 curr_pcl.paint_uniform_color([0.5, 0.5, 1.0])
@@ -79,7 +79,8 @@ def main(args, config):
                 viewer(pose.cpu(), canonical_scene, add_pcd=curr_pcl,
                        frame=slam.get_frame(), synth_frame=slam.get_rendered_frame(),
                        def_pcd=deformed_scene)
-
+            elif isinstance(viewer, Viewer2D):
+                viewer(slam.get_frame(), slam.get_rendered_frame(), i*args.step)
             trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
             if (args.log is not None) & (i > 0):
                 slam.recorder.log(step=i*args.step)
