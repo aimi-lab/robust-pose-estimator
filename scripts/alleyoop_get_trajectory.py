@@ -69,7 +69,7 @@ def main(args, config):
             limg,rimg, depth, mask = slam.pre_process(limg, rimg, depth, mask, semantics)
             pose, scene, pose_relscale = slam.processFrame(limg.to(device), rimg.to(device), depth.to(device), mask.to(device), flow.to(device))
 
-            if isinstance(viewer, Viewer3D):
+            if isinstance(viewer, Viewer3D) & (i > 0):
                 curr_pcl = SurfelMap(frame=slam.get_frame(), kmat=torch.tensor(calib['intrinsics']['left']).float(),
                                      pmat=pose_relscale, depth_scale=scene.depth_scale).pcl2open3d(stable=False)
                 curr_pcl.paint_uniform_color([0.5, 0.5, 1.0])
@@ -79,7 +79,7 @@ def main(args, config):
                 viewer(pose.cpu(), canonical_scene, add_pcd=curr_pcl,
                        frame=slam.get_frame(), synth_frame=slam.get_rendered_frame(),
                        def_pcd=deformed_scene)
-            elif isinstance(viewer, Viewer2D):
+            elif isinstance(viewer, Viewer2D) & (i > 0):
                 viewer(slam.get_frame(), slam.get_rendered_frame(), i*args.step)
             trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
             if (args.log is not None) & (i > 0):
