@@ -28,12 +28,15 @@ class PoseN(nn.Module):
         self.pose_scale = config['pose_scale']
 
         self.register_buffer("img_coords", create_img_coords_t(y=H, x=W), persistent=False)
-        if config['activation'] == 'relu':
-            activation = nn.ReLU
-        elif config['activation'] == 'sigmoid':
+        try:
+            if config['activation'] == 'relu':
+                activation = nn.ReLU
+            elif config['activation'] == 'sigmoid':
+                activation = nn.Sigmoid
+            else:
+                raise NotImplementedError
+        except KeyError:
             activation = nn.Sigmoid
-        else:
-            raise NotImplementedError
         self.conf_head1 = nn.Sequential(TinyUNet(in_channels=128+128+3+3+2, output_size=(H,W)), activation())
         self.conf_head2 = nn.Sequential(TinyUNet(in_channels=128+128+3+3+2, output_size=(H,W)), activation())
         self.use_weights = config["use_weights"]

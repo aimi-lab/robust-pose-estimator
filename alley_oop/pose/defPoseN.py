@@ -5,12 +5,15 @@ class DefPoseN(PoseN):
     def __init__(self, config):
         super(DefPoseN, self).__init__(config)
         H, W = config["image_shape"]
-        if config['activation'] == 'relu':
-            activation = nn.ReLU
-        elif config['activation'] == 'sigmoid':
+        try:
+            if config['activation'] == 'relu':
+                activation = nn.ReLU
+            elif config['activation'] == 'sigmoid':
+                activation = nn.Sigmoid
+            else:
+                raise NotImplementedError
+        except KeyError:
             activation = nn.Sigmoid
-        else:
-            raise NotImplementedError
         self.conf_head1 = nn.Sequential(TinyUNet(in_channels=128 + 128 + 3 + 3 + 2+1, output_size=(H, W)), activation())
         self.conf_head2 = nn.Sequential(TinyUNet(in_channels=128 + 128 + 3 + 3 + 2+1, output_size=(H, W)), activation())
 
