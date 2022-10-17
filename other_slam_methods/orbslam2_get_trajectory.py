@@ -66,7 +66,7 @@ def main(input_path, outpath, config, device_sel, start, stop, step, log, genera
                 mask, semantics = seg_model.get_mask(limg.to(device))
                 depth, _ = depth_network(255.0*limg.to(device), 255.0*rimg.to(device), baseline)
             elif isinstance(dataset, RGBDDataset) | isinstance(dataset, TUMDataset):
-                limg, depth, depth_noise, mask, semantics, img_number = data
+                limg, depth, mask, semantics, img_number = data
             else:
                 limg, rimg, mask, semantics, img_number = data
                 depth, _ = depth_network(255.0*limg.to(device), 255.0*rimg.to(device), baseline)

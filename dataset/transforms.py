@@ -41,7 +41,7 @@ class ResizeStereo(StereoTransform):
 
 
 class RGBDTransform(object):
-    def __call__(self, img, depth, depth_noise, mask, semantics):
+    def __call__(self, img, depth, mask, semantics):
         return img, depth, mask, semantics
 
 
@@ -49,7 +49,7 @@ class ResizeRGBD(RGBDTransform):
     def __init__(self, size):
         self.size = [int(size[1]), int(size[0])]
 
-    def __call__(self, img, depth, depth_noise=None, mask=None, semantics=None):
+    def __call__(self, img, depth, mask=None, semantics=None):
         # resize with cropping to conserve aspect ratio
         h, w = img.shape[-2:]
 
@@ -57,10 +57,9 @@ class ResizeRGBD(RGBDTransform):
         size = [int(scale * h), int(scale * w)]
         img = self._resize_with_crop(img, size)
         depth = self._resize_with_crop(depth, size)
-        depth_noise = self._resize_with_crop(depth_noise, size)
         mask = self._resize_with_crop(mask, size, InterpolationMode.NEAREST)
         semantics = self._resize_with_crop(semantics, size, InterpolationMode.NEAREST)
-        return img, depth,depth_noise, mask, semantics
+        return img, depth, mask, semantics
 
     def _resize_with_crop(self, img, size, mode=InterpolationMode.BILINEAR):
         if img is not None:

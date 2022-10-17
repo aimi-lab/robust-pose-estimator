@@ -36,8 +36,7 @@ def get_data(input_path: str, img_size: Tuple, sample_video: int=1, rect_mode: s
         calib = rect.get_rectified_calib()
         try:
             assert not force_video
-            assert False
-            dataset = RGBDDataset(input_path, img_size=calib['img_size'], baseline=calib['bf_orig'])
+            dataset = RGBDDataset(input_path, img_size=calib['img_size'])
             print(" RGBD Dataset with precomputed depth")
         except AssertionError:
             try:
