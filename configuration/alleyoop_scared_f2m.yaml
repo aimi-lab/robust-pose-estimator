@@ -10,6 +10,7 @@ slam:
   compensate_illumination: False  # do not use this with noisy depth estimates
   average_pts: False
   fuse_mode: projective
+  fuse_step: 1
 
 img_size:
   - 640
