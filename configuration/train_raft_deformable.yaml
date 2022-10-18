@@ -36,7 +36,7 @@ data:
 
   val:
     type: Intuitive
-    basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/slam_benchmark_data
+    basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_human
     sequences:
       - scared_dataset_7
       - scared_dataset_8
