@@ -32,15 +32,16 @@ data:
     step:
       - 1
       - 30
-    samples: 1500
+    samples: 2000
 
   val:
     type: Intuitive
     basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/slam_benchmark_data
     sequences:
-      - case_A
       - case_B
       - case_C
+      - scared_dataset_7
+      - scared_dataset_8
     step: 3
     samples: 40
 
