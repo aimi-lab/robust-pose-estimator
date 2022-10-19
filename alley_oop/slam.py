@@ -63,7 +63,7 @@ class SLAM(object):
             pose, self.rendered_frame, success, flow, crsp_list = self.pose_estimator.estimate(self.frame, self.scene)
             pose_scaled = pose.clone()
             pose_scaled[:3, 3] /= self.depth_scale  # de-normalize depth scaling
-            if (self.cnt%self.fuse_cnt == 1) & success & (flow is not None) & (not self.config['frame2frame']):
+            if (self.cnt%self.fuse_cnt == 0) & success & (flow is not None) & (not self.config['frame2frame']):
                 self.scene.fuse(self.frame, pose, flow, crsp_list)
                 if self.dbg_opt:
                     print(f"number of surfels: {self.scene.opts.shape[1]}, stable: {(self.scene.conf >= 1.0).sum().item()}")
