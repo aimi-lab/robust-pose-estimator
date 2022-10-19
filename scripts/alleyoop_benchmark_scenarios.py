@@ -2,6 +2,8 @@ import os
 import argparse
 import yaml
 import pandas as pd
+import sys
+sys.path.append('../')
 from scripts.alleyoop_get_trajectory import main as alleyoop
 
 if __name__ == '__main__':
