@@ -13,6 +13,7 @@ import wandb
 from evaluation.evaluate_ate_freiburg import main as evaluate
 from viewer.viewer3d import Viewer3D
 from viewer.viewer2d import Viewer2D
+from viewer.view_renderer import ViewRenderer
 
 
 def main(args, config):
@@ -53,6 +54,8 @@ def main(args, config):
             viewer = Viewer3D((2 * config['img_size'][0], 2 * config['img_size'][1]),blocking=args.block_viewer)
         elif args.viewer == '2d':
             viewer = Viewer2D(outpath=args.outpath, blocking=args.block_viewer)
+        elif args.viewer == 'video':
+            viewer = ViewRenderer((2*config['img_size'][1], 2*config['img_size'][0]), outpath=args.outpath)
 
         trajectory = []
         os.makedirs(args.outpath, exist_ok=True)
@@ -81,9 +84,12 @@ def main(args, config):
                        def_pcd=deformed_scene)
             elif isinstance(viewer, Viewer2D) & (i > 0):
                 viewer(slam.get_frame(), slam.get_rendered_frame(), i*args.step)
+            elif isinstance(viewer, ViewRenderer) & (i > 0):
+                canonical_scene = scene.pcl2open3d(stable=True)
+                viewer(pose.cpu(), canonical_scene)
             trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
             if (args.log is not None) & (i > 0):
-                slam.recorder.log(step=i*args.step)
+                slam.recorder.log(step=img_number[0])
             if args.store_map & ((i%50) == 49):
                 scene.save_ply(os.path.join(args.outpath, f'stable_map_{i}.ply'), stable=True)
                 scene.deform_cpy().save_ply(os.path.join(args.outpath, f'def_map_{i}.ply'), stable=True)
@@ -177,7 +183,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--viewer',
         default='none',
-        choices=['none', '2d', '3d'],
+        choices=['none', '2d', '3d', 'video'],
         help='select viewer'
     )
     parser.add_argument(
