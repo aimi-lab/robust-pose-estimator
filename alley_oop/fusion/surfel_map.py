@@ -384,7 +384,7 @@ class SurfelMap(object):
         if filter is None:
             filter = torch.ones_like(self.conf, dtype=torch.bool).squeeze()
         if stable:
-            stable_pts = (self.conf[:,filter] > 1.0).squeeze()
+            stable_pts = (self.conf[:,filter] >= 1.0).squeeze()
         else:
             stable_pts = torch.ones_like(self.conf[:,filter], dtype=torch.bool).squeeze()
 
