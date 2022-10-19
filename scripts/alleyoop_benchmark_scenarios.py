@@ -3,6 +3,8 @@ import argparse
 import yaml
 import pandas as pd
 import sys
+from multiprocessing import Process
+import multiprocessing as mp
 sys.path.append('../')
 from scripts.alleyoop_get_trajectory import main as alleyoop
 
@@ -81,7 +83,7 @@ if __name__ == '__main__':
     df = pd.read_csv(os.path.join(args.input, 'scenarios.csv'))
     for i, row in df.iterrows():
         args.start = row['start']
-        args.stop = row['end']
+        args.stop = min(row['start'] + 300, row['end'])
         config.update({'scenario': row['scenario']})
         print(f'{args.start} -> {args.stop} : {row["scenario"]}')
         # read scenario file
