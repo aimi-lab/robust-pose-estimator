@@ -10,6 +10,9 @@ class OptimizationRecordings():
         self.surfels_stable = []
         self.gt_trajectory = None
 
+    def __del__(self):
+        wandb.finish()
+
     def __call__(self, scene, pose):
         if scene is not None:
             self.surfels_total.append(scene.opts.shape[1])
