@@ -13,8 +13,8 @@ class ViewRenderer(object):
         self.viewer = o3d.visualization.VisualizerWithKeyCallback()
         self.viewer.create_window(width=self.image_width,
                              height=self.image_height, visible=True)
-        self.vid_writer = cv2.VideoWriter(os.path.join(outpath, 'vis.avi'), cv2.VideoWriter_fourcc(*'XVID'),
-                                     25.0, (image_shape[0], image_shape[1]))
+        self.vid_writer = cv2.VideoWriter(os.path.join(outpath, 'vis.mp4'), cv2.VideoWriter_fourcc(*'MP4V'),
+                                     25.0, (image_shape[1], image_shape[0]-1))
         # get mesh
         self.control = self.viewer.get_view_control()
         self.ref_view = self.control.convert_to_pinhole_camera_parameters()
@@ -25,6 +25,7 @@ class ViewRenderer(object):
         self.is_deformed = False
 
     def __del__(self):
+        print("release writer")
         self.vid_writer.release()
 
     def pose2view(self, pose):
