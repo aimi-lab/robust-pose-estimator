@@ -89,7 +89,7 @@ def main(args, config):
                 viewer(pose.cpu(), canonical_scene)
             trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
             if (args.log is not None) & (i > 0):
-                slam.recorder.log(step=img_number[0])
+                slam.recorder.log(step=int(img_number[0]))
             if args.store_map & ((i%50) == 49):
                 scene.save_ply(os.path.join(args.outpath, f'stable_map_{i}.ply'), stable=True)
                 scene.deform_cpy().save_ply(os.path.join(args.outpath, f'def_map_{i}.ply'), stable=True)
