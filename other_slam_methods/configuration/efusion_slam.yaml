@@ -18,4 +18,4 @@ viewer:
   matches: True
   view_synthesis: True
 
-rect_mode: 'pseudo'
+rect_mode: 'conventional'

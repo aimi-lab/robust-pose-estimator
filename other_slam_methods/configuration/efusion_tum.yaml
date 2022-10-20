@@ -17,3 +17,5 @@ viewer:
   show: True
   matches: True
   view_synthesis: True
+
+rect_mode: 'conventional'
