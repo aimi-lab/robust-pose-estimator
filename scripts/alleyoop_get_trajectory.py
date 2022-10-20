@@ -33,9 +33,9 @@ def main(args, config):
     # check for ground-truth pose data for logging purposes
     gt_file = os.path.join(args.input, 'groundtruth.txt')
     gt_trajectory = read_freiburg(gt_file) if os.path.isfile(gt_file) else None
-
+    init_pose = torch.tensor(gt_trajectory[0]) if gt_trajectory is not None else torch.eye(4)
     slam = SLAM(torch.tensor(calib['intrinsics']['left']).to(device), config['slam'], img_shape=config['img_size'], baseline=calib['bf'],
-                checkpoint=args.checkpoint, init_pose=torch.tensor(gt_trajectory[0]) if gt_trajectory is not None else torch.eye(4)).to(device)
+                checkpoint=args.checkpoint, init_pose=init_pose).to(device)
     if not isinstance(dataset, StereoVideoDataset):
         sampler = SequentialSubSampler(dataset, args.start, args.stop, args.step)
     else:
@@ -57,7 +57,7 @@ def main(args, config):
         elif args.viewer == 'video':
             viewer = ViewRenderer((2*config['img_size'][1], 2*config['img_size'][0]), outpath=args.outpath)
 
-        trajectory = []
+        trajectory = [{'camera-pose': init_pose.tolist(), 'timestamp': args.start, 'residual': 0.0, 'key_frame': True}]
         os.makedirs(args.outpath, exist_ok=True)
         for i, data in enumerate(tqdm(loader, total=min(len(dataset), (args.stop-args.start)//args.step))):
             if isinstance(dataset, StereoVideoDataset):
