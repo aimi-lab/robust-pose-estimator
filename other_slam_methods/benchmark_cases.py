@@ -24,7 +24,6 @@ if __name__ == '__main__':
         for i, row in df.iterrows():
             start = row['start']
             stop = min(row['start'] + 300, row['end'])
-            config.update({'scenario': row['scenario']})
             print(f'{start} -> {stop} : {row["scenario"]}')
             try:
                 # if not os.path.isfile(os.path.join(sequence, 'data/efusion/trajectory.json')):
@@ -36,6 +35,7 @@ if __name__ == '__main__':
                 if not os.path.isfile(os.path.join(sequence, f'data/{i}/orbslam2/trajectory.json')):
                     with open('configuration/orbslam2.yaml', 'r') as ymlfile:
                         config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
+                    config.update({'scenario': row['scenario']})
                     p = Process(target=orbslam, args=(sequence, os.path.join(sequence, f'data/{i}/orbslam2'), config, 'cpu', start, stop, step, 'scenario_orbslam2', False,))
                     p.start()
                     p.join()
