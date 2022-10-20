@@ -83,7 +83,7 @@ class FrameClass:
 
     @property
     def valid(self):
-        return self.mask - self.tool_mask
+        return self.mask ^ self.tool_mask
 
     def plot(self):
         import matplotlib.pyplot as plt
