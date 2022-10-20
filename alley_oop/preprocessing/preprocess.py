@@ -31,31 +31,32 @@ class PreProcess(object):
         self.cmp_illumination = compensate_illumination
         self.conf_thr = conf_thr
 
-    def __call__(self, img:torch.tensor, rimg: torch.tensor, depth:torch.tensor, mask:torch.tensor=None, semantics:torch.tensor=None):
+    def __call__(self, img:torch.tensor, rimg: torch.tensor, depth:torch.tensor, tool_mask:torch.tensor=None, semantics:torch.tensor=None):
         assert torch.is_tensor(img)
 
         # need to go back to numpy to use opencv functions
         depth = depth.cpu().numpy().squeeze()
-        mask = mask.cpu().numpy().squeeze()
+        tool_mask = tool_mask.cpu().numpy().squeeze()
 
         # filter depth to smooth out noisy points
         #depth = cv2.bilateralFilter(depth, d=-1, sigmaColor=0.01, sigmaSpace=10)
-        mask = np.ones_like(depth).astype(bool) if mask is None else mask
+        tool_mask = np.ones_like(depth).astype(bool) if tool_mask is None else tool_mask
         if self.mask_specularities:
-            mask &= self.specularity_mask(img)
+            mask = tool_mask & self.specularity_mask(img)
         # depth clipping
         mask &= (depth > self.depth_min) & (depth < 1.0)
         # border points are usually unstable, mask them out
+        tool_mask = cv2.erode(tool_mask.astype(np.uint8), kernel=np.ones((11, 11)))
         mask = cv2.erode(mask.astype(np.uint8), kernel=np.ones((11, 11)))
-
         depth = (torch.tensor(depth)[None,None,...]).to(self.dtype)
         mask = (torch.tensor(mask)[None,None,...]).to(torch.bool)
+        tool_mask = (torch.tensor(tool_mask)[None, None, ...]).to(torch.bool)
 
         # compensate illumination and transform to gray-scale image
         if self.cmp_illumination:
             img = self.compensate_illumination(rgb2gray_t(img.cpu(), ax0=0), depth, self.intrinsics)
 
-        return img,rimg, depth, mask
+        return img,rimg, depth, mask, tool_mask
 
     def specularity_mask(self, img, spec_thr=0.96):
         """ specularities can cause issues in the photometric pose estimation.

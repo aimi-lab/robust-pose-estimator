@@ -62,15 +62,15 @@ def main(args, config):
         for i, data in enumerate(tqdm(loader, total=min(len(dataset), (args.stop-args.start)//args.step))):
             if isinstance(dataset, StereoVideoDataset):
                 limg, rimg, pose_kinematics, img_number = data
-                mask, semantics = seg_model.get_mask(limg.to(device))
+                tool_mask, semantics = seg_model.get_mask(limg.to(device))
                 depth, flow, _ = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
             elif isinstance(dataset, RGBDDataset) | isinstance(dataset, TUMDataset):
                 raise NotImplementedError
             else:
-                limg, rimg, mask, semantics, img_number = data
+                limg, rimg, tool_mask, semantics, img_number = data
                 depth, flow, _ = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
-            limg,rimg, depth, mask = slam.pre_process(limg, rimg, depth, mask, semantics)
-            pose, scene, pose_relscale = slam.processFrame(limg.to(device), rimg.to(device), depth.to(device), mask.to(device), flow.to(device))
+            limg,rimg, depth, mask, tool_mask = slam.pre_process(limg, rimg, depth, tool_mask, semantics)
+            pose, scene, pose_relscale = slam.processFrame(limg.to(device), rimg.to(device), depth.to(device), mask.to(device), flow.to(device), tool_mask.to(device))
 
             if isinstance(viewer, Viewer3D) & (i > 0):
                 curr_pcl = SurfelMap(frame=slam.get_frame(), kmat=torch.tensor(calib['intrinsics']['left']).float(),

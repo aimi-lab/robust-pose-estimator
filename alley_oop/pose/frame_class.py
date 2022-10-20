@@ -10,7 +10,8 @@ class FrameClass:
         Class containing image, depth and normals
     """
     def __init__(self, img: torch.Tensor, rimg: torch.Tensor=None, depth: torch.Tensor=None, normals: torch.Tensor=None,
-                 intrinsics: torch.Tensor=None, mask: torch.Tensor=None, confidence: torch.Tensor=None, flow: torch.Tensor=None):
+                 intrinsics: torch.Tensor=None, mask: torch.Tensor=None, confidence: torch.Tensor=None, flow: torch.Tensor=None,
+                 tool_mask: torch.Tensor=None):
         """
 
         :param img: RGB image in range (0, 1) with shape Nx3xHxW or gray-scale Nx1xHxW
@@ -35,6 +36,7 @@ class FrameClass:
         if mask is None:
             mask = torch.ones_like(self.img_gray, dtype=torch.bool)
         self.mask = mask
+        self.tool_mask = tool_mask if tool_mask is not None else self.mask
         if depth is None:
             self.depth = torch.ones_like(self.img_gray)
         else:
@@ -78,6 +80,10 @@ class FrameClass:
     @property
     def shape(self):
         return self.img.shape[-2:]
+
+    @property
+    def valid(self):
+        return self.mask - self.tool_mask
 
     def plot(self):
         import matplotlib.pyplot as plt

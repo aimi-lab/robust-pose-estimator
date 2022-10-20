@@ -48,11 +48,11 @@ class RAFTPoseEstimator(torch.nn.Module):
             if self.last_frame is not None:
                 if isinstance(self.model, DefPoseN):
                     # we should not mask tools but provide a tool-mask to the conf-head.
-                    # ToDo we consider the mask as tools but it can also be invalid depth or similar.
                     flow, rel_pose_se3, *_, conf_1, conf_2 = self.model(255*self.last_frame.img, 255*frame.img,
                                                                         self.intrinsics, self.baseline*self.scale,
                                                                         image1r=self.last_frame.rimg, image2r=frame.rimg,
-                                                                        toolmask1=self.last_frame.mask, toolmask2=frame.mask,
+                                                                        toolmask1=self.last_frame.tool_mask, toolmask2=frame.tool_mask,
+                                                                        mask1=self.last_frame.valid, mask2=frame.valid,
                                                                         ret_confmap=True)
                 else:
                     flow, rel_pose_se3, *_, conf_1, conf_2 = self.model(255 * self.last_frame.img, 255 * frame.img,
