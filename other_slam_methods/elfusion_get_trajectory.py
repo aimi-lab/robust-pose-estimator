@@ -64,7 +64,8 @@ def main(input_path, outpath, config, device_sel, start, stop, step, log, genera
             limg = (255.0*limg.squeeze().permute(1,2,0)).numpy().astype(np.uint8)
             depth = depth.squeeze().numpy().astype(np.uint16)
             mask = (mask == 0).squeeze().numpy().astype(np.uint8)
-            pose= slam.processFrame(limg, depth,mask , idx, np.eye(4), config['slam']['kinematics'] == 'fuse')
+            pose= slam.processFrame(limg, depth,mask , idx, np.eye(4), True)
+
             trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
             if log:
                 log_dict = {'frame': idx*step}
