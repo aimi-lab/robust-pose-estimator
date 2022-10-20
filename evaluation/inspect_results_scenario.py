@@ -13,8 +13,8 @@ parser.add_argument(
     '--methods',
     nargs='+',
     type=str,
-    default=['orbslam2_raftdepth', 'scared_unet_f2m_w', 'scared_raftslam_f2m', 'scared_raftslam_f2m_w'],
-    help='Path to input folder.'
+    default=['scenario_orbslam2', 'scenarios_f2f_nw', 'scenarios_f2f_no_tools', 'scenarios_f2f_tools', 'scenarios_f2f_tools2'],
+    help='methods to inspect.'
 )
 args = parser.parse_args()
 METHODS = args.methods
@@ -49,13 +49,9 @@ runs_df = runs_df[runs_df.method.isin(METHODS)]
 runs_df.method = runs_df.method.astype('category')
 runs_df.method = runs_df.method.cat.set_categories(METHODS)
 runs_df.sort_values(['method'], inplace=True)
-runs_df.to_csv("project.csv")
-names = [d.split('_',maxsplit=2)[1:] for d in runs_df['keyframe']]
-names = list(map(list, zip(*names)))
-runs_df['dataset'] = names[0]
-runs_df['keyframe'] = names[1]
 runs_df["ATE/RMSE"] *= 1000.0 #m to mm
-runs_df.loc[runs_df.method.eq("test_orbslam2") & runs_df.dataset.eq("5") & runs_df.keyframe.eq("0"),"ATE/RMSE"] = 4.267 #ORBSLAM d5_0
+runs_df['dataset'] = [os.path.basename(d) for d in runs_df['dataset']]
+
 
 # Group into methods and datasets
 print('\n------------')
@@ -65,7 +61,7 @@ for method in METHODS:
     print(method)
     df = runs_df[runs_df.method.eq(method)]
     print('average duration in frames:', df['frame'].mean(), '+/-', df['frame'].std())
-    df = pd.DataFrame({'mean': df.groupby('dataset').mean()['ATE/RMSE'], 'std':df.groupby('dataset').std()['ATE/RMSE']})
+    df = pd.DataFrame({'mean': df.groupby('scenario').mean()['ATE/RMSE'], 'std':df.groupby('scenario').std()['ATE/RMSE']})
     print(df)
     print('macro average:', df.mean()['mean'],'+/-', df.std()['mean'])
     print('micro average:', runs_df[runs_df.method.eq(method)]['ATE/RMSE'].mean(), '+/-', runs_df[runs_df.method.eq(method)]['ATE/RMSE'].std())

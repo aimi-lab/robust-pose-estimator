@@ -13,7 +13,7 @@ parser.add_argument(
     '--methods',
     nargs='+',
     type=str,
-    default=['orbslam2_raftdepth', 'scared_unet_f2m_w', 'scared_raftslam_f2m', 'scared_raftslam_f2m_w'],
+    default=['orbslam2_raftdepth', 'scared_unet_f2f_w','scared_unet_f2m_w', 'scared_raftslam_f2f', 'scared_raftslam_f2m', 'scared_f2f_tools', 'scared_f2f_no_tools', 'scared_f2m_no_tools'],
     help='Path to input folder.'
 )
 args = parser.parse_args()
@@ -63,7 +63,9 @@ for method in METHODS:
     print('average duration in frames:', df['frame'].mean(), '+/-', df['frame'].std())
     df = pd.DataFrame({'mean': df.groupby('dataset').mean()['ATE/RMSE'], 'std':df.groupby('dataset').std()['ATE/RMSE']})
     print(df)
-    print('average:', df.mean()['mean'],'+/-', df.std()['mean'])
+    print('macro average:', df.mean()['mean'], '+/-', df.std()['mean'])
+    print('micro average:', runs_df[runs_df.method.eq(method)]['ATE/RMSE'].mean(), '+/-',
+          runs_df[runs_df.method.eq(method)]['ATE/RMSE'].std())
 
 # Per Run info
 print('\n------------')
