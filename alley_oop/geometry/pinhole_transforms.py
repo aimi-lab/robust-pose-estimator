@@ -190,7 +190,7 @@ def inv_transform(mat:torch.Tensor):
     return mat_inv
 
 
-def homogenous(opts: torch.Tensor):
+def homogeneous(opts: torch.Tensor):
     n = opts.shape[0]
     opts = torch.cat((opts, torch.ones((n, 1, opts.shape[-1]), device=opts.device, dtype=opts.dtype)), dim=1)
     return opts
@@ -207,14 +207,14 @@ def reproject(depth: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.T
     repr = torch.linalg.inv(intrinsics) @ img_coords.view(3, -1)
     opts = depth.view(n, 1, -1) * repr
 
-    opts = homogenous(opts)
+    opts = homogeneous(opts)
     return opts
 
 
 def project(opts: torch.Tensor, pmat:torch.tensor, kmat:torch.tensor):
     p = kmat @ pmat[:, :3]
     # pinhole projection
-    ipts = torch.bmm(p, homogenous(opts))
+    ipts = torch.bmm(p, homogeneous(opts))
     # inhomogenization
     ipts = ipts[:, :3] / torch.clamp(ipts[:, -1], 1e-12, None).unsqueeze(1)
     return ipts[:, :2]
