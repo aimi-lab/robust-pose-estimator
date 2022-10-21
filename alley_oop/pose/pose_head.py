@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from alley_oop.geometry.pinhole_transforms import create_img_coords_t, transform, homogenous, project
+from alley_oop.geometry.pinhole_transforms import create_img_coords_t, transform, homogeneous, project
 from alley_oop.geometry.absolute_pose_quarternion import align_torch
 from alley_oop.ddn.ddn.pytorch.node import *
 from alley_oop.network_core.raft.core.utils.flow_utils import remap_from_flow, remap_from_flow_nearest
@@ -74,7 +74,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         # se(3) to SE(3)
         pose = pseudo_lie_se3_to_SE3_batch_small(y)
         # # transform point cloud given the pose
-        pcl2_aligned = transform(homogenous(pcl2.view(n, 3, -1)), pose).reshape(n, 4, h, w)[:, :3]
+        pcl2_aligned = transform(homogeneous(pcl2.view(n, 3, -1)), pose).reshape(n, 4, h, w)[:, :3]
         # resample point clouds given the optical flow
         pcl2_aligned, _ = remap_from_flow(pcl2_aligned, flow)
         weights2_aligned, _ = remap_from_flow(weights2, flow)
@@ -122,7 +122,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         # se(3) to SE(3)
         pose = pseudo_lie_se3_to_SE3_batch_small(y)
         # # transform point cloud given the pose
-        pcl2_aligned = transform(homogenous(pcl2.view(n, 3, -1)), pose).reshape(n, 4, h, w)[:, :3]
+        pcl2_aligned = transform(homogeneous(pcl2.view(n, 3, -1)), pose).reshape(n, 4, h, w)[:, :3]
         # resample point clouds given the optical flow
         pcl2_aligned, _ = remap_from_flow(pcl2_aligned, flow)
         weights2_aligned, _ = remap_from_flow(weights2, flow)
@@ -227,7 +227,7 @@ class DeclarativePoseHead3DNode2(DeclarativePoseHead3DNode):
             # se(3) to SE(3)
             pose = pseudo_lie_se3_to_SE3_batch_small(y)
             # # transform point cloud given the pose
-            pcl2_aligned = transform(homogenous(pcl2.view(n, 3, -1)), pose).reshape(n, 4, h, w)[:, :3]
+            pcl2_aligned = transform(homogeneous(pcl2.view(n, 3, -1)), pose).reshape(n, 4, h, w)[:, :3]
             # resample point clouds given the optical flow
             pcl2_aligned, _ = remap_from_flow(pcl2_aligned, flow)
             weights2_aligned, _ = remap_from_flow(weights2, flow)
