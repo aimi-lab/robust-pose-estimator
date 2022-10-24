@@ -70,7 +70,7 @@ def main(args, config):
                 limg, rimg, tool_mask, semantics, img_number = data
                 depth, flow, _ = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
             limg,rimg, depth, mask, tool_mask = slam.pre_process(limg, rimg, depth, tool_mask, semantics)
-            pose, scene, pose_relscale = slam.processFrame(limg.to(device), rimg.to(device), depth.to(device), mask.to(device), flow.to(device), tool_mask.to(device))
+            pose, scene, pose_relscale, flow = slam.processFrame(limg.to(device), rimg.to(device), depth.to(device), mask.to(device), flow.to(device), tool_mask.to(device))
 
             if isinstance(viewer, Viewer3D) & (i > 0):
                 curr_pcl = SurfelMap(frame=slam.get_frame(), kmat=torch.tensor(calib['intrinsics']['left']).float(),
@@ -83,7 +83,7 @@ def main(args, config):
                        frame=slam.get_frame(), synth_frame=slam.get_rendered_frame(),
                        def_pcd=deformed_scene)
             elif isinstance(viewer, Viewer2D) & (i > 0):
-                viewer(slam.get_frame(), slam.get_rendered_frame(), i*args.step)
+                viewer(slam.get_frame(), slam.get_rendered_frame(), flow, i*args.step)
             elif isinstance(viewer, ViewRenderer) & (i > 0):
                 canonical_scene = scene.pcl2open3d(stable=True)
                 viewer(pose.cpu(), canonical_scene)

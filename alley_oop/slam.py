@@ -70,7 +70,7 @@ class SLAM(object):
             self.recorder(self.scene, pose_scaled)
             self.cnt += 1
 
-            return pose_scaled, self.scene, pose
+            return pose_scaled, self.scene, pose, flow
 
     def to(self, device: torch.device):
         self.device = device
