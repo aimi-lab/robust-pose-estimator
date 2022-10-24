@@ -5,7 +5,7 @@ import matplotlib as mpl
 mpl.use('Qt5Agg')
 from alley_oop.pose.trajectory_analyzer import TrajectoryAnalyzer
 from alley_oop.utils.trajectory import read_freiburg
-from evaluation.evaluate_ate_freiburg import main as evaluate
+from evaluation.evaluate_ate_freiburg import eval
 
 
 if __name__ == '__main__':
@@ -21,7 +21,7 @@ if __name__ == '__main__':
         '--pred_folders',
         type=str,
         nargs='+',
-        default='gt',
+        default=['gt'],
         help='Folder containing predictions.'
     )
     args = parser.parse_args()
@@ -39,8 +39,10 @@ if __name__ == '__main__':
     for k, meth in enumerate(freiburg_paths):
         print(meth)
         assert os.path.isfile(freiburg_paths[meth]), f'{meth} does not exist'
-        error = evaluate(freiburg_paths[meth], freiburg_paths['gt'])*1000
-        print('ATE-RMSE: ',np.sqrt(np.dot(error, error) / len(error)), ' mm')
+        ate_rmse, rpe_trans, rpe_rot, error = eval(freiburg_paths[meth], freiburg_paths['gt'])
+        print('ATE-RMSE: ',ate_rmse, ' mm')
+        print('RPE-trans: ', rpe_trans, ' mm')
+        print('RPE_rot: ', rpe_rot)
         pose_arrs = np.stack(read_freiburg(freiburg_paths[meth]))
         color = colors[k%len(colors)]
         pose_plotter.add_pose_trajectory(pose_arrs, label=meth, color=color)

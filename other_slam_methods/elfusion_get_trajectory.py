@@ -12,7 +12,7 @@ import warnings
 import torch
 import wandb
 import numpy as np
-from evaluation.evaluate_ate_freiburg import main as evaluate
+from evaluation.evaluate_ate_freiburg import eval
 from alley_oop.pose.PoseN import DepthNet
 
 
@@ -87,13 +87,14 @@ def main(input_path, outpath, config, device_sel, start, stop, step, log, genera
         wandb.save(os.path.join(outpath, 'trajectory.freiburg'))
         wandb.save(os.path.join(outpath, 'trajectory.json'))
         if os.path.isfile(os.path.join(input_path, 'groundtruth.txt')):
-            error = evaluate(os.path.join(input_path, 'groundtruth.txt'),
-                             os.path.join(outpath, 'trajectory.freiburg'))
+            ate_rmse, rpe_trans, rpe_rot, trans_error = eval(os.path.join(args.input, 'groundtruth.txt'),
+                                                             os.path.join(args.outpath, 'trajectory.freiburg'))
             wandb.define_metric('trans_error', step_metric='frame')
-            for i, e in enumerate(error):
+            for i, e in enumerate(trans_error):
                 wandb.log({'trans_error': e, 'frame': i})
-            wandb.summary['ATE/RMSE'] = np.sqrt(np.dot(error, error) / len(error))
-            wandb.summary['ATE/mean'] = np.mean(error)
+            wandb.summary['ATE/RMSE'] = ate_rmse
+            wandb.summary['RPE/trans'] = rpe_trans
+            wandb.summary['RPE/rot'] = rpe_rot
     wandb.finish()
     print('finished')
 

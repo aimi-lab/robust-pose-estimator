@@ -10,7 +10,7 @@ from dataset.dataset_utils import get_data, StereoVideoDataset, SequentialSubSam
 import warnings
 from torch.utils.data import DataLoader
 import wandb
-from evaluation.evaluate_ate_freiburg import main as evaluate
+from evaluation.evaluate_ate_freiburg import eval
 from viewer.viewer3d import Viewer3D
 from viewer.viewer2d import Viewer2D
 from viewer.view_renderer import ViewRenderer
@@ -103,13 +103,14 @@ def main(args, config):
             wandb.save(os.path.join(args.outpath, 'trajectory.json'))
             wandb.save(os.path.join(args.outpath, 'map.ply'))
             if os.path.isfile(os.path.join(args.input, 'groundtruth.txt')):
-                error = evaluate(os.path.join(args.input, 'groundtruth.txt'),
+                ate_rmse, rpe_trans, rpe_rot, trans_error = eval(os.path.join(args.input, 'groundtruth.txt'),
                                  os.path.join(args.outpath, 'trajectory.freiburg'))
                 wandb.define_metric('trans_error', step_metric='frame')
-                for i, e in enumerate(error):
+                for i, e in enumerate(trans_error):
                     wandb.log({'trans_error': e, 'frame': i})
-                wandb.summary['ATE/RMSE'] = np.sqrt(np.dot(error,error) / len(error))
-                wandb.summary['ATE/mean'] = np.mean(error)
+                wandb.summary['ATE/RMSE'] = ate_rmse
+                wandb.summary['RPE/trans'] = rpe_trans
+                wandb.summary['RPE/rot'] = rpe_rot
 
         print('finished')
 
