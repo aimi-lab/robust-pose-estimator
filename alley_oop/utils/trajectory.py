@@ -5,7 +5,6 @@ from scipy.spatial.transform import Rotation
 
 
 def save_trajectory(trajectory: list, path: str):
-    save_json(trajectory, path)
     save_freiburg(trajectory, path)
 
 

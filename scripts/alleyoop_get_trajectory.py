@@ -100,7 +100,6 @@ def main(args, config):
         scene.save_ply(os.path.join(args.outpath, 'all_map.ply'), stable=False)
         if args.log is not None:
             wandb.save(os.path.join(args.outpath, 'trajectory.freiburg'))
-            wandb.save(os.path.join(args.outpath, 'trajectory.json'))
             wandb.save(os.path.join(args.outpath, 'map.ply'))
             if os.path.isfile(os.path.join(args.input, 'groundtruth.txt')):
                 ate_rmse, rpe_trans, rpe_rot, trans_error = eval(os.path.join(args.input, 'groundtruth.txt'),
