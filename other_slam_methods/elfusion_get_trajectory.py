@@ -87,8 +87,8 @@ def main(input_path, outpath, config, device_sel, start, stop, step, log, genera
         wandb.save(os.path.join(outpath, 'trajectory.freiburg'))
         wandb.save(os.path.join(outpath, 'trajectory.json'))
         if os.path.isfile(os.path.join(input_path, 'groundtruth.txt')):
-            ate_rmse, rpe_trans, rpe_rot, trans_error = eval(os.path.join(args.input, 'groundtruth.txt'),
-                                                             os.path.join(args.outpath, 'trajectory.freiburg'))
+            ate_rmse, rpe_trans, rpe_rot, trans_error = eval(os.path.join(input_path, 'groundtruth.txt'),
+                                                             os.path.join(outpath, 'trajectory.freiburg'))
             wandb.define_metric('trans_error', step_metric='frame')
             for i, e in enumerate(trans_error):
                 wandb.log({'trans_error': e, 'frame': i})
