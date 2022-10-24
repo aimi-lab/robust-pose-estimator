@@ -68,18 +68,18 @@ def main(input_path, outpath, config, device_sel, start, stop, step, log, genera
 
             trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
             if log:
-                log_dict = {'frame': idx*step}
+                log_dict = {'frame': int(img_number[0])}
                 if gt_trajectory is not None:
-                    if len(gt_trajectory) > idx*step:
+                    if len(gt_trajectory) > int(img_number[0]):
                         pose = np.array(trajectory[-1]['camera-pose'])
-                        tr_err = gt_trajectory[idx*step][:3, 3] - pose[:3, 3]
-                        rot_err = (gt_trajectory[idx*step][:3, :3].T @ pose[:3, :3])
+                        tr_err = gt_trajectory[int(img_number[0])][:3, 3] - pose[:3, 3]
+                        rot_err = (gt_trajectory[int(img_number[0])][:3, :3].T @ pose[:3, :3])
                         rot_err_deg = np.linalg.norm(R.from_matrix(rot_err).as_rotvec(degrees=True), ord=2)
                         log_dict.update({'error/x': tr_err[0],
                                          'error/y': tr_err[1],
                                          'error/z': tr_err[2],
                                          'error/rot': rot_err_deg})
-                wandb.log(log_dict, step=idx*step)
+                wandb.log(log_dict, step=int(img_number[0]))
 
     os.makedirs(outpath, exist_ok=True)
     save_trajectory(trajectory, outpath)

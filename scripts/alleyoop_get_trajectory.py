@@ -33,7 +33,7 @@ def main(args, config):
     # check for ground-truth pose data for logging purposes
     gt_file = os.path.join(args.input, 'groundtruth.txt')
     gt_trajectory = read_freiburg(gt_file) if os.path.isfile(gt_file) else None
-    init_pose = torch.tensor(gt_trajectory[0]) if gt_trajectory is not None else torch.eye(4)
+    init_pose = torch.tensor(gt_trajectory[args.start]) if gt_trajectory is not None else torch.eye(4)
     slam = SLAM(torch.tensor(calib['intrinsics']['left']).to(device), config['slam'], img_shape=config['img_size'], baseline=calib['bf'],
                 checkpoint=args.checkpoint, init_pose=init_pose).to(device)
     if not isinstance(dataset, StereoVideoDataset):
