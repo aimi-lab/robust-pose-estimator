@@ -9,7 +9,7 @@ from typing import Tuple
 from torch.utils.data import Sampler
 
 
-def get_data(input_path: str, img_size: Tuple, sample_video: int=1, rect_mode: str='conventional', force_video: bool=False):
+def get_data(input_path: str, img_size: Tuple, sample_video: int=1, rect_mode: str='conventional', force_stereo: bool=False):
 
     # check the format of the calibration file
     img_size = tuple(img_size)
@@ -35,17 +35,15 @@ def get_data(input_path: str, img_size: Tuple, sample_video: int=1, rect_mode: s
         rect = StereoRectifier(calib_file, img_size_new=img_size, mode=rect_mode)
         calib = rect.get_rectified_calib()
         try:
-            assert not force_video
+            assert not force_stereo
             dataset = RGBDDataset(input_path, img_size=calib['img_size'])
             print(" RGBD Dataset with precomputed depth")
         except AssertionError:
             try:
-                assert not force_video
                 dataset = StereoDataset(input_path, img_size=calib['img_size'])
                 print(" Stereo Dataset")
             except AssertionError:
                 try:
-                    assert not force_video
                     dataset = ScaredDataset(input_path, img_size=calib['img_size'])
                     print(" SCARED Dataset")
                 except AssertionError:

@@ -29,7 +29,7 @@ def main(args, config):
         config.update({'dataset': os.path.split(args.input)[-2]})
         wandb.init(project='Alley-OOP', config=config, group=args.log)
 
-    dataset, calib = get_data(args.input, config['img_size'], force_video=args.force_video, rect_mode=config['rect_mode'])
+    dataset, calib = get_data(args.input, config['img_size'], force_stereo=True, rect_mode=config['rect_mode'])
     # check for ground-truth pose data for logging purposes
     gt_file = os.path.join(args.input, 'groundtruth.txt')
     gt_trajectory = read_freiburg(gt_file) if os.path.isfile(gt_file) else None
