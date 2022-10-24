@@ -84,7 +84,7 @@ if __name__ == '__main__':
     for i, row in df.iterrows():
         args.start = row['start']
         args.stop = min(row['start'] + 300, row['end'])
-        config.update({'scenario': row['scenario']})
+        config.update({'scenario': row['scenario'], 'start': args.start, 'seq_number': i})
         print(f'{args.start} -> {args.stop} : {row["scenario"]}')
         # read scenario file
         alleyoop(args, config)

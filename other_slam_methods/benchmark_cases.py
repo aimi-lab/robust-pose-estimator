@@ -29,13 +29,14 @@ if __name__ == '__main__':
                 if not os.path.isfile(os.path.join(sequence, f'data/{i}/efusion/trajectory.json')):
                     with open('configuration/efusion_slam.yaml', 'r') as ymlfile:
                         config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
+                    config.update({'scenario': row['scenario'], 'start': start, 'seq_number': i})
                     p = Process(target=elfusion, args=(sequence, os.path.join(sequence, f'data/{i}/efusion'), config, 'cpu', start, stop, step, 'scenario_efusion', False,))
                     p.start()
                     p.join()
                 if not os.path.isfile(os.path.join(sequence, f'data/{i}/orbslam2/trajectory.json')):
                     with open('configuration/orbslam2.yaml', 'r') as ymlfile:
                         config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
-                    config.update({'scenario': row['scenario']})
+                    config.update({'scenario': row['scenario'], 'start': start, 'seq_number': i})
                     p = Process(target=orbslam, args=(sequence, os.path.join(sequence, f'data/{i}/orbslam2'), config, 'cpu', start, stop, step, 'scenario_orbslam2', False,))
                     p.start()
                     p.join()
