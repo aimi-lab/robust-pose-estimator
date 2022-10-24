@@ -26,12 +26,12 @@ if __name__ == '__main__':
             stop = min(row['start'] + 300, row['end'])
             print(f'{start} -> {stop} : {row["scenario"]}')
             try:
-                # if not os.path.isfile(os.path.join(sequence, 'data/efusion/trajectory.json')):
-                #     with open('configuration/efusion_scared.yaml', 'r') as ymlfile:
-                #         config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
-                #     p = Process(target=elfusion, args=(sequence, os.path.join(sequence, 'data/efusion'), config, 'cpu', 0, 10000000, 1, 'efusion', False))
-                #     p.start()
-                #     p.join()
+                if not os.path.isfile(os.path.join(sequence, f'data/{i}/efusion/trajectory.json')):
+                    with open('configuration/efusion_slam.yaml', 'r') as ymlfile:
+                        config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
+                    p = Process(target=elfusion, args=(sequence, os.path.join(sequence, f'data/{i}/efusion'), config, 'cpu', start, stop, step, 'scenario_efusion', False,))
+                    p.start()
+                    p.join()
                 if not os.path.isfile(os.path.join(sequence, f'data/{i}/orbslam2/trajectory.json')):
                     with open('configuration/orbslam2.yaml', 'r') as ymlfile:
                         config = yaml.load(ymlfile, Loader=yaml.SafeLoader)

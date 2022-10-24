@@ -5,6 +5,7 @@ import yaml
 from multiprocessing import Process
 import multiprocessing as mp
 import shutil
+import pandas as pd
 
 PATH_REPLACEMENT = ['/home/mhayoz/research', '/storage/workspaces/artorg_aimi/ws_00000']
 if __name__ == '__main__':
@@ -30,3 +31,4 @@ if __name__ == '__main__':
                 p.join()
         except:
             print('not successfull. -> skip')
+

@@ -6,8 +6,6 @@ img_size:
   - 640
   - 480
 
-sample: 10
-
 depth_clipping:
   - 0
   - 8000 # in mm
