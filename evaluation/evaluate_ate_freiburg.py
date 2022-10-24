@@ -3,7 +3,7 @@ from alley_oop.metrics.trajectory_metrics import absolute_trajectory_error, rela
 from alley_oop.utils.trajectory import read_freiburg
 
 
-def eval(gt_list:str, pred_list:str, delta:int=1):
+def eval(gt_list:str, pred_list:str, delta:int=1, offset:int=0):
     if not isinstance(gt_list, dict):
         gt_list, gt_stamps = read_freiburg(gt_list, ret_stamps=True)
         gt_list = {key: pose for key, pose in zip(gt_stamps, gt_list)}
@@ -13,12 +13,19 @@ def eval(gt_list:str, pred_list:str, delta:int=1):
 
     # we assume exact synchronization (same time-stamps in gt and prediction)
     pred_keys = sorted(list(pred_list.keys()))
-    pred_poses = np.stack([pred_list[k] for k in pred_keys])
-    gt_poses = np.stack([gt_list[k] for k in pred_keys])
+    gt_keys = sorted(list(gt_list.keys()))
+    pred_poses = []
+    gt_poses = []
+    for k in pred_keys:
+        if (k+offset > 0) & (k+offset < max(gt_keys)):
+            pred_poses.append(pred_list[k])
+            gt_poses.append(gt_list[k+offset])
+    pred_poses = np.stack(pred_poses)
+    gt_poses = np.stack(gt_poses)
 
     ate_rmse, trans_error = absolute_trajectory_error(gt_poses, pred_poses)
     rpe_trans, rpe_rot = relative_pose_error(gt_poses, pred_poses, delta=delta)
-    return ate_rmse, rpe_trans, rpe_rot, trans_error
+    return ate_rmse/1000.0, rpe_trans/1000.0, rpe_rot, trans_error/1000.0
 
 
 if __name__=="__main__":
