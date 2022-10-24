@@ -319,7 +319,7 @@ class RGBDDataset(Dataset):
         super().__init__()
         self.imgs = sorted(glob.glob(os.path.join(input_folder, 'video_frames', '*l.png')))
         self.semantics = sorted(glob.glob(os.path.join(input_folder, 'semantic_predictions', '*l.png')))
-        self.depths = sorted(glob.glob(os.path.join(input_folder, 'depth', '*l.png')))
+        self.depths = sorted(glob.glob(os.path.join(input_folder, 'depth', '*l.pfm')))
         assert len(self.imgs) == len(self.semantics)
         assert len(self.imgs) == len(self.depths)
         assert len(self.imgs) > 0
