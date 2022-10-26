@@ -74,8 +74,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     with open(args.config, 'r') as ymlfile:
         config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
-    if args.outpath is None:
-        args.outpath = os.path.join(args.input, 'data','alleyoop')
     assert os.path.isfile(args.checkpoint), 'no valid checkpoint file'
 
     assert os.path.isfile(os.path.join(args.input, 'test_split.csv'))
