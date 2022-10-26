@@ -56,14 +56,13 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fi
         for i, data in enumerate(tqdm(loader, total=min(len(dataset), (stop-start)//step))):
             if isinstance(dataset, StereoVideoDataset):
                 limg, rimg, pose_kinematics, img_number = data
-                depth, *_ = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
+                depth, flow, _ = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
             elif isinstance(dataset, RGBDDataset):
-                limg, depth, depth_noise, mask, semantics, img_number = data
+                limg, depth, tool_mask, semantic, img_number = data
             else:
-                limg, rimg, mask, semantics, img_number = data
-                depth, *_ = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
-            depth *= config['slam']['depth_clipping'][1]
-            frame = FrameClass(limg, depth, intrinsics=torch.tensor(calib['intrinsics']['left']).float())
+                limg, rimg, tool_mask, semantics, img_number = data
+                depth, flow, _ = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
+            frame = FrameClass(limg, limg, depth, intrinsics=torch.tensor(calib['intrinsics']['left']).float())
 
             pose_gt = torch.tensor(gt_trajectory[int(img_number[0])]).float()
 
