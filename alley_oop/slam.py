@@ -33,8 +33,10 @@ class SLAM(object):
         self.pre_process = PreProcess(self.depth_scale, depth_min, self.intrinsics,
                                       self.dtype, mask_specularities=config['mask_specularities'],
                                       compensate_illumination=config['compensate_illumination'])
-        init_pose[:3, 3] *= self.depth_scale
-        self.init_pose = init_pose.to(self.device)
+        self.init_pose = init_pose.clone()
+        self.init_pose[:3, 3] *= self.depth_scale
+        self.init_pose = self.init_pose.to(self.device)
+
         self.pose_estimator = RAFTPoseEstimator(self.intrinsics, baseline, checkpoint, (img_shape[1], img_shape[0]), config['frame2frame'],
                                                 self.init_pose, self.depth_scale)
         self.pose_estimator.model.use_weights = config['conf_weighing']
