@@ -31,7 +31,10 @@ def main(args, config):
         if args.outpath is None:
             args.outpath = wandb.run.dir
     if args.outpath is None:
-        args.outpath = os.path.join(args.input, 'data', 'alleyoop')
+        try:
+            args.outpath = os.path.join(args.input, 'data',config['seq_number'], 'alleyoop')
+        except KeyError:
+            args.outpath = os.path.join(args.input, 'data', 'alleyoop')
     os.makedirs(args.outpath, exist_ok=True)
 
     dataset, calib = get_data(args.input, config['img_size'], force_stereo=True, rect_mode=config['rect_mode'])
