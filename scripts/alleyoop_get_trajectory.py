@@ -28,6 +28,11 @@ def main(args, config):
         config.update({'keyframe': os.path.split(args.input)[-1]})
         config.update({'dataset': os.path.split(args.input)[-2]})
         wandb.init(project='Alley-OOP', config=config, group=args.log)
+        if args.outpath is None:
+            args.outpath = wandb.run.dir
+    if args.outpath is None:
+        args.outpath = os.path.join(args.input, 'data', 'alleyoop')
+    os.makedirs(args.outpath, exist_ok=True)
 
     dataset, calib = get_data(args.input, config['img_size'], force_stereo=True, rect_mode=config['rect_mode'])
     # check for ground-truth pose data for logging purposes
@@ -58,7 +63,6 @@ def main(args, config):
             viewer = ViewRenderer((2*config['img_size'][1], 2*config['img_size'][0]), outpath=args.outpath)
 
         trajectory = [{'camera-pose': init_pose.tolist(), 'timestamp': args.start, 'residual': 0.0, 'key_frame': True}]
-        os.makedirs(args.outpath, exist_ok=True)
         for i, data in enumerate(tqdm(loader, total=min(len(dataset), (args.stop-args.start)//args.step))):
             if isinstance(dataset, StereoVideoDataset):
                 limg, rimg, pose_kinematics, img_number = data
@@ -194,8 +198,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     with open(args.config, 'r') as ymlfile:
         config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
-    if args.outpath is None:
-        args.outpath = os.path.join(args.input, 'data','alleyoop')
     assert os.path.isfile(args.checkpoint), 'no valid checkpoint file'
 
     main(args, config)
