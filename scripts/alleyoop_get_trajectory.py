@@ -32,7 +32,7 @@ def main(args, config):
             args.outpath = wandb.run.dir
     if args.outpath is None:
         try:
-            args.outpath = os.path.join(args.input, 'data',config['seq_number'], 'alleyoop')
+            args.outpath = os.path.join(args.input, 'data',f'{config["seq_number"]}', 'alleyoop')
         except KeyError:
             args.outpath = os.path.join(args.input, 'data', 'alleyoop')
     os.makedirs(args.outpath, exist_ok=True)
