@@ -39,7 +39,7 @@ if __name__ == '__main__':
     for k, meth in enumerate(freiburg_paths):
         print(meth)
         assert os.path.isfile(freiburg_paths[meth]), f'{meth} does not exist'
-        ate_rmse, rpe_trans, rpe_rot, error = eval(freiburg_paths[meth], freiburg_paths['gt'])
+        ate_rmse, rpe_trans, rpe_rot, error = eval(freiburg_paths['gt'], freiburg_paths[meth], offset=-4)
         print('ATE-RMSE: ',ate_rmse, ' mm')
         print('RPE-trans: ', rpe_trans, ' mm')
         print('RPE_rot: ', rpe_rot)

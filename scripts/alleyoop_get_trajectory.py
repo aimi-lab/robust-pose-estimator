@@ -107,7 +107,7 @@ def main(args, config):
             wandb.save(os.path.join(args.outpath, 'map.ply'))
             if os.path.isfile(os.path.join(args.input, 'groundtruth.txt')):
                 ate_rmse, rpe_trans, rpe_rot, trans_error = eval(os.path.join(args.input, 'groundtruth.txt'),
-                                 os.path.join(args.outpath, 'trajectory.freiburg'))
+                                 os.path.join(args.outpath, 'trajectory.freiburg'), offset=-4)
                 wandb.define_metric('trans_error', step_metric='frame')
                 for i, e in enumerate(trans_error):
                     wandb.log({'trans_error': e, 'frame': i})
