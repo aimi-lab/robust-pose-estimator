@@ -226,17 +226,14 @@ class DeclarativePoseHead3DNode2(DeclarativePoseHead3DNode):
             n, _, h, w = pcl1.shape
             # se(3) to SE(3)
             pose = pseudo_lie_se3_to_SE3_batch_small(y)
-            # # transform point cloud given the pose
+            # transform point cloud given the pose
             pcl2_aligned = transform(homogeneous(pcl2.view(n, 3, -1)), pose).reshape(n, 4, h, w)[:, :3]
-            # resample point clouds given the optical flow
-            pcl2_aligned, _ = remap_from_flow(pcl2_aligned, flow)
-            weights2_aligned, _ = remap_from_flow(weights2, flow)
-            mask2_aligned, valid = remap_from_flow_nearest(mask2, flow)
-            valid &= mask1 & mask2_aligned.to(bool)
+
+            valid = mask1 & mask2
             # define objective loss function
             residuals = torch.sum((pcl2_aligned.view(n, 3, -1) - pcl1.view(n, 3, -1)) ** 2, dim=1)
             # reweighing residuals
-            residuals *= weights2_aligned.view(n,-1)*weights1.view(n,-1)
+            residuals *= weights2.view(n,-1)
             residuals[~valid.view(n, -1)] = 0.0
             if ret_res:
                 return torch.mean(residuals, dim=-1), residuals
