@@ -13,7 +13,7 @@ parser.add_argument(
     '--methods',
     nargs='+',
     type=str,
-    default=['orbslam2_raftdepth', 'scared_unet_f2f_w','scared_unet_f2m_w', 'scared_raftslam_f2f', 'scared_raftslam_f2m', 'scared_f2f_tools', 'scared_f2f_no_tools', 'scared_f2m_no_tools'],
+    default=['orbslam2_raftdepth', 'scared_unet_f2f_w','scared_unet_f2m_w', 'scared_raftslam_f2f', 'scared_raftslam_f2m', 'scared_efusion', 'scared_f2m_no_tools'],
     help='Path to input folder.'
 )
 args = parser.parse_args()

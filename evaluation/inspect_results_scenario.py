@@ -13,7 +13,7 @@ parser.add_argument(
     '--methods',
     nargs='+',
     type=str,
-    default=['scenario_orbslam2', 'scenarios_f2f_nw', 'scenarios_f2f_no_tools', 'scenarios_f2f_tools', 'scenarios_f2f_tools2'],
+    default=['scenario_orbslam2', 'scenarios_f2f_nw', 'scenarios_f2f_no_tools', 'scenarios_f2f_tools', 'scenarios_f2f_tools2', 'scenario_efusion'],
     help='methods to inspect.'
 )
 args = parser.parse_args()
