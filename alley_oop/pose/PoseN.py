@@ -133,6 +133,63 @@ class PoseN(nn.Module):
         self.flow.eval()
         return self
 
+class PoseN2(PoseN):
+    def __init__(self, config):
+        super().__init__(config)
+        H, W = config["image_shape"]
+        if config['activation'] == 'relu':
+            activation = nn.ReLU
+        elif config['activation'] == 'sigmoid':
+            activation = nn.Sigmoid
+        else:
+            raise NotImplementedError
+        self.conf_head1 = nn.Sequential(TinyUNet(in_channels=128+128+3+3+2+1, output_size=(H,W)), activation())
+        self.conf_head2 = nn.Sequential(TinyUNet(in_channels=128+128+3+3+2+1, output_size=(H,W)), activation())
+
+    def forward(self, image1l, image2l, intrinsics, baseline, image1r=None, image2r=None, toolmask1=None, toolmask2=None, depth1=None, depth2=None,
+                mask1=None, mask2=None, flow1=None, flow2=None, iters=12, flow_init=None, pose_init=None,
+                ret_confmap=False):
+        intrinsics.requires_grad = False
+        baseline.requires_grad = False
+        """ estimate optical flow from stereo pair to get disparity map"""
+        if depth1 is None:
+            depth1, flow1, valid1 = self.flow2depth(image1l, image1r, baseline)
+            mask1 = mask1 & valid1 if mask1 is not None else valid1
+        if depth2 is None:
+            depth2, flow2, valid2 = self.flow2depth(image2l, image2r, baseline)
+            mask2 = mask2 & valid2 if mask2 is not None else valid2
+        """ Estimate optical flow and rigid pose between pair of frames """
+
+        pcl1 = self.proj(depth1, intrinsics)
+        pcl2 = self.proj(depth2, intrinsics)
+
+        flow_predictions, gru_hidden_state, context = self.flow(image1l, image2l, iters, flow_init)
+        if self.use_weights:
+            inp1 = torch.nn.functional.interpolate(torch.cat((toolmask1, flow1, image1l, pcl1), dim=1), scale_factor=0.5,
+                                                   mode='bilinear')
+            inp2 = torch.nn.functional.interpolate(torch.cat((toolmask2, flow2, image2l, pcl2), dim=1), scale_factor=0.5,
+                                                   mode='bilinear')
+            cont = torch.nn.functional.interpolate(torch.cat((gru_hidden_state, context), dim=1), scale_factor=4,
+                                                   mode='bilinear')
+            conf1 = self.conf_head1(torch.cat((inp1, cont), dim=1))
+            conf2 = self.conf_head2(torch.cat((inp2, cont), dim=1))
+        else:
+            conf1 = torch.ones_like(depth1)
+            conf2 = torch.ones_like(depth2)
+
+        # set confidence weights to zero where the mask is False
+        if mask1 is not None:
+            mask1.requires_grad = False
+        if mask2 is not None:
+            mask2.requires_grad = False
+
+        n = image1l.shape[0]
+        pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2, conf1, conf2, mask1, mask2,
+                                  self.loss_weight.repeat(n, 1), intrinsics)
+        if ret_confmap:
+            return flow_predictions, pose_se3.float() / self.pose_scale, depth1, depth2, conf1, conf2
+        return flow_predictions, pose_se3.float() / self.pose_scale, depth1, depth2
+
 
 class DepthNet(RAFT):
     def __init__(self):
