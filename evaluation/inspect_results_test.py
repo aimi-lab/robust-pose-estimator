@@ -67,20 +67,7 @@ for method in METHODS:
     df = pd.DataFrame({'mean': df.groupby('dataset').mean()['ATE/RMSE'], 'std':df.groupby('dataset').std()['ATE/RMSE']})
     print(df)
     print('macro average:', df.mean()['mean'],'+/-', df.std()['mean'])
-    print('micro average:', runs_df[runs_df.method.eq(method)]['ATE/RMSE'].mean(), '+/-', runs_df[runs_df.method.eq(method)]['ATE/RMSE'].std())
-
-print('\n------------')
-print('RPE-rot in deg')
-for method in METHODS:
-    print('\n------------')
-    print(method)
-    df = runs_df[runs_df.method.eq(method)]
-    print('average duration in frames:', df['frame'].mean(), '+/-', df['frame'].std())
-    df = pd.DataFrame({'mean': df.groupby('dataset').mean()['RPE/rot'], 'std':df.groupby('dataset').std()['RPE/rot']})
-    print(df)
-    print('macro average:', df.mean()['mean'],'+/-', df.std()['mean'])
-    print('micro average:', runs_df[runs_df.method.eq(method)]['RPE/rot'].mean(), '+/-', runs_df[runs_df.method.eq(method)]['RPE/rot'].std())
-
+    #print('micro average:', runs_df[runs_df.method.eq(method)]['ATE/RMSE'].mean(), '+/-', runs_df[runs_df.method.eq(method)]['ATE/RMSE'].std())
 print('\n------------')
 print('RPE-trans in mm')
 for method in METHODS:
@@ -92,8 +79,21 @@ for method in METHODS:
         {'mean': df.groupby('dataset').mean()['RPE/trans'], 'std': df.groupby('dataset').std()['RPE/trans']})
     print(df)
     print('macro average:', df.mean()['mean'], '+/-', df.std()['mean'])
-    print('micro average:', runs_df[runs_df.method.eq(method)]['RPE/trans'].mean(), '+/-',
-          runs_df[runs_df.method.eq(method)]['RPE/trans'].std())
+    #print('micro average:', runs_df[runs_df.method.eq(method)]['RPE/trans'].mean(), '+/-',
+    #      runs_df[runs_df.method.eq(method)]['RPE/trans'].std())
+print('\n------------')
+print('RPE-rot in deg')
+for method in METHODS:
+    print('\n------------')
+    print(method)
+    df = runs_df[runs_df.method.eq(method)]
+    print('average duration in frames:', df['frame'].mean(), '+/-', df['frame'].std())
+    df = pd.DataFrame({'mean': df.groupby('dataset').mean()['RPE/rot'], 'std':df.groupby('dataset').std()['RPE/rot']})
+    print(df)
+    print('macro average:', df.mean()['mean'],'+/-', df.std()['mean'])
+    #print('micro average:', runs_df[runs_df.method.eq(method)]['RPE/rot'].mean(), '+/-', runs_df[runs_df.method.eq(method)]['RPE/rot'].std())
+
+
 # Per Run info
 print('\n------------')
 print('ATE-RMSE in mm')

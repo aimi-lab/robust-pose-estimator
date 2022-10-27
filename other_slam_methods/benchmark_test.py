@@ -26,18 +26,18 @@ if __name__ == '__main__':
             stop = row['end']
             print(f'{start} -> {stop}')
             try:
+                if not os.path.isfile(os.path.join(sequence, f'data/{i}/test_orbslam2/trajectory.freiburg')):
+                    with open('configuration/orbslam2.yaml', 'r') as ymlfile:
+                        config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
+                    config.update({'start': start, 'seq_number': i})
+                    p = Process(target=orbslam, args=(sequence, os.path.join(sequence, f'data/{i}/test_orbslam2'), config, 'cpu', start, stop, step, 'test_orbslam2', False,))
+                    p.start()
+                    p.join()
                 if not os.path.isfile(os.path.join(sequence, f'data/{i}/test_efusion/trajectory.freiburg')):
                     with open('configuration/efusion_slam.yaml', 'r') as ymlfile:
                         config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
                     config.update({'start': start, 'seq_number': i})
                     p = Process(target=elfusion, args=(sequence, os.path.join(sequence, f'data/{i}/test_efusion'), config, 'cpu', start, stop, step, 'test_efusion', False,))
-                    p.start()
-                    p.join()
-                if not os.path.isfile(os.path.join(sequence, f'data/{i}/test_orbslam2/trajectory.freiburg')):
-                    with open('configuration/orbslam2.yaml', 'r') as ymlfile:
-                        config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
-                    config.update({'scenario': row['scenario'], 'start': start, 'seq_number': i})
-                    p = Process(target=orbslam, args=(sequence, os.path.join(sequence, f'data/{i}/test_orbslam2'), config, 'cpu', start, stop, step, 'test_orbslam2', False,))
                     p.start()
                     p.join()
             except:
