@@ -1,4 +1,5 @@
 from alley_oop.pose.defPoseN import *
+from alley_oop.pose.newPoseN2 import *
 from alley_oop.geometry.pinhole_transforms import inv_transform
 import torch
 from alley_oop.fusion.surfel_map import SurfelMap, FrameClass
@@ -29,8 +30,12 @@ class RAFTPoseEstimator(torch.nn.Module):
             model = PoseN(checkp['config']['model'])
             load()
         except RuntimeError:
-            model = DefPoseN(checkp['config']['model'])
-            load()
+            try:
+                model = DefPoseN(checkp['config']['model'])
+                load()
+            except RuntimeError:
+                model = NewPoseN2(checkp['config']['model'])
+                load()
         model.eval()
         self.model = model
         self.intrinsics = intrinsics.unsqueeze(0).float()
