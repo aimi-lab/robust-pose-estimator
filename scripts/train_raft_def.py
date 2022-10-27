@@ -9,8 +9,8 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, SubsetRandomSampler
 
 
-from alley_oop.pose.defPoseN import DefPoseN
-import alley_oop.network_core.raft.core.datasets as datasets
+from alley_oop.pose.PoseN import PoseN2
+import alley_oop.network_core.raftcore.datasets as datasets
 from alley_oop.network_core.raft.losses import supervised_pose_loss
 from alley_oop.network_core.raft.utils.logger import Logger
 from alley_oop.network_core.raft.utils.plotting import plot_res, plot_3d
@@ -87,7 +87,7 @@ def main(args, config, force_cpu):
     val2_loader = DataLoader(data_val2, num_workers=4, pin_memory=True, batch_size=config['val']['batch_size'])
 
     # get model
-    model = DefPoseN(config['model'])
+    model = PoseN2(config['model'])
     model, _ = model.init_from_raft(config['model']['pretrained'])
     if args.restore_ckpt is not None:
         model.load_state_dict(torch.load(args.restore_ckpt)['state_dict'], strict=False)
