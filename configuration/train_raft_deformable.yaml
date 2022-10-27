@@ -31,7 +31,7 @@ data:
       - scared_dataset_6
     step:
       - 1
-      - 30
+      - 5
     samples: 2000
 
   val:
@@ -40,7 +40,8 @@ data:
     sequences:
       - scared_dataset_7
       - scared_dataset_8
-    step: 3
+      - scared_dataset_9
+    step: 1
     samples: 40
 
   val2:
