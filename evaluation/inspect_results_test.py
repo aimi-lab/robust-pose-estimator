@@ -51,10 +51,13 @@ runs_df.method = runs_df.method.astype('category')
 runs_df.method = runs_df.method.cat.set_categories(METHODS)
 runs_df.sort_values(['method'], inplace=True)
 runs_df.to_csv("project.csv")
-runs_df['dataset'] = runs_df['keyframe']
+runs_df['dataset'] = [k[:9] for k in runs_df['keyframe']]
 runs_df["ATE/RMSE"] *= 1.0e3 #m to mm
 runs_df["RPE/trans"] *= 1.0e3 #m to mm
 runs_df["RPE/rot"] *= 180/np.pi # rad to deg
+
+
+
 
 # Group into methods and datasets
 print('\n------------')
@@ -94,17 +97,17 @@ for method in METHODS:
     #print('micro average:', runs_df[runs_df.method.eq(method)]['RPE/rot'].mean(), '+/-', runs_df[runs_df.method.eq(method)]['RPE/rot'].std())
 
 
-# Per Run info
-print('\n------------')
-print('ATE-RMSE in mm')
-for run in runs_df.dataset.unique():
-
-    df = runs_df[runs_df.dataset.eq(run)]
-    for kf in df.keyframe.unique():
-        print('\n------------')
-        print(run, kf)
-        df1 = df[df.keyframe.eq(kf)]
-        print(df1[['method', 'ATE/RMSE']])
-
-snb.violinplot(y='ATE/RMSE', x='dataset', hue='method', data=runs_df)
-plt.show()
+# # Per Run info
+# print('\n------------')
+# print('ATE-RMSE in mm')
+# for run in runs_df.dataset.unique():
+#
+#     df = runs_df[runs_df.dataset.eq(run)]
+#     for kf in df.keyframe.unique():
+#         print('\n------------')
+#         print(run, kf)
+#         df1 = df[df.keyframe.eq(kf)]
+#         print(df1[['method', 'ATE/RMSE']])
+#
+# snb.violinplot(y='ATE/RMSE', x='dataset', hue='method', data=runs_df)
+# plt.show()

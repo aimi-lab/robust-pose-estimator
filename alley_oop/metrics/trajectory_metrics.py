@@ -86,6 +86,6 @@ def relative_pose_error(gt_poses: Union[np.ndarray, torch.Tensor],
         d = 0.5*(lib.trace(rel_err[:3, :3]) - 1)
         rot_errors.append(np.arccos(max(min(d, 1.0), -1.0)))
 
-    rpe_trans = np.mean(np.asarray(trans_errors))
-    rpe_rot = np.mean(np.asarray(rot_errors))
+    rpe_trans = np.asarray(trans_errors)
+    rpe_rot = np.asarray(rot_errors)
     return rpe_trans, rpe_rot

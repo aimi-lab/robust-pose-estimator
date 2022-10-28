@@ -25,7 +25,7 @@ def eval(gt_list:str, pred_list:str, delta:int=1, offset:int=0):
 
     ate_rmse, trans_error = absolute_trajectory_error(gt_poses, pred_poses)
     rpe_trans, rpe_rot = relative_pose_error(gt_poses, pred_poses, delta=delta)
-    return ate_rmse/1000.0, rpe_trans/1000.0, rpe_rot, trans_error/1000.0
+    return ate_rmse, np.mean(rpe_trans), np.mean(rpe_rot), trans_error, rpe_trans, rpe_rot
 
 
 if __name__=="__main__":

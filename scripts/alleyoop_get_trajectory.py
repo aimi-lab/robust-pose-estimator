@@ -109,11 +109,13 @@ def main(args, config):
             wandb.save(os.path.join(args.outpath, 'trajectory.freiburg'))
             wandb.save(os.path.join(args.outpath, 'map.ply'))
             if os.path.isfile(os.path.join(args.input, 'groundtruth.txt')):
-                ate_rmse, rpe_trans, rpe_rot, trans_error = eval(os.path.join(args.input, 'groundtruth.txt'),
+                ate_rmse, rpe_trans, rpe_rot, trans_error, rpe_trans_e, rpe_rot_e = eval(os.path.join(args.input, 'groundtruth.txt'),
                                  os.path.join(args.outpath, 'trajectory.freiburg'), offset=-4)
                 wandb.define_metric('trans_error', step_metric='frame')
-                for i, e in enumerate(trans_error):
-                    wandb.log({'trans_error': e, 'frame': i})
+                wandb.define_metric('rpe_trans_e', step_metric='frame')
+                wandb.define_metric('rpe_rot_e', step_metric='frame')
+                for i, (e1,e2,e3) in enumerate(zip(trans_error,rpe_trans_e, rpe_rot_e)):
+                    wandb.log({'trans_error': e1,'rpe_trans_e': e2,'rpe_rot_e': e3 , 'frame': i})
                 wandb.summary['ATE/RMSE'] = ate_rmse
                 wandb.summary['RPE/trans'] = rpe_trans
                 wandb.summary['RPE/rot'] = rpe_rot
