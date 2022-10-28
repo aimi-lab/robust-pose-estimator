@@ -1,5 +1,6 @@
 from alley_oop.pose.defPoseN import *
 from alley_oop.pose.newPoseN2 import *
+from alley_oop.pose.newPoseN import *
 from alley_oop.geometry.pinhole_transforms import inv_transform
 import torch
 from alley_oop.fusion.surfel_map import SurfelMap, FrameClass
@@ -34,8 +35,12 @@ class RAFTPoseEstimator(torch.nn.Module):
                 model = DefPoseN(checkp['config']['model'])
                 load()
             except RuntimeError:
-                model = NewPoseN2(checkp['config']['model'])
-                load()
+                try:
+                    model = NewPoseN2(checkp['config']['model'])
+                    load()
+                except RuntimeError:
+                    model = NewPoseN(checkp['config']['model'])
+                    load()
         model.eval()
         self.model = model
         self.intrinsics = intrinsics.unsqueeze(0).float()
@@ -51,7 +56,7 @@ class RAFTPoseEstimator(torch.nn.Module):
         flow, crsp_list = None, None
         if self.frame2frame:
             if self.last_frame is not None:
-                if isinstance(self.model, DefPoseN):
+                if isinstance(self.model, DefPoseN) | isinstance(self.model, NewPoseN):
                     # we should not mask tools but provide a tool-mask to the conf-head.
                     flow, rel_pose_se3, *_, conf_1, conf_2 = self.model(255*self.last_frame.img, 255*frame.img,
                                                                         self.intrinsics, self.baseline*self.scale,
@@ -85,7 +90,7 @@ class RAFTPoseEstimator(torch.nn.Module):
             self.last_frame = frame
         else:
             # transform scene to last camera pose coordinates
-            if isinstance(self.model, DefPoseN):
+            if isinstance(self.model, DefPoseN)| isinstance(self.model, NewPoseN):
                 raise NotImplementedError
             scene_tlast = scene.transform_cpy(inv_transform(self.last_pose.float()))
             model_frame, crsp_list = scene_tlast.render(self.intrinsics.squeeze())
