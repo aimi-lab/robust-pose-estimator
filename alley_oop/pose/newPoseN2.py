@@ -34,14 +34,13 @@ class NewPoseN2(PoseN):
         pcl2 = self.proj(depth2, intrinsics)
 
         flow_predictions, gru_hidden_state, context = self.flow(image1l, image2l, iters, flow_init)
+        # remap from flow
+        pcl2, _ = remap_from_flow(pcl2, flow_predictions[-1])
+        image2l, _ = remap_from_flow(image2l, flow_predictions[-1])
+        flow2, _ = remap_from_flow(flow2, flow_predictions[-1])
+        mask2, valid_mapping = remap_from_flow_nearest(mask2, flow_predictions[-1])
+        mask2 = valid_mapping & mask2.to(bool)
         if self.use_weights:
-            # remap from flow
-            pcl2, _ = remap_from_flow(pcl2, flow_predictions[-1])
-            image2l, _ = remap_from_flow(image2l, flow_predictions[-1])
-            flow2, _ = remap_from_flow(flow2, flow_predictions[-1])
-            mask2, valid_mapping = remap_from_flow_nearest(mask2, flow_predictions[-1])
-            mask2 = valid_mapping & mask2.to(bool)
-
             inp1 = torch.nn.functional.interpolate(torch.cat((flow1, image1l, pcl1), dim=1),
                                                    scale_factor=0.125, mode='bilinear')
             inp2 = torch.nn.functional.interpolate(torch.cat((flow2, image2l, pcl2), dim=1),
