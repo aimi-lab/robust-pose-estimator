@@ -61,6 +61,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         valid = (flow_off[:, 0] > 0) & (flow_off[:, 1] > 0) & (flow_off[:, 0] < w) & (flow_off[:, 1] < h)
         valid = torch.isinf(residuals) | torch.isnan(residuals) | ~valid.view(n,-1) | ~mask1.view(n,-1)
         # weight residuals by confidences
+        self.loss2d = torch.mean(residuals, dim=1).detach()/ (h*w)
         residuals *= weights1.view(n,-1)
         residuals[valid] = 0.0
         loss = torch.mean(residuals, dim=1) / (h*w)  # normalize with width and height
@@ -84,6 +85,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         valid &= mask1 & mask2_aligned.to(bool)
         # define objective loss function
         residuals = torch.sum((pcl2_aligned.view(n, 3, -1) - pcl1.view(n, 3, -1)) ** 2, dim=1)
+        self.loss3d = torch.mean(residuals, dim=1).detach()
         # reweighing residuals
         residuals *= torch.sqrt(weights2_aligned.view(n,-1)*weights1.view(n,-1))
         residuals[~valid.view(n, -1)] = 0.0
@@ -95,8 +97,6 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         flow, pcl1, pcl2, weights1, weights2, mask1, mask2, loss_weight, intrinsics= xs
         loss3d = self.depth_objective(flow, pcl1, pcl2, weights1, weights2, mask1, mask2, y)
         loss2d = self.reprojection_objective(flow, pcl1, pcl2, weights1,mask1, intrinsics, y)
-        self.loss2d = loss2d
-        self.loss3d = loss3d
         return loss_weight[:, 1]*loss2d + loss_weight[:, 0]*loss3d
 
     def solve(self, *xs):
@@ -236,6 +236,7 @@ class DeclarativePoseHead3DNode2(DeclarativePoseHead3DNode):
             valid = mask1 & mask2
             # define objective loss function
             residuals = torch.sum((pcl2_aligned.view(n, 3, -1) - pcl1.view(n, 3, -1)) ** 2, dim=1)
+            self.loss3d = torch.mean(residuals, dim=1).detach()
             # reweighing residuals
             residuals *= weights2.view(n,-1)
             residuals[~valid.view(n, -1)] = 0.0
