@@ -46,6 +46,8 @@ class HornPoseHead(MLPPoseHead):
 class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
     def __init__(self):
         super(DeclarativePoseHead3DNode, self).__init__(eps=1e-3)
+        self.loss2d = 0.0
+        self.loss3d = 0.0
 
     def reprojection_objective(self, flow, pcl1, pcl2, weights1, mask1, intrinsics, y, ret_res=False):
         # this is generally better for rotation
@@ -93,6 +95,8 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         flow, pcl1, pcl2, weights1, weights2, mask1, mask2, loss_weight, intrinsics= xs
         loss3d = self.depth_objective(flow, pcl1, pcl2, weights1, weights2, mask1, mask2, y)
         loss2d = self.reprojection_objective(flow, pcl1, pcl2, weights1,mask1, intrinsics, y)
+        self.loss2d = loss2d
+        self.loss3d = loss3d
         return loss_weight[:, 1]*loss2d + loss_weight[:, 0]*loss3d
 
     def solve(self, *xs):
