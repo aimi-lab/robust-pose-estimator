@@ -111,7 +111,7 @@ def main(input_path, outpath, config, device_sel, start, stop, step, log, genera
         if scene is not None:
             wandb.save(os.path.join(outpath, 'map.ply'))
         if os.path.isfile(os.path.join(input_path, 'groundtruth.txt')):
-            ate_rmse, rpe_trans, rpe_rot, trans_error = eval(os.path.join(input_path, 'groundtruth.txt'),
+            ate_rmse, rpe_trans, rpe_rot, trans_error, *_ = eval(os.path.join(input_path, 'groundtruth.txt'),
                                                              os.path.join(outpath, 'trajectory.freiburg'), offset=-4)
             wandb.define_metric('trans_error', step_metric='frame')
             for i, e in enumerate(trans_error):

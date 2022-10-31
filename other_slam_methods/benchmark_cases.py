@@ -10,7 +10,7 @@ import pandas as pd
 
 PATH_REPLACEMENT = ['/home/mhayoz/research', '/storage/workspaces/artorg_aimi/ws_00000']
 if __name__ == '__main__':
-    with open(os.path.join('..', 'intuitive_slam_test.txt'), 'r') as f:
+    with open(os.path.join('..', 'intuitive_slam_scenarios.txt'), 'r') as f:
         sequences = f.readlines()
     mp.set_start_method('spawn')
     for s in sequences:
@@ -26,14 +26,14 @@ if __name__ == '__main__':
             stop = min(row['start'] + 300, row['end'])
             print(f'{start} -> {stop} : {row["scenario"]}')
             try:
-                if not os.path.isfile(os.path.join(sequence, f'data/{i}/efusion/trajectory.json')):
+                if not os.path.isfile(os.path.join(sequence, f'data/{i}/efusion/trajectory.freiburg')):
                     with open('configuration/efusion_slam.yaml', 'r') as ymlfile:
                         config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
                     config.update({'scenario': row['scenario'], 'start': start, 'seq_number': i})
                     p = Process(target=elfusion, args=(sequence, os.path.join(sequence, f'data/{i}/efusion'), config, 'cpu', start, stop, step, 'scenario_efusion', False,))
                     p.start()
                     p.join()
-                if not os.path.isfile(os.path.join(sequence, f'data/{i}/orbslam2/trajectory.json')):
+                if not os.path.isfile(os.path.join(sequence, f'data/{i}/orbslam2/trajectory.freiburg')):
                     with open('configuration/orbslam2.yaml', 'r') as ymlfile:
                         config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
                     config.update({'scenario': row['scenario'], 'start': start, 'seq_number': i})
