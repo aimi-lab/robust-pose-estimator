@@ -46,10 +46,10 @@ class HornPoseHead(MLPPoseHead):
 class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
     def __init__(self):
         super(DeclarativePoseHead3DNode, self).__init__(eps=1e-3)
-        self.loss2d = 0.0
-        self.loss3d = 0.0
-        self.loss2d_weighted = 0.0
-        self.loss3d_weighted  = 0.0
+        self.loss2d = torch.tensor(0.0)
+        self.loss3d = torch.tensor(0.0)
+        self.loss2d_weighted = torch.tensor(0.0)
+        self.loss3d_weighted = torch.tensor(0.0)
 
     def reprojection_objective(self, flow, pcl1, pcl2, weights1, mask1, intrinsics, y, ret_res=False):
         # this is generally better for rotation
