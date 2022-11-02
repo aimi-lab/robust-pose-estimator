@@ -1,5 +1,6 @@
 import sys
 sys.path.append('../')
+from alley_oop.slam import SLAM
 import os
 import torch
 import numpy as np
@@ -50,7 +51,7 @@ class ColorMatcher(object):
         return torch.tensor(matched, dtype=torch.float).permute(2,0,1)/255.0
 
 
-def main(input_path, output_path, device_sel, step, log, match_color):
+def main(input_path, output_path, device_sel, step, log, match_color, rect_mode):
     device = torch.device('cpu')
     if device_sel == 'gpu':
         if torch.cuda.is_available():
@@ -61,8 +62,20 @@ def main(input_path, output_path, device_sel, step, log, match_color):
     if log is not None:
         wandb.init(project='Alley-OOP-dataextraction', group=log)
 
-
-    dataset, calib = get_data(input_path, (1280, 1024), force_video=True, sample_video=step)
+    dataset, calib = get_data(input_path, (1280, 1024), sample_video=step, rect_mode=rect_mode)
+    config={"frame2frame": True,
+            "dist_thr": 0.05, # relative distance threshold for data association
+            "depth_clipping":[1,250], # in mm
+            "debug": False,
+            "mask_specularities": True,
+            "conf_weighing": True,
+            "compensate_illumination": False,  # do not use this with noisy depth estimates
+            "average_pts": False,
+            "fuse_mode": "projective",
+            "fuse_step": 1}
+    slam = SLAM(torch.tensor(calib['intrinsics']['left']).to(device), config, img_shape=(640, 512),
+                baseline=calib['bf'],
+                checkpoint="../trained/no_tools_22666t1j.pth", init_pose=torch.eye(4)).to(device)
     assert isinstance(dataset, StereoVideoDataset)
     if match_color:
         cmatcher = ColorMatcher()
@@ -77,13 +90,15 @@ def main(input_path, output_path, device_sel, step, log, match_color):
 
     os.makedirs(os.path.join(output_path, 'video_frames'), exist_ok=True)
     os.makedirs(os.path.join(output_path, 'semantic_predictions'), exist_ok=True)
+    os.makedirs(os.path.join(output_path, 'depth'), exist_ok=True)
 
     with torch.inference_mode():
-        os.makedirs(output_path, exist_ok=True)
         for i, data in enumerate(tqdm(loader, total=len(dataset))):
             limg, rimg, pose_kinematics, img_number = data
             segmentation = seg_model.segment(limg.to(device))[1]
             segmentation = rgb_decoder.colorize(segmentation.squeeze().cpu().numpy()).astype(np.uint8)
+            depth, flow, _ = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
+            depth = depth.squeeze().cpu().numpy()
 
             # store images and depth and semantics
             if torch.is_tensor(img_number):
@@ -94,7 +109,7 @@ def main(input_path, output_path, device_sel, step, log, match_color):
             cv2.imwrite(os.path.join(output_path, 'video_frames', img_name + 'r.png'),
                         cv2.cvtColor(255.0*rimg.squeeze().permute(1,2,0).cpu().numpy(), cv2.COLOR_RGB2BGR).astype(np.uint8))
             cv2.imwrite(os.path.join(output_path, 'semantic_predictions', img_name + 'l.png'), cv2.cvtColor(segmentation, cv2.COLOR_RGB2BGR))
-
+            save_pfm(depth, os.path.join(output_path,'depth', f'{img_number[0]}l.pfm'))
         print('finished')
 
 
@@ -136,8 +151,15 @@ if __name__ == '__main__':
         action='store_true',
         help='match color of images with a template img. Enable this for phantom data'
     )
+    parser.add_argument(
+        '--rect_mode',
+        type=str,
+        choices=['conventional', 'pseudo'],
+        default='conventional',
+        help='rectification mode, use pseudo for SCARED'
+    )
     args = parser.parse_args()
     if args.outpath is None:
         args.outpath = args.input
 
-    main(args.input, args.outpath, args.device, args.step, args.log, args.match_color)
+    main(args.input, args.outpath, args.device, args.step, args.log, args.match_color, args.rect_mode)
