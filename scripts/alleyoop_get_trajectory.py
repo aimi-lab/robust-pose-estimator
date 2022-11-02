@@ -90,8 +90,6 @@ def main(args, config):
                        frame=slam.get_frame(), synth_frame=slam.get_rendered_frame(),
                        def_pcd=deformed_scene)
             elif isinstance(viewer, Viewer2D) & (i > 0):
-                loss2d = slam.pose_estimator.model.pose_head.problem.loss2d.item()
-                loss3d = slam.pose_estimator.model.pose_head.problem.loss3d.item()
                 viewer(slam.get_frame(), slam.get_rendered_frame(), flow, loss2d, loss3d, i*args.step)
             elif isinstance(viewer, ViewRenderer) & (i > 0):
                 canonical_scene = scene.pcl2open3d(stable=True)

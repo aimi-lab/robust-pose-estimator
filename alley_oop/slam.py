@@ -69,7 +69,11 @@ class SLAM(object):
                 self.scene.fuse(self.frame, pose, flow, crsp_list)
                 if self.dbg_opt:
                     print(f"number of surfels: {self.scene.opts.shape[1]}, stable: {(self.scene.conf >= 1.0).sum().item()}")
-            self.recorder(self.scene, pose_scaled)
+            loss2d = self.pose_estimator.model.pose_head.problem.loss2d.item()
+            loss3d = self.pose_estimator.model.pose_head.problem.loss3d.item()
+            loss2d_weighted = self.pose_estimator.model.pose_head.problem.loss2d_weighted.item()
+            loss3d_weighted = self.pose_estimator.model.pose_head.problem.loss3d_weighted.item()
+            self.recorder(self.scene, pose_scaled, loss2d, loss3d, loss2d_weighted, loss3d_weighted)
             self.cnt += 1
 
             return pose_scaled, self.scene, pose, flow
