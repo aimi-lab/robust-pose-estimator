@@ -37,7 +37,7 @@ def _align(model, data):
 
 def absolute_trajectory_error(gt_poses: Union[np.ndarray, torch.Tensor],
                               predicted_poses: Union[np.ndarray, torch.Tensor],
-                              prealign: bool=True) -> Tuple[float, Union[np.ndarray, torch.Tensor]]:
+                              prealign: bool=True, ret_align_T: bool=False) -> Tuple[float, Union[np.ndarray, torch.Tensor]]:
     """
         Absolute Trajectory Error ATE-RMSE
 
@@ -49,6 +49,7 @@ def absolute_trajectory_error(gt_poses: Union[np.ndarray, torch.Tensor],
     """
     assert len(gt_poses) == len(predicted_poses)
     lib = get_lib(gt_poses)
+    T = None
     if prealign:
         T = _align(predicted_poses[:, :3, 3].T, gt_poses[:, :3, 3].T)
         predicted_poses = T[None,...] @ predicted_poses
@@ -58,6 +59,8 @@ def absolute_trajectory_error(gt_poses: Union[np.ndarray, torch.Tensor],
         trans_err.append(lib.sum((gt[:3,3].T-pred[:3, 3])**2))
     trans_err = np.asarray(trans_err)
     ate_pos = lib.sqrt(lib.mean(trans_err))
+    if ret_align_T:
+        return ate_pos, np.sqrt(trans_err), T
     return ate_pos, np.sqrt(trans_err)
 
 

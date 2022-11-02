@@ -7,7 +7,6 @@ from alley_oop.pose.trajectory_analyzer import TrajectoryAnalyzer
 from alley_oop.utils.trajectory import read_freiburg
 from evaluation.evaluate_ate_freiburg import eval
 
-
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Plot Trajectories')
@@ -18,35 +17,50 @@ if __name__ == '__main__':
         help='Path to scared dataset.'
     )
     parser.add_argument(
-        '--pred_folders',
+        '--methods',
         type=str,
         nargs='+',
         default=['gt'],
         help='Folder containing predictions.'
     )
+    parser.add_argument(
+        '--prealign',
+        action="store_true",
+
+        help='pre-align trajectories.'
+    )
     args = parser.parse_args()
     
-    colors = ['b', 'g', 'r', 'k', 'm', 'y']
+    colors = {'ground truth': ['k', 1.5, 'dashed'], 'orbslam2': ['b', 0.5, 'solid'], 'efusion': ['m', 0.5, 'solid'], 'ours': ['c', 1.5, 'solid']}
     d_idx = 1
 
     keyframe = os.path.basename(args.base_path)
     dataset = os.path.basename(os.path.dirname(args.base_path))
     pose_plotter = TrajectoryAnalyzer(title=dataset + '/' + keyframe)
 
-    freiburg_paths = {m: os.path.join(args.base_path, 'data', m, 'trajectory.freiburg') for m in args.pred_folders}
-    freiburg_paths.update({'gt': os.path.join(args.base_path, 'groundtruth.txt')})
-
+    freiburg_paths = {m: os.path.join(args.base_path, 'data', m, 'trajectory.freiburg') for m in args.methods}
+    freiburg_paths.update({'ground truth': os.path.join(args.base_path, 'groundtruth.txt')})
     for k, meth in enumerate(freiburg_paths):
         print(meth)
-        assert os.path.isfile(freiburg_paths[meth]), f'{meth} does not exist'
-        ate_rmse, rpe_trans, rpe_rot, error = eval(freiburg_paths['gt'], freiburg_paths[meth], offset=-4)
-        print('ATE-RMSE: ',ate_rmse, ' mm')
-        print('RPE-trans: ', rpe_trans, ' mm')
-        print('RPE_rot: ', rpe_rot)
-        pose_arrs = np.stack(read_freiburg(freiburg_paths[meth]))
-        color = colors[k%len(colors)]
-        pose_plotter.add_pose_trajectory(pose_arrs, label=meth, color=color)
+        if meth == 'ground truth':
+            pose_arrs = gt_poses
+            pose_arrs = np.linalg.inv(pose_arrs[0])[None, ...] @ pose_arrs
+        else:
+            assert os.path.isfile(freiburg_paths[meth]), f'{meth} does not exist'
+            ate_rmse, rpe_trans, rpe_rot, error, *_ , T, gt_poses= eval(freiburg_paths['ground truth'], freiburg_paths[meth], offset=-4, ret_align_T=True)
+
+            print('ATE-RMSE: ',ate_rmse, ' mm')
+            print('RPE-trans: ', rpe_trans, ' mm')
+            print('RPE_rot: ', rpe_rot)
+            pose_arrs = np.stack(read_freiburg(freiburg_paths[meth]))
+            if args.prealign:
+                # align trajectories
+                pose_arrs = T[None, ...] @ pose_arrs
+            else:
+                pose_arrs = np.linalg.inv(pose_arrs[0])[None, ...] @ pose_arrs
+        n = meth.split('/')[-1]
+        pose_plotter.add_pose_trajectory(pose_arrs, label=n, color=colors[n][0], linewidth=colors[n][1], linestyle=colors[n][2])
     pose_plotter.legend()
     #pose_plotter.get_rmse_by_idx(idx_a=-1, idx_b=-2, plot_opt=True) if len(args.base_path) > 1 else None
-    pose_plotter.write_file()
+    pose_plotter.write_file(args.base_path)
     pose_plotter.show()

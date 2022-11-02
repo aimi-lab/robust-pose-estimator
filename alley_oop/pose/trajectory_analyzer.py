@@ -15,7 +15,7 @@ class TrajectoryAnalyzer(object):
 
         if 'title' in kwargs: self.ax.set_title(kwargs['title'])
     
-    def add_pose_trajectory(self, pose, label:str='', color='b', val_list=None, plot_outliers=True):
+    def add_pose_trajectory(self, pose, label:str='', color='b', val_list=None, plot_outliers=True, linewidth=0.5, linestyle='solid'):
         """
         pose: nx3x4 nd.array
         """
@@ -27,41 +27,41 @@ class TrajectoryAnalyzer(object):
         val_list = np.ones(pose.shape[0]).astype('bool') if val_list is None else val_list
 
         # plot valid trajectory of translation vectors
-        self.ax.plot(pose[val_list, 0, 3], pose[val_list, 1, 3], pose[val_list, 2, 3], '-', color=color, linewidth=0.5, markersize=3, label=label)
-        self.ax.set_xlabel('x')
-        self.ax.set_ylabel('y')
-        self.ax.set_zlabel('z')
-        # plot trajectory outliers (if validation provided)
-        if sum(val_list) != len(val_list) and plot_outliers:
-            self.ax.plot(pose[~val_list, 0, 3], pose[~val_list, 1, 3], pose[~val_list, 2, 3], 'x', color='b', label=str(label)+' outliers')
-
-        # plot camera orientation as arrows
-        base_vec = np.array((0, 0, 1))
-        for i in range(pose.shape[0]):
-            if val_list[i] or plot_outliers:
-                rmat_es = pose[i, :3, :3]
-                u_es, v_es, w_es = rmat_es.dot(base_vec)
-                x_es, y_es, z_es = pose[i, :3, 3]
-                self.ax.quiver(x_es, y_es, z_es, u_es, v_es, w_es, length=1, normalize=True, color=color)
-
-                # plot correspondences given alternative pose trajectory
-                try:
-                    if len(self.pose_list) > 1: self.plot_pose_correspondence(self.pose_list[-1][i], self.pose_list[-2][i])
-                except IndexError:
-                    break
-
-        # plot coordinate frame of first view
-        for cc, base_vec in zip(('blue', 'red', 'green'),(np.array((1, 0, 0)),np.array((0, 1, 0)),np.array((0, 0, 1)))):
-            rmat_es = pose[50, :3, :3]
-            u_es, v_es, w_es = rmat_es.dot(base_vec)
-            x_es, y_es, z_es = pose[50, :3, 3]
-            self.ax.quiver(x_es, y_es, z_es, u_es, v_es, w_es, length=2, normalize=True, color=cc)
-
-            # plot correspondences given alternative pose trajectory
-            try:
-                if len(self.pose_list) > 1: self.plot_pose_correspondence(self.pose_list[-1][i], self.pose_list[-2][i])
-            except IndexError:
-                break
+        self.ax.plot(pose[val_list, 0, 3], pose[val_list, 1, 3], pose[val_list, 2, 3], linestyle=linestyle, color=color, linewidth=linewidth, markersize=3, label=label)
+        self.ax.set_xlabel('x (mm)')
+        self.ax.set_ylabel('y (mm)')
+        self.ax.set_zlabel('z (mm)')
+        # # plot trajectory outliers (if validation provided)
+        # if sum(val_list) != len(val_list) and plot_outliers:
+        #     self.ax.plot(pose[~val_list, 0, 3], pose[~val_list, 1, 3], pose[~val_list, 2, 3], 'x', color='b', label=str(label)+' outliers')
+        #
+        # # plot camera orientation as arrows
+        # base_vec = np.array((0, 0, 1))
+        # for i in range(pose.shape[0]):
+        #     if val_list[i] or plot_outliers:
+        #         rmat_es = pose[i, :3, :3]
+        #         u_es, v_es, w_es = rmat_es.dot(base_vec)
+        #         x_es, y_es, z_es = pose[i, :3, 3]
+        #         self.ax.quiver(x_es, y_es, z_es, u_es, v_es, w_es, length=1, normalize=True, color=color)
+        #
+        #         # plot correspondences given alternative pose trajectory
+        #         try:
+        #             if len(self.pose_list) > 1: self.plot_pose_correspondence(self.pose_list[-1][i], self.pose_list[-2][i])
+        #         except IndexError:
+        #             break
+        #
+        # # plot coordinate frame of first view
+        # for cc, base_vec in zip(('blue', 'red', 'green'),(np.array((1, 0, 0)),np.array((0, 1, 0)),np.array((0, 0, 1)))):
+        #     rmat_es = pose[50, :3, :3]
+        #     u_es, v_es, w_es = rmat_es.dot(base_vec)
+        #     x_es, y_es, z_es = pose[50, :3, 3]
+        #     self.ax.quiver(x_es, y_es, z_es, u_es, v_es, w_es, length=2, normalize=True, color=cc)
+        #
+        #     # plot correspondences given alternative pose trajectory
+        #     try:
+        #         if len(self.pose_list) > 1: self.plot_pose_correspondence(self.pose_list[-1][i], self.pose_list[-2][i])
+        #     except IndexError:
+        #         break
     def plot_pose_correspondence(self, pose_a, pose_b):
 
         assert pose_a.shape == pose_b.shape, 'number of pose dimensions unequal'
