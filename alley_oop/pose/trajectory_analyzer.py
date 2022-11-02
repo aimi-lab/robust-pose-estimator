@@ -8,7 +8,7 @@ class TrajectoryAnalyzer(object):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__()
 
-        self.fig = plt.figure()
+        self.fig = plt.figure(figsize=(7,7))
         self.ax = self.fig.gca(projection='3d')
 
         self.pose_list = []
