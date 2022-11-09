@@ -59,6 +59,7 @@ for run in runs:
 
 runs_df = pd.DataFrame(summary_list)
 runs_df = runs_df[runs_df.method.isin(METHODS)]
+runs_df = runs_df[runs_df['scenario'] != 'A']
 runs_df.replace('F', 'C', inplace=True)
 runs_df.replace('G', 'B', inplace=True)
 runs_df.method = runs_df.method.astype('category')
@@ -90,28 +91,28 @@ for method in METHODS:
         {'mean': df.groupby('scenario').mean()['RPE/trans'], 'std': df.groupby('scenario').std()['RPE/trans']})
     print(df)
     print('macro average:', df.mean()['mean'], '+/-', df.std()['mean'])
-    #print('micro average:', runs_df[runs_df.method.eq(method)]['RPE/trans'].mean(), '+/-',
-    #      runs_df[runs_df.method.eq(method)]['RPE/trans'].std())
-print('\n------------')
-print('RPE-rot in deg')
-for method in METHODS:
-    print('\n------------')
-    print(method)
-    df = runs_df[runs_df.method.eq(method)]
-    df = pd.DataFrame({'mean': df.groupby('scenario').mean()['RPE/rot'], 'std':df.groupby('scenario').std()['RPE/rot']})
-    print(df)
-    print('macro average:', df.mean()['mean'],'+/-', df.std()['mean'])
-# # Per Run info
-print('\n------------')
-print('ATE-RMSE in mm')
-# for run in runs_df.dataset.unique():
-#
-#     df = runs_df[runs_df.dataset.eq(run)]
-#     for kf in df.keyframe.unique():
-#         print('\n------------')
-#         print(run, kf)
-#         df1 = df[df.keyframe.eq(kf)]
-#         print(df1[['method', 'ATE/RMSE']])
-#
-# snb.violinplot(y='ATE/RMSE', x='scenario', hue='method', data=runs_df)
-# plt.show()
+    print('micro average:', runs_df[runs_df.method.eq(method)]['RPE/trans'].mean(), '+/-',
+          runs_df[runs_df.method.eq(method)]['RPE/trans'].std())
+# print('\n------------')
+# print('RPE-rot in deg')
+# for method in METHODS:
+#     print('\n------------')
+#     print(method)
+#     df = runs_df[runs_df.method.eq(method)]
+#     df = pd.DataFrame({'mean': df.groupby('scenario').mean()['RPE/rot'], 'std':df.groupby('scenario').std()['RPE/rot']})
+#     print(df)
+#     print('macro average:', df.mean()['mean'],'+/-', df.std()['mean'])
+# # # Per Run info
+# print('\n------------')
+# print('ATE-RMSE in mm')
+# # for run in runs_df.dataset.unique():
+# #
+# #     df = runs_df[runs_df.dataset.eq(run)]
+# #     for kf in df.keyframe.unique():
+# #         print('\n------------')
+# #         print(run, kf)
+# #         df1 = df[df.keyframe.eq(kf)]
+# #         print(df1[['method', 'ATE/RMSE']])
+# #
+# # snb.violinplot(y='ATE/RMSE', x='scenario', hue='method', data=runs_df)
+# # plt.show()
