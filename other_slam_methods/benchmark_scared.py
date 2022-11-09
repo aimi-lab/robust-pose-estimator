@@ -26,7 +26,7 @@ if __name__ == '__main__':
             if not os.path.isfile(os.path.join(sequence, 'data/orbslam2/trajectory.freiburg')):
                 with open('configuration/orbslam2.yaml', 'r') as ymlfile:
                     config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
-                p = Process(target=orbslam, args=(sequence, os.path.join(sequence, 'data/orbslam2'), config, 'cpu', 0, 1000000000, 1, 'orbslam2_raftdepth', False,))
+                p = Process(target=orbslam, args=(sequence, os.path.join(sequence, 'data/orbslam2'), config, 'cpu', 0, 1000000000, 1, 'scared_orbslam2', False,))
                 p.start()
                 p.join()
         except:
