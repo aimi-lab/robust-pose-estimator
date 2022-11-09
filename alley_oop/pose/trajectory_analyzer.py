@@ -13,7 +13,7 @@ class TrajectoryAnalyzer(object):
             self.ax = self.fig.gca(projection='3d')
             self._3d = True
         else:
-            self.fig, self.ax = plt.subplots(1,3,figsize=(9, 3))
+            self.fig, self.ax = plt.subplots(1,3,figsize=(9, 2.5))
             self._3d = False
         self.label = []
 
@@ -47,6 +47,7 @@ class TrajectoryAnalyzer(object):
 
 
     def write_file(self, path:str=None):
+        plt.tight_layout()
         self.fig.savefig(path, bbox_inches='tight')
     
     def show(self):
