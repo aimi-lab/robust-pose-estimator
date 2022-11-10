@@ -36,12 +36,11 @@ class OptimizationRecordings():
         self.l3d_mean_weight.append(w3d)
         self.flow.append(flow)
 
-
     def log(self, step):
-        if len(self.trajectory) >= 2:
-            pose_change = np.linalg.norm((np.linalg.inv(self.trajectory[-2]) @ self.trajectory[-1])[:3,3])
+        if len(self.gt_trajectory) > step:
+            pose_change = np.linalg.norm((np.linalg.inv(self.trajectory[step - 1]) @ self.trajectory[step])[:3, 3])
         else:
-            pose_change = 0
+            pose_change = 0.0
         log_dict = {'frame': step,
                     'surfels/total': self.surfels_total[-1],
                     'surfels/stable': self.surfels_stable[-1],
@@ -56,7 +55,7 @@ class OptimizationRecordings():
 
         if self.gt_trajectory is not None:
             if len(self.gt_trajectory) > step:
-                tr_err = self.gt_trajectory[step][:3,3] - self.trajectory[-1][:3,3]
+                tr_err = self.gt_trajectory[step][:3, 3] - self.trajectory[-1][:3, 3]
                 rot_err = (self.gt_trajectory[step][:3, :3].T @ self.trajectory[-1][:3, :3])
                 rot_err_deg = np.linalg.norm(R.from_matrix(rot_err).as_rotvec(degrees=True), ord=2)
                 log_dict.update({'error/x': tr_err[0],
@@ -66,9 +65,9 @@ class OptimizationRecordings():
                                  'error/x_pred': self.trajectory[-1][0, 3],
                                  'error/y_pred': self.trajectory[-1][1, 3],
                                  'error/z_pred': self.trajectory[-1][2, 3],
-                                 'error/x_gt': self.gt_trajectory[step][0,3],
-                                 'error/y_gt': self.gt_trajectory[step][1,3],
-                                 'error/z_gt':self.gt_trajectory[step][2,3]})
+                                 'error/x_gt': self.gt_trajectory[step][0, 3],
+                                 'error/y_gt': self.gt_trajectory[step][1, 3],
+                                 'error/z_gt': self.gt_trajectory[step][2, 3]})
         wandb.log(log_dict, step=step)
 
     def set_gt(self, gt_trajectory):
