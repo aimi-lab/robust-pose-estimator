@@ -38,7 +38,7 @@ class OptimizationRecordings():
 
     def log(self, step):
         if len(self.gt_trajectory) > step:
-            pose_change = np.linalg.norm((np.linalg.inv(self.trajectory[step - 1]) @ self.trajectory[step])[:3, 3])
+            pose_change = np.linalg.norm((np.linalg.inv(self.gt_trajectory[step - 1]) @ self.gt_trajectory[step])[:3, 3])
         else:
             pose_change = 0.0
         log_dict = {'frame': step,
