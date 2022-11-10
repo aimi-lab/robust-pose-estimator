@@ -69,6 +69,7 @@ class RAFTPoseEstimator(torch.nn.Module):
                                                                         self.intrinsics, self.baseline*self.scale,
                                                                         depth1=self.last_frame.depth,
                                                                         depth2=frame.depth,
+                                                                        normals1=self.last_frame.normals,
                                                                         mask1=self.last_frame.mask, mask2=frame.mask,
                                                                         flow1=self.last_frame.flow, flow2=frame.flow,
                                                                         ret_confmap=True)
@@ -96,6 +97,7 @@ class RAFTPoseEstimator(torch.nn.Module):
             model_frame, crsp_list = scene_tlast.render(self.intrinsics.squeeze())
             flow, rel_pose_se3, *_, conf_1, conf_2  = self.model(255*model_frame.img, 255*frame.img, self.intrinsics, self.baseline,
                                       depth1=model_frame.depth, depth2=frame.depth,
+                                      normals1=self.last_frame.normals,
                                       mask1=model_frame.mask, mask2=frame.mask,
                                       flow1=model_frame.flow, flow2=frame.flow, ret_confmap=True)
             rel_pose_se3 = rel_pose_se3.squeeze(0)

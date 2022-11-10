@@ -1,4 +1,5 @@
 from alley_oop.pose.PoseN import *
+from alley_oop.geometry.normals import normals_from_regular_grid
 
 
 class NewPoseN2(PoseN):
@@ -14,11 +15,11 @@ class NewPoseN2(PoseN):
                 raise NotImplementedError
         except KeyError:
             activation = nn.Sigmoid
-        self.pose_head = DeclarativeLayer(DeclarativePoseHead3DNode2())
+        self.pose_head = DeclarativeLayer(DeclarativePoseHead3DNode3())
         self.conf_head1 = nn.Sequential(TinyUNet(in_channels=128 + 128 + 8, output_size=(H, W)), activation())
         self.conf_head2 = nn.Sequential(TinyUNet(in_channels=128 + 128 + 8+8, output_size=(H, W)), activation())
 
-    def forward(self, image1l, image2l, intrinsics, baseline, image1r=None, image2r=None, depth1=None, depth2=None, mask1=None, mask2=None, flow1=None, flow2=None, iters=12, flow_init=None, pose_init=None, ret_confmap=False):
+    def forward(self, image1l, image2l, intrinsics, baseline, normals1=None, image1r=None, image2r=None, depth1=None, depth2=None, mask1=None, mask2=None, flow1=None, flow2=None, iters=12, flow_init=None, pose_init=None, ret_confmap=False):
         intrinsics.requires_grad = False
         baseline.requires_grad = False
         """ estimate optical flow from stereo pair to get disparity map"""
@@ -56,9 +57,17 @@ class NewPoseN2(PoseN):
             mask1.requires_grad = False
         if mask2 is not None:
             mask2.requires_grad = False
+        if normals1 is None:
+            pad = torch.nn.ReplicationPad2d((0, 1, 0, 1))
+            normals1 = []
+            for i in range(pcl1.shape[0]):
+                n = normals_from_regular_grid(pcl1[i].view((*image1l.shape[-2:], 3)))
+                # pad normals
+                normals1.append(pad(n.permute(2, 0, 1)).contiguous().unsqueeze(0))
+            normals1 = torch.cat(normals1)
 
         n = image1l.shape[0]
-        pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2, conf1, conf2, mask1, mask2, self.loss_weight.repeat(n, 1), intrinsics)
+        pose_se3 = self.pose_head(flow_predictions[-1], pcl1, pcl2, conf1, conf2, mask1, mask2, normals1, self.loss_weight.repeat(n, 1), intrinsics)
         if ret_confmap:
             return flow_predictions, pose_se3.float() / self.pose_scale, depth1, depth2, conf1, conf2
         return flow_predictions, pose_se3.float()/self.pose_scale, depth1, depth2

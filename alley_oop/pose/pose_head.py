@@ -247,3 +247,57 @@ class DeclarativePoseHead3DNode2(DeclarativePoseHead3DNode):
             if ret_res:
                 return torch.mean(residuals, dim=-1), residuals
             return torch.mean(residuals, dim=-1)
+
+
+from alley_oop.utils.pytorch import batched_dot_product
+
+
+class DeclarativePoseHead3DNode3(DeclarativePoseHead3DNode):
+    def reprojection_objective(self, flow, pcl1, pcl2, weights1, mask1, intrinsics, y, ret_res=False):
+        # this is generally better for rotation
+        n, _, h, w = flow.shape
+        img_coordinates = create_img_coords_t(y=pcl1.shape[-2], x=pcl1.shape[-1]).to(pcl1.device)
+        pose = pseudo_lie_se3_to_SE3_batch_small(-y)  # invert transform to be consistent with other pose estimators
+        # project to image plane
+        warped_pts = project(pcl1.view(n,3,-1), pose, intrinsics)
+        flow_off = img_coordinates[None, :2] + flow.view(n, 2, -1)
+        residuals = torch.sum((flow_off - warped_pts)**2, dim=1)
+        valid = (flow_off[:, 0] > 0) & (flow_off[:, 1] > 0) & (flow_off[:, 0] < w) & (flow_off[:, 1] < h)
+        valid = torch.isinf(residuals) | torch.isnan(residuals) | ~valid.view(n,-1) | ~mask1.view(n,-1)
+        # weight residuals by confidences
+        self.loss2d = torch.mean(residuals, dim=1).detach()/ (h*w)
+        residuals *= weights1.view(n,-1)
+        residuals[valid] = 0.0
+        loss = torch.mean(residuals, dim=1) / (h*w)  # normalize with width and height
+        if ret_res:
+            flow = warped_pts - img_coordinates[None, :2]
+            return loss, residuals, flow
+        return loss
+
+    def depth_objective(self, flow, pcl1, pcl2, weights1, weights2, mask1, mask2, normals1, y, ret_res=False):
+        # this is generally better for translation (essentially in z-direction)
+        # 3D geometric L2 loss
+        n, _, h, w = pcl1.shape
+        # se(3) to SE(3)
+        pose = pseudo_lie_se3_to_SE3_batch_small(y)
+        # transform point cloud given the pose
+        pcl2_aligned = transform(homogeneous(pcl2.view(n, 3, -1)), pose).reshape(n, 4, h, w)[:, :3]
+
+        valid = mask1 & mask2
+        # define objective loss function
+        residuals = batched_dot_product(normals1.view(n,3,-1), (pcl2_aligned.view(n, 3, -1) - pcl1.view(n, 3, -1)))
+        self.loss3d = torch.mean(residuals, dim=1).detach()
+        # reweighing residuals
+        residuals *= weights2.view(n, -1)
+        residuals[~valid.view(n, -1)] = 0.0
+        if ret_res:
+            return torch.mean(residuals, dim=-1), residuals
+        return torch.mean(residuals, dim=-1)
+
+    def objective(self, *xs, y):
+        flow, pcl1, pcl2, weights1, weights2, mask1, mask2, normals1, loss_weight, intrinsics= xs
+        loss3d = self.depth_objective(flow, pcl1, pcl2, weights1, weights2, mask1, mask2, normals1, y)
+        loss2d = self.reprojection_objective(flow, pcl1, pcl2, weights1,mask1, intrinsics, y)
+        self.loss2d_weighted = loss2d.detach()
+        self.loss3d_weighted = loss3d.detach()
+        return loss_weight[:, 1]*loss2d + loss_weight[:, 0]*loss3d
