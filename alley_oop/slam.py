@@ -73,7 +73,8 @@ class SLAM(object):
             loss3d = self.pose_estimator.model.pose_head.problem.loss3d.item()
             loss2d_weighted = self.pose_estimator.model.pose_head.problem.loss2d_weighted.item()
             loss3d_weighted = self.pose_estimator.model.pose_head.problem.loss3d_weighted.item()
-            self.recorder(self.scene, pose_scaled, loss2d, loss3d, loss2d_weighted, loss3d_weighted)
+            if self.cnt > 0:
+                self.recorder(self.scene, pose_scaled, loss2d, loss3d, loss2d_weighted, loss3d_weighted, flow.abs().mean(), self.rendered_frame.confidence.mean(), self.frame.confidence.mean())
             self.cnt += 1
 
             return pose_scaled, self.scene, pose, flow
