@@ -13,7 +13,7 @@ parser.add_argument(
     '--methods',
     nargs='+',
     type=str,
-    default=['orbslam2_raftdepth', 'scared_unet_f2f_w','scared_unet_f2m_w', 'scared_raftslam_f2f', 'scared_raftslam_f2m', 'scared_efusion', 'scared_f2m_no_tools'],
+    default=['orbslam2_raftdepth', 'scared_efusion', 'scared_f2m_decoupled2'],
     help='Path to input folder.'
 )
 args = parser.parse_args()
@@ -42,6 +42,12 @@ for run in runs:
     all_dict.update({"state": run.state})
     all_dict.update({"method": run._attrs['group']})
     all_dict.update({"id": run.id})
+    try:
+        if all_dict["ATE/RMSE"] < 0.01:
+            all_dict["ATE/RMSE"] *= 1000.0 #m to mm
+            all_dict["RPE/trans"] *= 1000.0  # m to mm
+    except KeyError:
+        pass
     summary_list.append(all_dict)
 
 runs_df = pd.DataFrame(summary_list)
@@ -51,7 +57,7 @@ runs_df.method = runs_df.method.cat.set_categories(METHODS)
 runs_df.sort_values(['method'], inplace=True)
 runs_df.to_csv("project.csv")
 runs_df['dataset'] = [os.path.basename(d) for d in runs_df['dataset']]
-runs_df["ATE/RMSE"] *= 1000.0 #m to mm
+runs_df = runs_df[runs_df.dataset.isin(['dataset_1', 'dataset_8', 'dataset_9'])]
 
 # Group into methods and datasets
 print('\n------------')
