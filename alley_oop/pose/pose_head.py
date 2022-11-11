@@ -285,7 +285,7 @@ class DeclarativePoseHead3DNode3(DeclarativePoseHead3DNode):
 
         valid = mask1 & mask2
         # define objective loss function
-        residuals = batched_dot_product(normals1.view(n,3,-1), (pcl2_aligned.view(n, 3, -1) - pcl1.view(n, 3, -1)))
+        residuals = batched_dot_product(normals1.view(n,3,-1), (pcl2_aligned.view(n, 3, -1) - pcl1.view(n, 3, -1)))**2
         self.loss3d = torch.mean(residuals, dim=1).detach()
         # reweighing residuals
         residuals *= weights2.view(n, -1)
