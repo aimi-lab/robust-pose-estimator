@@ -3,32 +3,56 @@ model:
   iters: 12
   dropout: 0.0
   small: False
-  RGBD: False
   pose_scale: 1.0
-  mode: lbgfs #mlp # horn
+  lbgfs_iters: 100
   use_weights: True
-  activation: sigmoid
 
 data:
   train:
     type: Intuitive
-    basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/01_stereo/01_intuitive_scared
+    basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_human
     sequences:
-      - dataset_1
-      - dataset_2
-      - dataset_3
-      - dataset_6
+      - dataset_1_0
+      - dataset_1_1
+      - dataset_1_2
+      - dataset_1_3
+      - dataset_1_4
+      - dataset_1_5
+      - dataset_1_6
+      - dataset_3_0
+      - dataset_3_1
+      - dataset_3_2
+      - dataset_3_3
+      - scared_dataset_1
+      - scared_dataset_2
+      - scared_dataset_3
+      - scared_dataset_6
     step:
       - 1
-      - 20
+      - 5
+    samples: 2000
+
   val:
     type: Intuitive
-    basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/01_stereo/01_intuitive_scared
+    basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_human
     sequences:
-      - dataset_7
-      - dataset_8
-      - dataset_9
+      - scared_dataset_7
+      - scared_dataset_8
+      - scared_dataset_9
     step: 1
+    samples: 40
+
+  val2:
+    type: Intuitive
+    basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/slam_benchmark_data
+    sequences:
+      - case_B
+      - case_C
+      - case_D
+      - case_F
+      - case_G
+    step: 1
+    samples: 40
 
 train:
   batch_size: 8
