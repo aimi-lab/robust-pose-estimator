@@ -32,11 +32,8 @@ class PoseEstimator(torch.nn.Module):
         self.model = model
         self.intrinsics = intrinsics.unsqueeze(0).float()
         self.scale = 1 / config['depth_clipping'][1]
-        # scale init pose
-        self.init_pose = init_pose.clone()
-        self.init_pose[:3, 3] *= self.scale
-        self.register_buffer("last_pose",init_pose.double())
-        self.register_buffer("baseline", torch.tensor(baseline).unsqueeze(0).float())
+        self.register_buffer("last_pose",init_pose.double(), persistent=False)
+        self.register_buffer("baseline", torch.tensor(baseline).unsqueeze(0).float(), persistent=False)
         self.last_frame = None
         self.frame2frame = config['frame2frame']
         self.scene = None
@@ -68,17 +65,14 @@ class PoseEstimator(torch.nn.Module):
             success = True
         self.last_frame = ret_frame
         # chain relative pose with last pose estimation to obtain absolute pose
+        rel_pose[:3, 3] /= self.scale # de-normalize depth scaling
         self.last_pose.data = self.last_pose.data @ rel_pose
-
-        # de-normalize depth scaling
-        pose_orig_scale = self.last_pose.clone()
-        pose_orig_scale[:3, 3] /= self.scale
 
         # update scene model
         if success & (flow is not None) & (self.scene is not None):
-            self.scene.fuse(self.frame, pose_orig_scale)
+            self.scene.fuse(self.frame, self.last_pose.data)
 
-        return pose_orig_scale, self.scene, flow
+        return self.last_pose.data, self.scene, flow
 
     def get_pose_f2f(self):
         """
