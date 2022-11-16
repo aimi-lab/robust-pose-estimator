@@ -13,7 +13,7 @@ import torch
 import wandb
 import numpy as np
 from evaluation.evaluate_ate_freiburg import eval
-from alley_oop.pose.PoseN import DepthNet
+from alley_oop.pose.pose_net import DepthNet
 
 
 def main(input_path, outpath, config, device_sel, start, stop, step, log, generate_map):

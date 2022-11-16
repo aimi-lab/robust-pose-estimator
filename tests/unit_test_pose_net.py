@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import cv2
 import os
-from alley_oop.pose.PoseN import PoseN
+from alley_oop.pose.pose_net import PoseN
 from alley_oop.utils.trajectory import read_freiburg
 from alley_oop.geometry.lie_3d import lie_SE3_to_se3, lie_se3_to_SE3
 from alley_oop.geometry.pinhole_transforms import create_img_coords_t, transform, homogeneous

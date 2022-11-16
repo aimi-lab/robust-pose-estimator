@@ -12,7 +12,7 @@ import torch
 import wandb
 import numpy as np
 from evaluation.evaluate_ate_freiburg import eval
-from alley_oop.pose.PoseN import DepthNet
+from alley_oop.pose.pose_net import DepthNet
 
 
 def tuple2list(listpose):

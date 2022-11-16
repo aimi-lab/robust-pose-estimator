@@ -7,7 +7,7 @@ import torch
 from torch.utils.data import DataLoader, SubsetRandomSampler
 
 
-from alley_oop.pose.PoseN import PoseN
+from alley_oop.pose.pose_net import PoseN
 import alley_oop.network_core.raft.core.datasets as datasets
 from alley_oop.network_core.raft.losses import supervised_pose_loss
 from alley_oop.network_core.raft.utils.plotting import plot_res
