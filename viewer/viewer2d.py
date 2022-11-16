@@ -34,7 +34,7 @@ class Viewer2D(object):
         ax[0].imshow(img_t)
         ax[0].axis('off')
         ax[0].set_title('I_t')
-        ax[1].imshow(depth_t, vmin=0, vmax=1)
+        ax[1].imshow(depth_t, vmin=0)
         ax[1].axis('off')
         ax[1].set_title('depth_t')
         ax[2].imshow(flow_rgb)

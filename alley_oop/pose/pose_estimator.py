@@ -53,7 +53,7 @@ class PoseEstimator(torch.nn.Module):
             if self.scene is None:
                 # initialize scene with first frame
                 self.scene = SurfelMap(frame=self.frame, kmat=self.intrinsics.squeeze(), upscale=1,
-                                       d_thresh=self.config['dist_thr'], depth_scale=self.scale,
+                                       d_thresh=self.config['dist_thr'],
                                        pmat=self.init_pose, average_pts=self.config['average_pts']).to(self.device)
             rel_pose_se3, ret_frame, flow = self.get_pose_f2m()
 
@@ -76,7 +76,7 @@ class PoseEstimator(torch.nn.Module):
 
         # update scene model
         if success & (flow is not None) & (self.scene is not None):
-            self.scene.fuse(self.frame, self.last_pose)
+            self.scene.fuse(self.frame, pose_orig_scale)
 
         return pose_orig_scale, self.scene, flow
 
@@ -88,19 +88,22 @@ class PoseEstimator(torch.nn.Module):
         if self.last_frame is None:
             # if this is the first frame, we don't need to compute the relative pose
             rel_pose_se3 = torch.zeros(6, dtype=torch.float64, device=self.last_pose.device)
+            depth, _, valid = self.model.flow2depth(self.frame.img, self.frame.rimg,self.baseline*self.scale)
+            self.frame.depth = depth/self.scale
+            self.frame.mask &= valid
             ret_frame = None
         else:
             # get pose
             rel_pose_se3, depth1, depth2, conf_1, conf_2, flow = self.model.infer(self.last_frame.img, self.frame.img,
                                                                  self.intrinsics, self.baseline*self.scale,
-                                                                 depth1=self.last_frame.depth,
+                                                                 depth1=self.last_frame.depth*self.scale,
                                                                  image2r=self.frame.rimg,
                                                                  mask1=self.last_frame.mask, mask2=self.frame.mask,
                                                                  stereo_flow1=self.last_frame.flow,
                                                                  ret_details=True)
             # assign values for visualization purpose
             self.frame.confidence = conf_2
-            self.frame.depth = depth2
+            self.frame.depth = depth2/self.scale
             self.last_frame.confidence = conf_1
             ret_frame = self.last_frame
 
@@ -118,7 +121,7 @@ class PoseEstimator(torch.nn.Module):
         flow, rel_pose_se3, depth1, depth2, conf_1, conf_2 = self.model.infer(model_frame.img, self.frame.img,
                                                                               self.intrinsics,
                                                                               self.baseline * self.scale,
-                                                                              depth1=model_frame.depth,
+                                                                              depth1=model_frame.depth*self.scale,
                                                                               image2r=self.frame.rimg,
                                                                               mask1=model_frame.mask,
                                                                               mask2=self.frame.mask,
@@ -126,7 +129,7 @@ class PoseEstimator(torch.nn.Module):
                                                                               ret_details=True)
         # assign values for visualization purpose
         self.frame.confidence = conf_2
-        self.frame.depth = depth2
+        self.frame.depth = depth2/self.scale
         model_frame.confidence = conf_1
         return rel_pose_se3.double(), model_frame, flow
 

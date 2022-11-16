@@ -1,20 +1,22 @@
 import sys
 sys.path.append('../')
-from alley_oop.pose.pose_estimator import PoseEstimator
 import os
 from tqdm import tqdm
-from dataset.preprocess.segmentation_network.seg_model import SemanticSegmentationModel
+import wandb
+from torch.utils.data import DataLoader
+
 from alley_oop.fusion.surfel_map_deformable import *
 from alley_oop.utils.trajectory import save_trajectory, read_freiburg
+from alley_oop.pose.pose_estimator import PoseEstimator
+from alley_oop.utils.logging import OptimizationRecordings
+
+from dataset.preprocess.segmentation_network.seg_model import SemanticSegmentationModel
 from dataset.dataset_utils import get_data, StereoVideoDataset, SequentialSubSampler
-import warnings
-from torch.utils.data import DataLoader
-import wandb
 from evaluation.evaluate_ate_freiburg import eval
 from viewer.viewer3d import Viewer3D
 from viewer.viewer2d import Viewer2D
 from viewer.view_renderer import ViewRenderer
-from alley_oop.utils.logging import OptimizationRecordings
+
 
 def main(args, config):
     device = torch.device('cpu')
@@ -77,37 +79,30 @@ def main(args, config):
                 limg, rimg, mask, semantics, img_number = data
 
             pose, scene, flow = pose_estimator(limg.to(device), rimg.to(device), mask.to(device))
-            # logging
-            if i > 0:
-                recorder(scene, pose)
 
+            # visualization
             if isinstance(viewer, Viewer3D) & (i > 0):
-                #ToDo unscale depth here!
                 curr_pcl = SurfelMap(frame=pose_estimator.get_frame(), kmat=torch.tensor(calib['intrinsics']['left']).float(),
                                      pmat=pose).pcl2open3d(stable=False)
                 curr_pcl.paint_uniform_color([0.5, 0.5, 1.0])
-                canonical_scene = scene.pcl2open3d(stable=config['viewer']['stable'])
-                deformed_scene = scene.deform_cpy().pcl2open3d(stable=config['viewer']['stable']) if isinstance(scene, SurfelMapDeformable) else None
-                print('Current Frame vs Scene (Canonical/Deformed)')
-                viewer(pose.cpu(), canonical_scene, add_pcd=curr_pcl,
-                       frame=pose_estimator.get_frame(), synth_frame=pose_estimator.get_last_frame(),
-                       def_pcd=deformed_scene)
+                canonical_scene = scene.pcl2open3d(stable=False)
+                viewer(pose.cpu(), canonical_scene, add_pcd=curr_pcl)
             elif isinstance(viewer, Viewer2D) & (i > 0):
                 viewer(pose_estimator.get_frame(), pose_estimator.get_last_frame(), flow, i*args.step)
             elif isinstance(viewer, ViewRenderer) & (i > 0):
                 canonical_scene = scene.pcl2open3d(stable=True)
                 viewer(pose.cpu(), canonical_scene)
             trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
+
+            # logging
             if (args.log is not None) & (i > 0):
-                pose_estimator.recorder.log(step=int(img_number[0]))
-            if args.store_map & ((i%50) == 49):
-                scene.save_ply(os.path.join(args.outpath, f'stable_map_{i}.ply'), stable=True)
-                scene.deform_cpy().save_ply(os.path.join(args.outpath, f'def_map_{i}.ply'), stable=True)
+                recorder(scene, pose)
+                recorder.log(step=int(img_number[0]))
 
         save_trajectory(trajectory, args.outpath)
-
-        scene.save_ply(os.path.join(args.outpath, 'stable_map.ply'), stable=True)
-        scene.save_ply(os.path.join(args.outpath, 'all_map.ply'), stable=False)
+        if scene is not None:
+            scene.save_ply(os.path.join(args.outpath, 'stable_map.ply'), stable=True)
+            scene.save_ply(os.path.join(args.outpath, 'all_map.ply'), stable=False)
         if args.log is not None:
             wandb.save(os.path.join(args.outpath, 'trajectory.freiburg'))
             wandb.save(os.path.join(args.outpath, 'map.ply'))
@@ -186,11 +181,6 @@ if __name__ == '__main__':
         '--force_video',
         action="store_true",
         help='force to use video input and recompute depth'
-    )
-    parser.add_argument(
-        '--store_map',
-        action="store_true",
-        help='store intermediate maps'
     )
     parser.add_argument(
         '--viewer',

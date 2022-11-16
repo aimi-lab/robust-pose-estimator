@@ -6,12 +6,9 @@ slam:
     - 1
     - 250 # in mm
   debug: False
-  mask_specularities: True
   conf_weighing: True
-  compensate_illumination: False  # do not use this with noisy depth estimates
   average_pts: False
-  fuse_mode: projective
-  fuse_step: 1
+  lbgfs_iters: 20
 
 img_size:
   - 640
@@ -19,7 +16,3 @@ img_size:
 
 rect_mode: conventional
 
-viewer:
-  enable: False
-  blocking: True
-  stable: False
