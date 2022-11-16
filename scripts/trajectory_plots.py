@@ -31,7 +31,7 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
     
-    colors = {'ground truth': ['k', 2.5, 'dashed'], 'orbslam2': ['b', 1, 'solid'], 'efusion': ['m', 0.5, 'solid'], 'ours': ['goldenrod', 2.5, 'solid']}
+    colors = {'ground truth': ['k', 2.5, 'dashed'], 'orbslam2': ['b', 1, 'dashdot'], 'efusion': ['m', 0.5, 'solid'], 'ours': ['goldenrod', 2.5, 'solid']}
     d_idx = 1
 
     keyframe = os.path.basename(args.base_path)
