@@ -24,40 +24,20 @@ from alley_oop.geometry.lie_3d_pseudo import pseudo_lie_se3_to_SE3, pseudo_lie_s
 SUM_FREQ = 100
 VAL_FREQ = 1000
 
-def count_parameters(model):
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-def fetch_optimizer(config, model):
-    """ Create the optimizer and learning rate scheduler """
-    optimizer = optim.AdamW(model.parameters(), lr=config['learning_rate'], weight_decay=config['weight_decay'], eps=config['epsilon'])
-    return optimizer
-    
-
-def val(model, dataloader, device, intrinsics, logger, infer_depth, key):
+def val(model, dataloader, device, intrinsics, logger, key):
     model.eval()
     with torch.no_grad():
         for i_batch, data_blob in enumerate(dataloader):
-            if infer_depth:
-                ref_img, trg_img, ref_img_r, trg_img_r, ref_mask, trg_mask, gt_pose, intrinsics, baseline = [x.to(device) for x in
+            ref_img, trg_img, ref_img_r, trg_img_r, ref_mask, trg_mask, gt_pose, intrinsics, baseline = [x.to(device) for x in
                                                                                               data_blob]
-                flow_predictions, pose_predictions, trg_depth, ref_depth, conf1, conf2 = model(trg_img, ref_img,
-                                                                                               intrinsics.float(), baseline.float(),
-                                                                                               image1r=trg_img_r,
-                                                                                               image2r=ref_img_r,
-                                                                                               mask1=trg_mask.to(torch.bool),
-                                                                                               mask2=ref_mask.to(torch.bool),
-                                                                                               iters=config['model'][
-                                                                                                   'iters'],
-                                                                                               ret_confmap=True)
-            else:
-                ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, gt_pose, intrinsics, baseline  = [x.to(device) for x in
-                                                                                              data_blob]
-                flow_predictions, pose_predictions, *_, conf1, conf2 = model(trg_img, ref_img,intrinsics.float(), baseline.float(),
-                                                                             depth1=trg_depth,
-                                                                         depth2=ref_depth,
-                                                                         iters=config['model']['iters'],
-                                                                         ret_confmap=True)
-
+            flow_predictions, pose_predictions, trg_depth, ref_depth, conf1, conf2 = model(trg_img, ref_img,
+                                                                                           intrinsics.float(), baseline.float(),
+                                                                                           image1r=trg_img_r,
+                                                                                           image2r=ref_img_r,
+                                                                                           mask1=trg_mask.to(torch.bool),
+                                                                                           mask2=ref_mask.to(torch.bool),
+                                                                                           ret_confmap=True)
             loss_pose = supervised_pose_loss(pose_predictions, gt_pose)
             loss = torch.nanmean(loss_pose)
             loss_cpu = loss_pose.detach().cpu()
@@ -66,21 +46,21 @@ def val(model, dataloader, device, intrinsics, logger, infer_depth, key):
                        f"{key}/loss_total": loss_cpu.nanmean().item()}
             logger.push(metrics, len(dataloader))
         logger.flush()
-        logger.log_plot(plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth, pseudo_lie_se3_to_SE3_batch(-pose_predictions), conf1, conf2, intrinsics)[0])
+        logger.log_plot(plot_res(ref_img, trg_img, flow_predictions, trg_depth,
+                                 pseudo_lie_se3_to_SE3_batch(-pose_predictions), conf1, conf2, intrinsics)[0])
     model.train()
     return loss.detach().mean().cpu().item()
 
 
 def main(args, config, force_cpu):
     # general
-    loss_weights = config['train']['loss_weights']
     config['model']['image_shape'] = config['image_shape']
     device = torch.device('cuda') if (torch.cuda.is_available() & (not force_cpu)) else torch.device('cpu')
 
     # get data
-    data_train, *_ = datasets.get_data(config['data']['train'], config['image_shape'], config['depth_scale'])
-    data_val, infer_depth = datasets.get_data(config['data']['val'], config['image_shape'], config['depth_scale'])
-    data_val2, infer_depth = datasets.get_data(config['data']['val2'], config['image_shape'], config['depth_scale'])
+    data_train = datasets.get_data(config['data']['train'], config['image_shape'], config['depth_scale'])
+    data_val = datasets.get_data(config['data']['val'], config['image_shape'], config['depth_scale'])
+    data_val2 = datasets.get_data(config['data']['val2'], config['image_shape'], config['depth_scale'])
     print(f"train: {len(data_train)} samples, val: {len(data_val)} samples")
     train_loader = DataLoader(data_train, num_workers=4, pin_memory=True, batch_size=config['train']['batch_size'], shuffle=True)
     val_loader = DataLoader(data_val, num_workers=4, pin_memory=True, batch_size=config['val']['batch_size'])
@@ -99,7 +79,9 @@ def main(args, config, force_cpu):
     if (device != torch.device('cpu')) & (torch.cuda.device_count() > 1):
         parallel = True
         model = nn.DataParallel(model).to(device)
-    optimizer = fetch_optimizer(config['train'], model)
+    optimizer = optim.AdamW(model.parameters(), lr=config['train']['learning_rate'],
+                            weight_decay=config['train']['weight_decay'],
+                            eps=config['train']['epsilon'])
 
     # training loop
     total_steps = 0
@@ -118,37 +100,18 @@ def main(args, config, force_cpu):
             if i_batch == config['train']['freeze_flow_steps']:
                 model.module.freeze_flow(False) if parallel else model.freeze_flow(False)
             optimizer.zero_grad()
-            if infer_depth:
-                ref_img, trg_img, ref_img_r, trg_img_r, ref_mask, trg_mask, gt_pose, intrinsics, baseline = [
-                    x.to(device) for x in
-                    data_blob]
-            else:
-                ref_img, trg_img, ref_depth, trg_depth, ref_conf, trg_conf, valid, gt_pose, intrinsics, baseline = [
-                    x.to(device) for x in data_blob]
-
-            if config['train']['add_noise']:
-                stdv = np.random.uniform(0.0, 5.0)
-                ref_img = (ref_img + stdv * torch.randn(*ref_img.shape).to(device)).clamp(0.0, 255.0)
-                trg_img = (trg_img + stdv * torch.randn(*trg_img.shape).to(device)).clamp(0.0, 255.0)
+            ref_img, trg_img, ref_img_r, trg_img_r, ref_mask, trg_mask, gt_pose, intrinsics, baseline = [
+                x.to(device) for x in
+                data_blob]
 
             # forward pass
-            if infer_depth:
-                torch.cuda.set_sync_debug_mode(1 if args.dbg else 0)
-                flow_predictions, pose_predictions, trg_depth, ref_depth, conf1, conf2 = model(trg_img, ref_img,
-                                                                                               intrinsics.float(), baseline.float(),
-                                                                                               image1r=trg_img_r,
-                                                                                               image2r=ref_img_r,
-                                                                                               mask1=trg_mask.to(torch.bool),
-                                                                                               mask2=ref_mask.to(torch.bool),
-                                                                                               iters=config['model'][
-                                                                                                   'iters'],
-                                                                                               ret_confmap=True)
-            else:
-                flow_predictions, pose_predictions, *_, conf1, conf2 = model(trg_img, ref_img, intrinsics.float(), baseline.float(),
-                                                                             depth1=trg_depth,
-                                                                             depth2=ref_depth,
-                                                                             iters=config['model']['iters'],
-                                                                             ret_confmap=True)
+            flow_predictions, pose_predictions, trg_depth, ref_depth, conf1, conf2 = model(trg_img, ref_img,
+                                                                                           intrinsics.float(), baseline.float(),
+                                                                                           image1r=trg_img_r,
+                                                                                           image2r=ref_img_r,
+                                                                                           mask1=trg_mask.to(torch.bool),
+                                                                                           mask2=ref_mask.to(torch.bool),
+                                                                                           ret_confmap=True)
             # loss computations
             loss_pose = supervised_pose_loss(pose_predictions, gt_pose)
             loss = torch.mean(loss_pose)
@@ -167,7 +130,7 @@ def main(args, config, force_cpu):
                 if device == torch.device('cpu'):
                     pose = pose_predictions.clone()
                     pose[:, 3:] *= config['depth_scale']
-                    fig, ax = plot_res(ref_img, trg_img, flow_predictions[-1], trg_depth * config['depth_scale'],
+                    fig, ax = plot_res(ref_img, trg_img, flow_predictions, trg_depth * config['depth_scale'],
                                        pseudo_lie_se3_to_SE3_batch(-pose), conf1, conf2, intrinsics)
                     import matplotlib.pyplot as plt
                     plt.show()
@@ -190,8 +153,8 @@ def main(args, config, force_cpu):
                 logger.flush()
 
             if (total_steps % VAL_FREQ) == 0:
-                val_loss = val(model, val_loader, device, intrinsics, logger, infer_depth, 'val')
-                val_loss2 = val(model, val2_loader, device, intrinsics, logger, infer_depth, 'val2')
+                val_loss = val(model, val_loader, device, intrinsics, logger, 'val')
+                val_loss2 = val(model, val2_loader, device, intrinsics, logger, 'val2')
                 val_loss += val_loss2
                 if torch.isnan(torch.tensor(val_loss)):
                     should_keep_training = False

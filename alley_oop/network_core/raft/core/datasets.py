@@ -21,13 +21,7 @@ def get_data(config, img_size: Tuple, depth_cutoff: float):
     torch.manual_seed(1234)
     np.random.seed(1234)
     img_size = tuple(img_size)
-    infer_depth = True
-    if config['type'] == 'TUM':
-        dataset = TUMDataset(root=config['basepath'], step=config['step'], img_size=img_size, depth_cutoff=depth_cutoff)
-        intrinsics = torch.tensor([[525.0, 0, 319.5], [0, 525.0, 239.5], [0.0, 0.0, 1.0]]).float()
-        infer_depth = False
-        baseline= 1.0
-    elif config['type'] == 'TartanAir':
+    if config['type'] == 'TartanAir':
         dataset = TartainAir(root=config['basepath'], seqs=config['sequences'], step=config['step'], img_size=img_size, depth_cutoff=depth_cutoff)
     elif config['type'] == 'Intuitive':
         baseline = []
@@ -56,7 +50,7 @@ def get_data(config, img_size: Tuple, depth_cutoff: float):
     else:
         raise NotImplementedError
 
-    return dataset, infer_depth
+    return dataset
 
 
 class PoseDataset(Dataset):
