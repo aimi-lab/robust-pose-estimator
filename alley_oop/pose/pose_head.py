@@ -4,9 +4,10 @@ from alley_oop.geometry.lie_3d_pseudo import pseudo_lie_se3_to_SE3_batch_small
 
 
 class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
-    def __init__(self):
+    def __init__(self, img_coordinates, lbgfs_iters=100):
         super(DeclarativePoseHead3DNode, self).__init__(eps=1e-3)
-        self.register_buffer("img_coordinates", create_img_coords_t(y=512, x=640), persistent=False)
+        self.img_coordinates = img_coordinates
+        self.lbgfs_iters = lbgfs_iters
 
     def reprojection_objective(self, flow, pcl1, weights1, mask1, intrinsics, y, ret_res=False):
         """
@@ -60,13 +61,14 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         return loss_weight[:, 1]*loss2d + loss_weight[:, 0]*loss3d
 
     def solve(self, *xs):
+        self.img_coordinates = self.img_coordinates.to(xs[0].device)
         xs = [x.detach().clone() for x in xs]
         with torch.enable_grad():
             n = xs[0].shape[0]
             # Solve using LBFGS optimizer:
             y = torch.zeros((n,6), device=xs[0].device, requires_grad=True)
             torch.backends.cuda.matmul.allow_tf32 = False
-            optimizer = torch.optim.LBFGS([y], lr=1.0, max_iter=20, line_search_fn="strong_wolfe", )
+            optimizer = torch.optim.LBFGS([y], lr=1.0, max_iter=self.lbgfs_iters, line_search_fn="strong_wolfe", )
 
             def fun():
                 optimizer.zero_grad()

@@ -20,7 +20,7 @@ class PoseNet(nn.Module):
         self.flow = RAFT(config)
         self.flow.freeze_bn()
         self.loss_weight = nn.Parameter(torch.tensor([1.0, 1.0]))  # 3d vs 2d loss weights
-        self.pose_head = DeclarativeLayer(DeclarativePoseHead3DNode())
+        self.pose_head = DeclarativeLayer(DeclarativePoseHead3DNode(self.img_coords, config['lbgfs_iters']))
         self.weight_head_2d = nn.Sequential(TinyUNet(in_channels=128 + 128 + 8, output_size=(H, W)), nn.Sigmoid())
         self.weight_head_3d = nn.Sequential(TinyUNet(in_channels=128 + 128 + 8 + 8, output_size=(H, W)), nn.Sigmoid())
 
@@ -65,6 +65,8 @@ class PoseNet(nn.Module):
             flow_predictions, gru_hidden_state, context = self.flow(ref_imgs, trg_imgs)
             time_flow = flow_predictions[-1][0].unsqueeze(0)
             stereo_flow2 = flow_predictions[-1][1].unsqueeze(0)
+            gru_hidden_state = gru_hidden_state[0].unsqueeze(0)
+            context = context[0].unsqueeze(0)
 
             # depth from flow
             n, _, h, w = image1l.shape
@@ -93,14 +95,12 @@ class PoseNet(nn.Module):
         mask2, valid_mapping = remap_from_flow_nearest(mask2, time_flow)
         mask2 = valid_mapping & mask2.to(bool)
         if self.use_weights:
-            gru_hidden_state = gru_hidden_state[0].unsqueeze(0)
-            context = context[0].unsqueeze(0)
             inp1 = torch.nn.functional.interpolate(torch.cat((stereo_flow1, image1l, pcl1), dim=1),
                                                    scale_factor=0.125, mode='bilinear')
             inp2 = torch.nn.functional.interpolate(torch.cat((stereo_flow2, image2l, pcl2), dim=1),
                                                    scale_factor=0.125, mode='bilinear')
-            conf1 = self.conf_head1(torch.cat((inp1, gru_hidden_state, context), dim=1))
-            conf2 = self.conf_head2(torch.cat((inp1, inp2, gru_hidden_state, context), dim=1))
+            conf1 = self.weight_head_2d(torch.cat((inp1, gru_hidden_state, context), dim=1))
+            conf2 = self.weight_head_3d(torch.cat((inp1, inp2, gru_hidden_state, context), dim=1))
         else:
             conf1 = torch.ones_like(mask2, dtype=torch.float32)
             conf2 = torch.ones_like(mask2, dtype=torch.float32)
@@ -121,7 +121,6 @@ class PoseNet(nn.Module):
         return depth.unsqueeze(1), flow, valid.unsqueeze(1)
 
     def init_from_raft(self, raft_ckp):
-        raft = RAFT(self.config)
         new_state_dict = OrderedDict()
         try:
             state_dict = torch.load(raft_ckp)
@@ -130,9 +129,8 @@ class PoseNet(nn.Module):
         for k, v in state_dict.items():
             name = k.replace('module.','')  # remove `module.`
             new_state_dict[name] = v
-        raft.load_state_dict(new_state_dict)
         self.flow.load_state_dict(new_state_dict)
-        return self, raft
+        return self
 
     def freeze_flow(self, freeze=True):
         for param in self.flow.parameters():

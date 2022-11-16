@@ -3,11 +3,9 @@ model:
   iters: 12
   dropout: 0.0
   small: False
-  RGBD: False
   pose_scale: 1.0
-  mode: lbgfs #mlp # horn
+  lbgfs_iters: 100
   use_weights: True
-  activation: sigmoid
 
 data:
   train:

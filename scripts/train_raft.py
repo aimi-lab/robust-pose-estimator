@@ -68,7 +68,7 @@ def main(args, config, force_cpu):
 
     # get model
     model = PoseNet(config['model'])
-    model, _ = model.init_from_raft(config['model']['pretrained'])
+    model = model.init_from_raft(config['model']['pretrained'])
     if args.restore_ckpt is not None:
         model.load_state_dict(torch.load(args.restore_ckpt)['state_dict'], strict=False)
 
