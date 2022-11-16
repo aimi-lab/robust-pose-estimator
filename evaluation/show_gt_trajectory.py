@@ -5,7 +5,7 @@ import os
 import torch
 import numpy as np
 from tqdm import tqdm
-from alley_oop.fusion.surfel_map import SurfelMap, FrameClass
+from alley_oop.fusion.surfel_map import SurfelMap, Frame
 from alley_oop.utils.trajectory import read_freiburg
 from dataset.dataset_utils import get_data, StereoVideoDataset, SequentialSubSampler, RGBDDataset
 from dataset.transforms import Compose
@@ -62,7 +62,7 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fi
             else:
                 limg, rimg, tool_mask, semantics, img_number = data
                 depth, flow, _ = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
-            frame = FrameClass(limg, limg, depth, intrinsics=torch.tensor(calib['intrinsics']['left']).float())
+            frame = Frame(limg, limg, depth, intrinsics=torch.tensor(calib['intrinsics']['left']).float())
 
             pose_gt = torch.tensor(gt_trajectory[int(img_number[0])]).float()
 

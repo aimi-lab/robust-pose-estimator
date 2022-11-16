@@ -28,8 +28,8 @@ class Viewer2D(object):
     def __call__(self, frame, synth_frame, flow, idx:int=0):
         # plot input frame and synthesized frame
         fig, ax = plt.subplots(1, 5, num=1, clear=True, figsize=(10,8))
-        img_t, _,_, depth_t, *_, conf_t = frame.to_numpy()
-        img, _,_, depth, *_, conf = synth_frame.to_numpy()
+        img_t, _, depth_t, *_, conf_t = frame.to_numpy()
+        img, _, depth, *_, conf = synth_frame.to_numpy()
         flow_rgb = flow_to_image(flow.squeeze().cpu()).permute(1,2,0).numpy()
         ax[0].imshow(img_t)
         ax[0].axis('off')
@@ -40,12 +40,12 @@ class Viewer2D(object):
         ax[2].imshow(flow_rgb)
         ax[2].axis('off')
         ax[2].set_title('flow')
-        ax[3].imshow(conf, vmin=0, vmax=1)
+        ax[3].imshow(conf, vmin=0)
         ax[3].axis('off')
-        ax[3].set_title('w')
-        ax[4].imshow(np.sqrt(conf_t*conf), vmin=0, vmax=1)
+        ax[3].set_title('w_2d')
+        ax[4].imshow(conf_t, vmin=0)
         ax[4].axis('off')
-        ax[4].set_title('w_hat')
+        ax[4].set_title('w_3d')
 
         plt.tight_layout()
         if not self.blocking & SHOW:

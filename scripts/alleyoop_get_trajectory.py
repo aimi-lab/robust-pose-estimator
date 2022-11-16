@@ -1,12 +1,12 @@
 import sys
 sys.path.append('../')
-from alley_oop.slam import SLAM
+from alley_oop.pose.pose_estimator import PoseEstimator
 import os
 from tqdm import tqdm
 from dataset.preprocess.segmentation_network.seg_model import SemanticSegmentationModel
 from alley_oop.fusion.surfel_map_deformable import *
 from alley_oop.utils.trajectory import save_trajectory, read_freiburg
-from dataset.dataset_utils import get_data, StereoVideoDataset, SequentialSubSampler, RGBDDataset, TUMDataset
+from dataset.dataset_utils import get_data, StereoVideoDataset, SequentialSubSampler
 import warnings
 from torch.utils.data import DataLoader
 import wandb
@@ -14,7 +14,7 @@ from evaluation.evaluate_ate_freiburg import eval
 from viewer.viewer3d import Viewer3D
 from viewer.viewer2d import Viewer2D
 from viewer.view_renderer import ViewRenderer
-
+from alley_oop.utils.logging import OptimizationRecordings
 
 def main(args, config):
     device = torch.device('cpu')
@@ -42,8 +42,9 @@ def main(args, config):
     gt_file = os.path.join(args.input, 'groundtruth.txt')
     gt_trajectory = read_freiburg(gt_file) if os.path.isfile(gt_file) else None
     init_pose = torch.tensor(gt_trajectory[args.start]) if gt_trajectory is not None else torch.eye(4)
-    slam = SLAM(torch.tensor(calib['intrinsics']['left']).to(device), config['slam'], img_shape=config['img_size'], baseline=calib['bf'],
-                checkpoint=args.checkpoint, init_pose=init_pose).to(device)
+
+    pose_estimator = PoseEstimator(config['slam'], torch.tensor(calib['intrinsics']['left']).to(device), baseline=calib['bf'],
+                                    checkpoint=args.checkpoint, img_shape=config['img_size'], init_pose=init_pose).to(device)
     if not isinstance(dataset, StereoVideoDataset):
         sampler = SequentialSubSampler(dataset, args.start, args.stop, args.step)
     else:
@@ -55,7 +56,8 @@ def main(args, config):
         seg_model = SemanticSegmentationModel('../dataset/preprocess/segmentation_network/trained/deepLabv3plus_trained_intuitive.pth',
                                               device, config['img_size'])
 
-    slam.recorder.set_gt(gt_trajectory)
+    recorder = OptimizationRecordings()
+    recorder.set_gt(gt_trajectory)
     with torch.no_grad():
         viewer = None
         if args.viewer == '3d':
@@ -68,35 +70,36 @@ def main(args, config):
         trajectory = [{'camera-pose': init_pose.tolist(), 'timestamp': args.start, 'residual': 0.0, 'key_frame': True}]
         for i, data in enumerate(tqdm(loader, total=min(len(dataset), (args.stop-args.start)//args.step))):
             if isinstance(dataset, StereoVideoDataset):
-                limg, rimg, pose_kinematics, img_number = data
+                limg, rimg, mask, pose_kinematics, img_number = data
                 tool_mask, semantics = seg_model.get_mask(limg.to(device))
-                depth, flow, _ = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
-            elif isinstance(dataset, RGBDDataset) | isinstance(dataset, TUMDataset):
-                raise NotImplementedError
+                mask &= tool_mask
             else:
-                limg, rimg, tool_mask, semantics, img_number = data
-                depth, flow, _ = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
-            limg,rimg, depth, mask, tool_mask = slam.pre_process(limg, rimg, depth, tool_mask, semantics)
-            pose, scene, pose_relscale, flow = slam.processFrame(limg.to(device), rimg.to(device), depth.to(device), mask.to(device), flow.to(device), tool_mask.to(device))
+                limg, rimg, mask, semantics, img_number = data
+
+            pose, scene, flow = pose_estimator(limg.to(device), rimg.to(device), mask.to(device))
+            # logging
+            if i > 0:
+                recorder(scene, pose)
 
             if isinstance(viewer, Viewer3D) & (i > 0):
-                curr_pcl = SurfelMap(frame=slam.get_frame(), kmat=torch.tensor(calib['intrinsics']['left']).float(),
-                                     pmat=pose_relscale, depth_scale=scene.depth_scale).pcl2open3d(stable=False)
+                #ToDo unscale depth here!
+                curr_pcl = SurfelMap(frame=pose_estimator.get_frame(), kmat=torch.tensor(calib['intrinsics']['left']).float(),
+                                     pmat=pose).pcl2open3d(stable=False)
                 curr_pcl.paint_uniform_color([0.5, 0.5, 1.0])
                 canonical_scene = scene.pcl2open3d(stable=config['viewer']['stable'])
                 deformed_scene = scene.deform_cpy().pcl2open3d(stable=config['viewer']['stable']) if isinstance(scene, SurfelMapDeformable) else None
                 print('Current Frame vs Scene (Canonical/Deformed)')
                 viewer(pose.cpu(), canonical_scene, add_pcd=curr_pcl,
-                       frame=slam.get_frame(), synth_frame=slam.get_rendered_frame(),
+                       frame=pose_estimator.get_frame(), synth_frame=pose_estimator.get_last_frame(),
                        def_pcd=deformed_scene)
             elif isinstance(viewer, Viewer2D) & (i > 0):
-                viewer(slam.get_frame(), slam.get_rendered_frame(), flow, i*args.step)
+                viewer(pose_estimator.get_frame(), pose_estimator.get_last_frame(), flow, i*args.step)
             elif isinstance(viewer, ViewRenderer) & (i > 0):
                 canonical_scene = scene.pcl2open3d(stable=True)
                 viewer(pose.cpu(), canonical_scene)
             trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
             if (args.log is not None) & (i > 0):
-                slam.recorder.log(step=int(img_number[0]))
+                pose_estimator.recorder.log(step=int(img_number[0]))
             if args.store_map & ((i%50) == 49):
                 scene.save_ply(os.path.join(args.outpath, f'stable_map_{i}.ply'), stable=True)
                 scene.deform_cpy().save_ply(os.path.join(args.outpath, f'def_map_{i}.ply'), stable=True)
@@ -126,7 +129,7 @@ def main(args, config):
 if __name__ == '__main__':
     import argparse
     import yaml
-    parser = argparse.ArgumentParser(description='script to run Raft Pose SLAM')
+    parser = argparse.ArgumentParser(description='script to run pose estmation')
 
     parser.add_argument(
         'input',
@@ -153,7 +156,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--device',
         choices=['cpu', 'gpu'],
-        default='cpu',
+        default='gpu',
         help='select cpu or gpu to run slam.'
     )
     parser.add_argument(

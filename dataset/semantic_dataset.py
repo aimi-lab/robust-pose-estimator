@@ -283,6 +283,13 @@ class RGBDecoder(object):
         return orig_label
 
 
+def mask_specularities(img, mask=None, spec_thr=0.96):
+    spec_mask = img.sum(axis=-1) < (3 * 255*spec_thr)
+    mask = mask & spec_mask if mask is not None else spec_mask
+    mask = cv2.erode(mask.astype(np.uint8), kernel=np.ones((11, 11)))
+    return mask
+
+
 class StereoDataset(Dataset):
     def __init__(self, input_folder:str, img_size:Tuple):
         super().__init__()
@@ -301,9 +308,11 @@ class StereoDataset(Dataset):
         semantic = cv2.cvtColor(cv2.imread(self.semantics[item]), cv2.COLOR_BGR2RGB)
         mask = self.rgb_decoder.getToolMask(semantic)
         semantic = self.rgb_decoder.mergelabels(self.rgb_decoder.rgbDecode(semantic))
+        # mask specularities
+        mask = mask_specularities(img_l, mask)
         # to torch tensor
-        img_l = torch.tensor(img_l).permute(2,0,1).float()/255.0
-        img_r = torch.tensor(img_r).permute(2, 0, 1).float() / 255.0
+        img_l = torch.tensor(img_l).permute(2, 0, 1).float()
+        img_r = torch.tensor(img_r).permute(2, 0, 1).float()
         mask = torch.tensor(mask).unsqueeze(0)
         semantic = torch.tensor(semantic).unsqueeze(0)
 
@@ -335,11 +344,12 @@ class RGBDDataset(Dataset):
         mask = self.rgb_decoder.getToolMask(semantic)
         semantic = self.rgb_decoder.mergelabels(self.rgb_decoder.rgbDecode(semantic))
         # to torch tensor
-        img_l = torch.tensor(img_l).permute(2,0,1).float()/255.0
+        img_l = torch.tensor(img_l).permute(2,0,1).float()
         mask = torch.tensor(mask).unsqueeze(0)
         semantic = torch.tensor(semantic).unsqueeze(0)
         depth = torch.tensor(depth.copy()).unsqueeze(0)*250
-
+        # mask specularities
+        mask = mask_specularities(img_l, mask)
         data = self.transform(img_l, depth, mask, semantic)
         return (*data, img_number)
 

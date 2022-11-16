@@ -5,7 +5,7 @@ import configparser
 import json
 import torch
 import warnings
-from dataset.preprocess.disparity.stereo_rectify import rectify_pair, get_rect_maps, pseudo_rectify_2d
+from dataset.preprocess.stereo_rectify import rectify_pair, get_rect_maps, pseudo_rectify_2d
 
 
 class StereoRectifier(object):

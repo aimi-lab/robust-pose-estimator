@@ -1,7 +1,7 @@
 import torch
 from torch.nn.functional import conv2d, pad, max_pool2d
 from typing import List
-from alley_oop.pose.frame_class import FrameClass
+from alley_oop.utils.frame_class import Frame
 
 
 class GaussPyramid(torch.nn.Module):
@@ -89,7 +89,7 @@ class FrameGaussPyramid(GaussPyramid):
         self._top_level_frame = kwargs['frame'] if 'frame' in kwargs else None
         self.level_frame = []
 
-    def forward(self, frame:FrameClass=None, intrinsics:torch.tensor=None):
+    def forward(self, frame:Frame=None, intrinsics:torch.tensor=None):
         # re-initialization
         self._top_level_frame = frame if frame is not None else self._top_level_frame
         assert self._top_level_frame is not None
@@ -100,7 +100,7 @@ class FrameGaussPyramid(GaussPyramid):
         conf_pyr, _ = super().forward(self._top_level_frame.confidence)
         mask_pyr = self.discrete_pyramid(self._top_level_frame.mask)
         for img, depth, intrinsics, mask, conf in zip(img_pyr[1:], depth_pyr[1:], self.intrinsics_levels[1:], mask_pyr[1:], conf_pyr[1:]):
-            self.level_frame.append(FrameClass(img, depth, intrinsics=intrinsics, mask=mask, confidence=conf))
+            self.level_frame.append(Frame(img, depth, intrinsics=intrinsics, mask=mask, confidence=conf))
         return self.level_frame, self.intrinsics_levels
 
     def discrete_pyramid(self, mask: torch.Tensor) -> List[torch.Tensor]:

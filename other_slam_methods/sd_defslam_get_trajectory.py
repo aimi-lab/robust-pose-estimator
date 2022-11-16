@@ -6,7 +6,7 @@ from alley_oop.utils.trajectory import save_trajectory, read_freiburg
 from dataset.dataset_utils import get_data, StereoVideoDataset, SequentialSubSampler
 from dataset.preprocess.disparity.disparity_model import DisparityModel
 from dataset.preprocess.segmentation_network.seg_model import SemanticSegmentationModel
-from alley_oop.fusion.surfel_map import SurfelMap, FrameClass
+from alley_oop.fusion.surfel_map import SurfelMap, Frame
 from scipy.spatial.transform import Rotation as R
 from torch.utils.data import DataLoader
 import warnings
@@ -70,8 +70,8 @@ def main(input_path, outpath, config, device_sel, start, stop, step, log, genera
                     {'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
 
             if generate_map:
-                frame = FrameClass(limg.permute(0,3,1,2).float()/255.0, depth.unsqueeze(1), mask=mask.unsqueeze(1).to(torch.bool),
-                                   intrinsics=torch.tensor(calib['intrinsics']['left']).float())
+                frame = Frame(limg.permute(0, 3, 1, 2).float() / 255.0, depth.unsqueeze(1), mask=mask.unsqueeze(1).to(torch.bool),
+                              intrinsics=torch.tensor(calib['intrinsics']['left']).float())
                 if scene is None:
                     scene = SurfelMap(frame=frame, kmat=torch.tensor(calib['intrinsics']['left']).float(), upscale=1)
                 else:

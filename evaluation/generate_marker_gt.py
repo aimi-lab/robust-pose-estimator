@@ -11,7 +11,7 @@ import wandb
 import cv2
 from scipy.spatial.distance import cdist
 from scipy.optimize import linear_sum_assignment
-from alley_oop.fusion.surfel_map import SurfelMap, FrameClass
+from alley_oop.fusion.surfel_map import SurfelMap, Frame
 from alley_oop.metrics.point_cloud_metrics import pcl_absolute_error
 from dataset.preprocess.disparity.disparity_model import DisparityModel
 import pickle
@@ -184,7 +184,7 @@ def main(input_path, output_path, visualize):
             # show depth and sparse gt
             if visualize:
                 disparity, depth, noise = disp_model(limg, rimg)
-                frame = FrameClass(limg, depth, intrinsics=torch.tensor(calib['intrinsics']['left']).float())
+                frame = Frame(limg, depth, intrinsics=torch.tensor(calib['intrinsics']['left']).float())
                 pcd = SurfelMap(frame=frame, kmat=torch.tensor(calib['intrinsics']['left']).float(),
                                 pmat=pose_kinematics.squeeze(), depth_scale=1)
                 print(tracker.evaluate(pcd))

@@ -52,12 +52,12 @@ class PoseNet(nn.Module):
 
         # estimate relative pose
         n = image1l.shape[0]
-        pose_se3 = self.pose_head(time_flow, pcl1, pcl2, conf1, conf2, mask1, mask2, self.loss_weight.repeat(n, 1), intrinsics)
+        pose_se3 = self.pose_head(time_flow, pcl1, pcl2, conf1, conf2, mask1.bool(), mask2.bool(), self.loss_weight.repeat(n, 1), intrinsics)
         if ret_confmap:
             return time_flow, pose_se3.float() / self.pose_scale, depth1, depth2, conf1, conf2
         return time_flow, pose_se3.float()/self.pose_scale, depth1, depth2
 
-    def infer(self, image1l, image2l, intrinsics, baseline, depth1, image2r, mask1, mask2, stereo_flow1):
+    def infer(self, image1l, image2l, intrinsics, baseline, depth1, image2r, mask1, mask2, stereo_flow1, ret_details=False):
         with torch.inference_mode():
             """ infer depth and flow in one go using batch dimension """
             ref_imgs = torch.cat((image1l, image2l), dim=0)
@@ -83,9 +83,12 @@ class PoseNet(nn.Module):
                                                              stereo_flow1, stereo_flow2, gru_hidden_state, context)
 
         n = image1l.shape[0]
-        pose_se3 = self.pose_head(time_flow, pcl1, pcl2, conf1, conf2, mask1, mask2,
+        pose_se3 = self.pose_head(time_flow, pcl1, pcl2, conf1, conf2, mask1.bool(), mask2.bool(),
                                   self.loss_weight.repeat(n, 1), intrinsics)
-        return pose_se3.float()/self.pose_scale
+        pose_se3 = (pose_se3 / self.pose_scale).squeeze(0)
+        if ret_details:
+            return pose_se3, depth1, depth2, conf1, conf2, time_flow
+        return pose_se3
 
     def get_weight_maps(self, pcl1, pcl2, image1l, image2l, mask2, time_flow, stereo_flow1, stereo_flow2, gru_hidden_state, context):
         # warp reference frame using flow

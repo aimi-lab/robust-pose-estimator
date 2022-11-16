@@ -7,6 +7,7 @@ from typing import Tuple, Callable
 import numpy as np
 import torch
 from alley_oop.utils.trajectory import read_freiburg
+from dataset.semantic_dataset import mask_specularities
 
 
 class StereoVideoDataset(IterableDataset):
@@ -51,14 +52,15 @@ class StereoVideoDataset(IterableDataset):
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             img_left, img_right = self._split_stereo_img(img)
             pose = self.poses[counter-1] if self.poses is not None else np.eye(4)
-            img_left = torch.tensor(img_left).permute(2, 0, 1).float() / 255.0
-            img_right = torch.tensor(img_right).permute(2, 0, 1).float() / 255.0
+            mask = mask_specularities(img_left)
+            img_left = torch.tensor(img_left).permute(2, 0, 1).float()
+            img_right = torch.tensor(img_right).permute(2, 0, 1).float()
             if self.transform is not None:
                 img_left, img_right = self.transform(img_left, img_right)[:2]
             if self.rectify is not None:
                 img_left, img_right = self.rectify(img_left, img_right)
             img_number = self.timestamps[counter-1] if self.timestamps is not None else counter
-            yield img_left, img_right, pose, str(img_number)
+            yield img_left, img_right, mask, pose, str(img_number)
         vid_grabber.release()
 
     def __len__(self):

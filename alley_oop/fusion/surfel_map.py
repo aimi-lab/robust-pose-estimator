@@ -8,7 +8,7 @@ from alley_oop.geometry.pinhole_transforms import forward_project2image, reverse
 from alley_oop.interpol.sparse_img_interpolation import SparseImgInterpolator
 from alley_oop.geometry.normals import normals_from_regular_grid, resize_normalmap
 from alley_oop.utils.pytorch import batched_dot_product
-from alley_oop.pose.frame_class import FrameClass
+from alley_oop.utils.frame_class import Frame
 from alley_oop.utils.save_ply import save_ply
 
 
@@ -372,7 +372,7 @@ class SurfelMap(object):
         colors[2][img_coords] = self.rgb[2, sort_idx][valid]
         colors = self.interpolate(colors[None,...])
 
-        return FrameClass(colors, depth=depth, intrinsics=intrinsics, mask=mask, confidence=confidence[None,None,...]).to(intrinsics.device), None
+        return Frame(colors, depth=depth, intrinsics=intrinsics, mask=mask, confidence=confidence[None, None, ...]).to(intrinsics.device), None
 
     def pcl2open3d(self, stable: bool=True, filter: torch.Tensor=None):
         """

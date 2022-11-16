@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from alley_oop.utils.pfm_handler import load_pfm
 from alley_oop.geometry.pinhole_transforms import reverse_project, create_img_coords_t, disp2depth
 from alley_oop.geometry.lie_3d import lie_se3_to_SE3
-from alley_oop.fusion.surfel_map import SurfelMap, FrameClass
+from alley_oop.fusion.surfel_map import SurfelMap, Frame
 from alley_oop.utils.rgb2gray import rgb2gray_t
 from alley_oop.geometry.normals import normals_from_regular_grid
 from alley_oop.interpol.img_mappings import img_map_torch
@@ -108,7 +108,7 @@ class SurfelMapTest(unittest.TestCase):
         surf_map.kmat[:2, -1] = torch.tensor([self.target_gray.shape[-1]//2, self.target_gray.shape[-2]//2])
 
         # update surfel map
-        target_frame = FrameClass(img=self.target_gray, depth=self.target_dept, normals=self.target_nrml.reshape(1,3, *self.target_dept.shape[-2:]))
+        target_frame = Frame(img=self.target_gray, depth=self.target_dept, normals=self.target_nrml.reshape(1, 3, *self.target_dept.shape[-2:]))
         surf_map.fuse(target_frame, pmat=torch.eye(4))
 
         # test assertions
