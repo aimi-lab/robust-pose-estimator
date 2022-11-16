@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 from alley_oop.fusion.surfel_map_deformable import *
 from alley_oop.utils.trajectory import save_trajectory, read_freiburg
 from alley_oop.pose.pose_estimator import PoseEstimator
-from alley_oop.utils.logging import OptimizationRecordings
+from alley_oop.utils.logging import InferenceLogger
 
 from dataset.preprocess.segmentation_network.seg_model import SemanticSegmentationModel
 from dataset.dataset_utils import get_data, StereoVideoDataset, SequentialSubSampler
@@ -58,7 +58,7 @@ def main(args, config):
         seg_model = SemanticSegmentationModel('../dataset/preprocess/segmentation_network/trained/deepLabv3plus_trained_intuitive.pth',
                                               device, config['img_size'])
 
-    recorder = OptimizationRecordings()
+    recorder = InferenceLogger()
     recorder.set_gt(gt_trajectory)
     with torch.no_grad():
         viewer = None
@@ -96,8 +96,7 @@ def main(args, config):
 
             # logging
             if (args.log is not None) & (i > 0):
-                recorder(scene, pose)
-                recorder.log(step=int(img_number[0]))
+                recorder(scene, pose, step=int(img_number[0]))
 
         save_trajectory(trajectory, args.outpath)
         if scene is not None:
