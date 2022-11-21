@@ -11,7 +11,6 @@ from torch.cuda.amp import GradScaler
 import wandb
 
 from alley_oop.pose.pose_net import PoseNet
-from alley_oop.network_core.raft.losses import supervised_pose_loss
 from alley_oop.utils.logging import TrainLogger as Logger
 from alley_oop.utils.plotting import plot_res
 from alley_oop.geometry.lie_3d_pseudo import pseudo_lie_se3_to_SE3_batch
@@ -20,6 +19,11 @@ import dataset.train_datasets as datasets
 
 SUM_FREQ = 100
 VAL_FREQ = 1000
+
+
+def supervised_pose_loss(pose_pred, pose_gt):
+    l1 = (pose_pred - pose_gt).abs()
+    return l1
 
 
 def val(model, dataloader, device, intrinsics, logger, key):

@@ -6,7 +6,7 @@ from alley_oop.RAFT.core.raft import RAFT
 from alley_oop.ddn.ddn.pytorch.node import DeclarativeLayer
 from alley_oop.pose.pose_head import DeclarativePoseHead3DNode
 from alley_oop.interpol.flow_utils import remap_from_flow, remap_from_flow_nearest
-from alley_oop.network_core.unet import TinyUNet
+from alley_oop.unet.unet import TinyUNet
 
 
 class PoseNet(nn.Module):
