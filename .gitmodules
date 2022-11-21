@@ -4,3 +4,6 @@
 [submodule "alley_oop/ddn"]
 	path = alley_oop/ddn
 	url = https://github.com/anucvml/ddn.git
+[submodule "alley_oop/RAFT"]
+	path = alley_oop/RAFT
+	url = https://github.com/aimi-lab/RAFT.git
