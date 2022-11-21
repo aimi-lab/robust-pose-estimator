@@ -1,6 +1,6 @@
 import sys
 sys.path.append('../')
-from core.slam import SLAM
+from core.pose.pose_estimator import PoseEstimator
 import os
 import torch
 import numpy as np
@@ -8,7 +8,6 @@ from tqdm import tqdm
 from core.fusion.surfel_map import SurfelMap, Frame
 from core.utils.trajectory import read_freiburg
 from dataset.dataset_utils import get_data, StereoVideoDataset, SequentialSubSampler, RGBDDataset
-from dataset.transforms import Compose
 import warnings
 from torch.utils.data import DataLoader
 import tifffile
@@ -36,9 +35,10 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fi
     gt_file = os.path.join(input_path, file)
     gt_trajectory = read_freiburg(gt_file) if os.path.isfile(gt_file) else None
 
-    slam = SLAM(torch.tensor(calib['intrinsics']['left']).to(device), config['slam'],img_shape=config['img_size'], baseline=calib['bf'],
-                checkpoint="../trained/dummy.pth",
-                init_pose=torch.tensor(gt_trajectory[0]) if gt_trajectory is not None else None).to(device)
+    pose_estimator = PoseEstimator(config['slam'], torch.tensor(calib['intrinsics']['left']).to(device),
+                                   baseline=calib['bf'],
+                                   checkpoint=args.checkpoint,
+                                   img_shape=config['img_size']).to(device)
 
     if not isinstance(dataset, StereoVideoDataset):
         sampler = SequentialSubSampler(dataset, start, stop, step)
@@ -56,13 +56,13 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fi
         for i, data in enumerate(tqdm(loader, total=min(len(dataset), (stop-start)//step))):
             if isinstance(dataset, StereoVideoDataset):
                 limg, rimg, pose_kinematics, img_number = data
-                depth, flow, _ = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
+                depth, flow, _ = pose_estimator.flow2depth(limg.to(device), rimg.to(device), pose_estimator.baseline)
             elif isinstance(dataset, RGBDDataset):
                 limg, depth, tool_mask, semantic, img_number = data
             else:
                 limg, rimg, tool_mask, semantics, img_number = data
                 depth, flow, _ = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
-            frame = Frame(limg, limg, depth, intrinsics=torch.tensor(calib['intrinsics']['left']).float())
+            frame = Frame(limg, limg, depth)
 
             pose_gt = torch.tensor(gt_trajectory[int(img_number[0])]).float()
 

@@ -9,12 +9,18 @@ api = wandb.Api()
 import argparse
 
 parser = argparse.ArgumentParser(description='Inspect WandB results')
+parser.add_argument(
+    'project',
+    type=str,
+    default="hayoz/Alley-OOP",
+    help='Path to input folder.'
+)
 
 parser.add_argument(
     '--methods',
     nargs='+',
     type=str,
-    default=['test_orbslam2', 'test_efusion', 'test_f2f_nw', 'test_f2f_no_tools', 'test_f2f_tools', 'test_f2f_tools2'],
+    default=['test_orbslam2', 'test_efusion', 'test_ours'],
     help='Path to input folder.'
 )
 args = parser.parse_args()
@@ -23,7 +29,7 @@ METHODS = args.methods
 # Download data from WANDB
 
 # Project is specified by <entity/project-name>
-runs = api.runs("hayoz/Alley-OOP")
+runs = api.runs(args.project)
 
 summary_list = []
 for run in runs:

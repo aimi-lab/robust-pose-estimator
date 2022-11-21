@@ -1,19 +1,23 @@
 import pandas as pd
 import wandb
-import seaborn as snb
-import matplotlib.pyplot as plt
 import os
 
 api = wandb.Api()
 import argparse
 
 parser = argparse.ArgumentParser(description='Inspect WandB results')
+parser.add_argument(
+    'project',
+    type=str,
+    default="hayoz/Alley-OOP",
+    help='Path to input folder.'
+)
 
 parser.add_argument(
     '--methods',
     nargs='+',
     type=str,
-    default=['scenario_orbslam2', 'scenarios_f2f_nw', 'scenarios_f2f_no_tools', 'scenarios_f2f_tools', 'scenarios_f2f_tools2', 'scenario_efusion'],
+    default=['scenario_orbslam2', 'scenario_efusion', 'scenarios_f2f_nw', 'scenario_ours'],
     help='methods to inspect.'
 )
 args = parser.parse_args()
@@ -22,7 +26,7 @@ METHODS = args.methods
 # Download data from WANDB
 
 # Project is specified by <entity/project-name>
-runs = api.runs("hayoz/Alley-OOP")
+runs = api.runs(args.project)
 
 summary_list = []
 for run in runs:
@@ -42,19 +46,6 @@ for run in runs:
     all_dict.update({"state": run.state})
     all_dict.update({"method": run._attrs['group']})
     all_dict.update({"id": run.id})
-    if run._attrs['group'] in ['scenario_orbslam2', 'scenario_efusion']:
-        if (int(run.createdAt[5:7])*100+int(run.createdAt[8:10])) < (100*10+25):
-            try:
-                all_dict["ATE/RMSE"] *= 1000.0 #m to mm
-                all_dict["RPE/trans"] *= 1000.0  # m to mm
-            except KeyError:
-                pass
-    else:
-        try:
-            all_dict["ATE/RMSE"] *= 1000.0  # m to mm
-            all_dict["RPE/trans"] *= 1000.0  # m to mm
-        except KeyError:
-            pass
     summary_list.append(all_dict)
 
 runs_df = pd.DataFrame(summary_list)

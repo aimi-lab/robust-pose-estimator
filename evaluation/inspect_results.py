@@ -8,12 +8,18 @@ api = wandb.Api()
 import argparse
 
 parser = argparse.ArgumentParser(description='Inspect WandB results')
+parser.add_argument(
+    'project',
+    type=str,
+    default="hayoz/Alley-OOP",
+    help='Path to input folder.'
+)
 
 parser.add_argument(
     '--methods',
     nargs='+',
     type=str,
-    default=['orbslam2_raftdepth', 'scared_efusion', 'scared_f2m_decoupled2'],
+    default=['orbslam2_raftdepth', 'scared_efusion', 'scared_f2m_ours'],
     help='Path to input folder.'
 )
 args = parser.parse_args()
@@ -22,7 +28,7 @@ METHODS = args.methods
 # Download data from WANDB
 
 # Project is specified by <entity/project-name>
-runs = api.runs("hayoz/Alley-OOP")
+runs = api.runs(args.project)
 
 summary_list = []
 for run in runs:
@@ -42,12 +48,6 @@ for run in runs:
     all_dict.update({"state": run.state})
     all_dict.update({"method": run._attrs['group']})
     all_dict.update({"id": run.id})
-    try:
-        if all_dict["ATE/RMSE"] < 0.01:
-            all_dict["ATE/RMSE"] *= 1000.0 #m to mm
-            all_dict["RPE/trans"] *= 1000.0  # m to mm
-    except KeyError:
-        pass
     summary_list.append(all_dict)
 
 runs_df = pd.DataFrame(summary_list)
@@ -55,7 +55,6 @@ runs_df = runs_df[runs_df.method.isin(METHODS)]
 runs_df.method = runs_df.method.astype('category')
 runs_df.method = runs_df.method.cat.set_categories(METHODS)
 runs_df.sort_values(['method'], inplace=True)
-runs_df.to_csv("project.csv")
 runs_df['dataset'] = [os.path.basename(d) for d in runs_df['dataset']]
 runs_df = runs_df[runs_df.dataset.isin(['dataset_1', 'dataset_8', 'dataset_9'])]
 
