@@ -87,7 +87,7 @@ class PoseNet(nn.Module):
                                   self.loss_weight.repeat(n, 1), intrinsics)
         pose_se3 = (pose_se3 / self.pose_scale).squeeze(0)
         if ret_details:
-            return pose_se3, depth1, depth2, conf1, conf2, time_flow
+            return pose_se3, depth1, depth2, conf1, conf2, time_flow, stereo_flow2
         return pose_se3
 
     def get_weight_maps(self, pcl1, pcl2, image1l, image2l, mask2, time_flow, stereo_flow1, stereo_flow2, gru_hidden_state, context):
