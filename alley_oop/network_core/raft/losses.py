@@ -4,19 +4,7 @@ from alley_oop.geometry.pinhole_transforms import create_img_coords_t, reproject
 from alley_oop.network_core.raft.core.utils.flow_utils import remap_from_flow
 
 
-def _warp_frame(depth: torch.Tensor, T: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.Tensor):
-    # transform and project using pinhole camera model
-    # pinhole projection
-    opts = reproject(depth, intrinsics, img_coords)
-    # compose projection matrix
-    pmat = intrinsics @ T[:,:3]
 
-    # pinhole projection
-    ipts = torch.bmm(pmat, opts)
-
-    # inhomogenization
-    ipts = ipts[:, :3] / ipts[:,-1].unsqueeze(1)
-    return ipts[:,:2]
 
 
 def of_sequence_loss(flow_preds, flow_gt, valid, gamma=0.8, max_flow=400):
