@@ -1,6 +1,6 @@
 import sys
 sys.path.append('../')
-from alley_oop.slam import SLAM
+from core.slam import SLAM
 import os
 import torch
 import numpy as np
@@ -13,7 +13,7 @@ import warnings
 from torch.utils.data import DataLoader
 import wandb
 import cv2
-from alley_oop.utils.pfm_handler import save_pfm
+from core.utils.pfm_handler import save_pfm
 
 
 class ColorMatcher(object):

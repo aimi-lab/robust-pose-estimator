@@ -6,7 +6,7 @@ import sys
 from multiprocessing import Process
 import multiprocessing as mp
 sys.path.append('../')
-from scripts.alleyoop_get_trajectory import main as alleyoop
+from scripts.infer_trajectory import main as infer_trajectory
 
 if __name__ == '__main__':
 
@@ -85,4 +85,4 @@ if __name__ == '__main__':
         config.update({'scenario': row['scenario'], 'start': args.start, 'seq_number': i})
         print(f'{args.start} -> {args.stop} : {row["scenario"]}')
         # read scenario file
-        alleyoop(args, config)
+        infer_trajectory(args, config)

@@ -1,8 +1,8 @@
-from alley_oop.pose.pose_net import PoseNet
-from alley_oop.geometry.pinhole_transforms import inv_transform
+from core.pose.pose_net import PoseNet
+from core.geometry.pinhole_transforms import inv_transform
 import torch
-from alley_oop.fusion.surfel_map import SurfelMap, Frame
-from alley_oop.geometry.lie_3d_pseudo import pseudo_lie_se3_to_SE3
+from core.fusion.surfel_map import SurfelMap, Frame
+from core.geometry.lie_3d_pseudo import pseudo_lie_se3_to_SE3
 from collections import OrderedDict
 import warnings
 from typing import Tuple

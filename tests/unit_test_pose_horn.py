@@ -1,6 +1,6 @@
 import unittest
 import torch
-from alley_oop.geometry.absolute_pose_quarternion import align_torch
+from core.geometry.absolute_pose_quarternion import align_torch
 from scipy.spatial.transform import Rotation as R
 
 

@@ -3,7 +3,7 @@ import yaml
 import numpy as np
 import glob
 import json
-from alley_oop.utils.trajectory import save_freiburg
+from core.utils.trajectory import save_freiburg
 import shutil
 
 PATH_REPLACEMENT = ['/home/mhayoz/research', '/storage/workspaces/artorg_aimi/ws_00000']

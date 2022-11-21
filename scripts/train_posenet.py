@@ -10,10 +10,10 @@ from torch.utils.data import DataLoader
 from torch.cuda.amp import GradScaler
 import wandb
 
-from alley_oop.pose.pose_net import PoseNet
-from alley_oop.utils.logging import TrainLogger as Logger
-from alley_oop.utils.plotting import plot_res
-from alley_oop.geometry.lie_3d_pseudo import pseudo_lie_se3_to_SE3_batch
+from core.pose.pose_net import PoseNet
+from core.utils.logging import TrainLogger as Logger
+from core.utils.plotting import plot_res
+from core.geometry.lie_3d_pseudo import pseudo_lie_se3_to_SE3_batch
 import dataset.train_datasets as datasets
 
 
@@ -181,7 +181,7 @@ if __name__ == '__main__':
     parser.add_argument('--outpath', default='output', help="output path")
     parser.add_argument('--log', action="store_true")
     parser.add_argument('--restore_ckpt', help="restore checkpoint")
-    parser.add_argument('--config', help="yaml config file", default='../configuration/train_raft.yaml')
+    parser.add_argument('--config', help="yaml config file", default='../configuration/train.yaml')
     parser.add_argument('--force_cpu', action="store_true")
     parser.add_argument('--dbg', action="store_true")
     args = parser.parse_args()

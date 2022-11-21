@@ -4,7 +4,7 @@ import numpy as np
 import torchvision.transforms.functional as F
 from torchvision.utils import flow_to_image
 from skimage.transform import warp
-from alley_oop.geometry.pinhole_transforms import create_img_coords_t, reproject, project
+from core.geometry.pinhole_transforms import create_img_coords_t, reproject, project
 
 
 def _get_warpfield(depth: torch.Tensor, T: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.Tensor):

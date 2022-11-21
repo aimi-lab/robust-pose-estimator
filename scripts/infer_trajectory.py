@@ -34,9 +34,9 @@ def main(args, config):
             args.outpath = wandb.run.dir
     if args.outpath is None:
         try:
-            args.outpath = os.path.join(args.input, 'data',f'{config["seq_number"]}', 'alleyoop')
+            args.outpath = os.path.join(args.input, 'data',f'{config["seq_number"]}', 'infer_trajectory')
         except KeyError:
-            args.outpath = os.path.join(args.input, 'data', 'alleyoop')
+            args.outpath = os.path.join(args.input, 'data', 'infer_trajectory')
     os.makedirs(args.outpath, exist_ok=True)
 
     dataset, calib = get_data(args.input, config['img_size'], force_stereo=True, rect_mode=config['rect_mode'])

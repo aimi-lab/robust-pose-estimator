@@ -139,6 +139,6 @@ if __name__ == '__main__':
     with open(args.config, 'r') as ymlfile:
         config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
     if args.outpath is None:
-        args.outpath = os.path.join(args.input, 'data','alleyoop')
+        args.outpath = os.path.join(args.input, 'data','infer_trajectory')
 
     main(args.input, args.outpath, config, args.device, args.stop, args.start, args.step, args.log, file=args.file)

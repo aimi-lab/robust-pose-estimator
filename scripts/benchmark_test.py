@@ -5,7 +5,7 @@ import pandas as pd
 import sys
 
 sys.path.append('../')
-from scripts.alleyoop_get_trajectory import main as alleyoop
+from scripts.infer_trajectory import main as infer_trajectory
 
 if __name__ == '__main__':
 
@@ -84,4 +84,4 @@ if __name__ == '__main__':
         config.update({'start': args.start, 'end': args.stop})
         print(f'{args.start} -> {args.stop}')
         # read scenario file
-        alleyoop(args, config)
+        infer_trajectory(args, config)

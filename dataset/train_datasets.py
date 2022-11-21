@@ -6,9 +6,9 @@ import os
 from glob import glob
 from typing import Tuple
 import cv2
-from alley_oop.utils.pfm_handler import load_pfm
-from alley_oop.utils.trajectory import read_freiburg
-from alley_oop.geometry.lie_3d_pseudo import pseudo_lie_SE3_to_se3
+from core.utils.pfm_handler import load_pfm
+from core.utils.trajectory import read_freiburg
+from core.geometry.lie_3d_pseudo import pseudo_lie_SE3_to_se3
 from torchvision.transforms import Resize, InterpolationMode
 from torch.utils.data import Dataset
 from dataset.rectification import StereoRectifier

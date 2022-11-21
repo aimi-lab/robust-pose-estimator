@@ -6,8 +6,8 @@ import numpy as np
 import torch
 from typing import Union
 
-from alley_oop.utils.lib_handling import get_lib, get_class
-from alley_oop.utils.pytorch import beye, batched_dot_product
+from core.utils.lib_handling import get_lib, get_class
+from core.utils.pytorch import beye, batched_dot_product
 
 
 def lie_so3_to_SO3(

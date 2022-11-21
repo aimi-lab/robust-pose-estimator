@@ -1,7 +1,7 @@
 # Lie group for so3, SO3 and se3, SE3 spaces
 # implementations follow https://ethaneade.com/lie.pdf
 
-from alley_oop.geometry.lie_3d import *
+from core.geometry.lie_3d import *
 
 
 def pseudo_lie_se3_to_SE3(
