@@ -1,5 +1,4 @@
 from alley_oop.fusion.surfel_map import *
-from alley_oop.network_core.raft.core.utils.flow_utils import remap_from_flow_nearest
 
 
 class SurfelMapFlow(SurfelMap):
