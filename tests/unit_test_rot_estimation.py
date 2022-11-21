@@ -2,8 +2,8 @@ import unittest
 import numpy as np
 from pathlib import Path
 
-from alley_oop.pose.rotation_estimation import RotationEstimator, FrameClass
-from alley_oop.geometry.lie_3d import lie_so3_to_SO3
+from core.pose.rotation_estimation import RotationEstimator, FrameClass
+from core.geometry.lie_3d import lie_so3_to_SO3
 from scipy.spatial.transform import Rotation
 import cv2
 import torch

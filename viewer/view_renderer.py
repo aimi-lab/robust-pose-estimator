@@ -2,7 +2,7 @@ import open3d as o3d
 import numpy as np
 import cv2
 import os
-from alley_oop.geometry.pinhole_transforms import inv_transform
+from core.geometry.pinhole_transforms import inv_transform
 
 
 class ViewRenderer(object):

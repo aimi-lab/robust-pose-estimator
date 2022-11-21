@@ -1,5 +1,5 @@
-from alley_oop.geometry.pinhole_transforms import forward_project, reverse_project
-from alley_oop.utils.lib_handling import get_lib
+from core.geometry.pinhole_transforms import forward_project, reverse_project
+from core.utils.lib_handling import get_lib
 
 def feat_homo_rmse(rpts, qpts, hmat):
 

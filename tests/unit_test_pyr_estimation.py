@@ -2,9 +2,9 @@ import unittest
 import numpy as np
 from pathlib import Path
 
-from alley_oop.pose.pyramid_pose_estimator import PyramidPoseEstimator, FrameClass
-from alley_oop.fusion.surfel_map import SurfelMap
-from alley_oop.utils.pfm_handler import load_pfm
+from core.pose.pyramid_pose_estimator import PyramidPoseEstimator, FrameClass
+from core.fusion.surfel_map import SurfelMap
+from core.utils.pfm_handler import load_pfm
 from scipy.spatial.transform import Rotation as R
 import cv2
 import torch

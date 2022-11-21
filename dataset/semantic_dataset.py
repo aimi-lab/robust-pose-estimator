@@ -8,7 +8,7 @@ from torch.utils.data import Dataset
 from dataset.transforms import ResizeStereo, ResizeRGBD
 from typing import Tuple
 
-from alley_oop.utils.pfm_handler import load_pfm
+from core.utils.pfm_handler import load_pfm
 
 LABEL_LOOKUP = [
     {

@@ -3,10 +3,10 @@ import numpy as np
 import torch
 import cv2
 import os
-from alley_oop.pose.pose_net import PoseN
-from alley_oop.utils.trajectory import read_freiburg
-from alley_oop.geometry.lie_3d import lie_SE3_to_se3, lie_se3_to_SE3
-from alley_oop.geometry.pinhole_transforms import create_img_coords_t, transform, homogeneous
+from core.pose.pose_net import PoseN
+from core.utils.trajectory import read_freiburg
+from core.geometry.lie_3d import lie_SE3_to_se3, lie_se3_to_SE3
+from core.geometry.pinhole_transforms import create_img_coords_t, transform, homogeneous
 
 import matplotlib.pyplot as plt
 
@@ -16,7 +16,7 @@ class PoseNetTester(unittest.TestCase):
         super(PoseNetTester, self).__init__(*args, **kwargs)
 
     def setUp(self):
-        config = {"pretrained" : "../alley_oop/network_core/raft/pretrained/raft-things.pth",
+        config = {"pretrained" : "../core/network_core/raft/pretrained/raft-things.pth",
                   "iters": 12, "dropout": 0.0, "small": False, "pose_scale": 1.0, "mode": "lbgfs", "image_shape": (480, 640)}
 
         self.pose_net = PoseN(config)

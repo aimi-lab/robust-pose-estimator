@@ -3,7 +3,7 @@ import numpy as np
 from typing import Union, Tuple
 
 
-from alley_oop.utils.lib_handling import get_lib
+from core.utils.lib_handling import get_lib
 
 
 def forward_project(

@@ -1,6 +1,6 @@
-from alley_oop.geometry.pinhole_transforms import create_img_coords_t, transform, homogeneous, project
-from alley_oop.ddn.ddn.pytorch.node import *
-from alley_oop.geometry.lie_3d_pseudo import pseudo_lie_se3_to_SE3_batch_small
+from core.geometry.pinhole_transforms import create_img_coords_t, transform, homogeneous, project
+from core.ddn.ddn.pytorch.node import *
+from core.geometry.lie_3d_pseudo import pseudo_lie_se3_to_SE3_batch_small
 
 
 class DeclarativePoseHead3DNode(AbstractDeclarativeNode):

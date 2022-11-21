@@ -1,9 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.ndimage import gaussian_filter
-from alley_oop.geometry.pinhole_transforms import create_img_coords_np
+from core.geometry.pinhole_transforms import create_img_coords_np
 from viewer.view_render import Render
-from alley_oop.geometry.camera import PinholeCamera
+from core.geometry.camera import PinholeCamera
 import open3d
 import time
 from scipy.spatial.transform import Rotation as R

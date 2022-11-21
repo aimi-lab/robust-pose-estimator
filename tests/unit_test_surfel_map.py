@@ -5,13 +5,13 @@ import torch
 import imageio
 import matplotlib.pyplot as plt
 
-from alley_oop.utils.pfm_handler import load_pfm
-from alley_oop.geometry.pinhole_transforms import reverse_project, create_img_coords_t, disp2depth
-from alley_oop.geometry.lie_3d import lie_se3_to_SE3
-from alley_oop.fusion.surfel_map import SurfelMap, Frame
-from alley_oop.utils.rgb2gray import rgb2gray_t
-from alley_oop.geometry.normals import normals_from_regular_grid
-from alley_oop.interpol.img_mappings import img_map_torch
+from core.utils.pfm_handler import load_pfm
+from core.geometry.pinhole_transforms import reverse_project, create_img_coords_t, disp2depth
+from core.geometry.lie_3d import lie_se3_to_SE3
+from core.fusion.surfel_map import SurfelMap, Frame
+from core.utils.rgb2gray import rgb2gray_t
+from core.geometry.normals import normals_from_regular_grid
+from core.interpol.img_mappings import img_map_torch
 
 
 
@@ -25,7 +25,7 @@ class SurfelMapTest(unittest.TestCase):
         self.plot_opt = False
         if self.plot_opt:
             from mayavi import mlab
-            from alley_oop.utils.mlab_plot import mlab_rgbd
+            from core.utils.mlab_plot import mlab_rgbd
 
         self.kmat = torch.eye(3)
         self.pmat = torch.eye(4)

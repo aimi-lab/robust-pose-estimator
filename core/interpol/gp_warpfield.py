@@ -1,6 +1,6 @@
 import torch
 import gpytorch
-from alley_oop.geometry.lie_3d import lie_se3_to_SE3_batch
+from core.geometry.lie_3d import lie_se3_to_SE3_batch
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel
 

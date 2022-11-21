@@ -1,6 +1,6 @@
 import torch
 from torch.nn.functional import conv2d, pad
-from alley_oop.utils.pytorch import MedianPool2d
+from core.utils.pytorch import MedianPool2d
 
 
 class SparseImgInterpolator(torch.nn.Module):

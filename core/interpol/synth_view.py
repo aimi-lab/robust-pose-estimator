@@ -2,10 +2,10 @@ import numpy
 import torch
 from typing import Union
 
-from alley_oop.geometry.pinhole_transforms import reverse_project, forward_project
-from alley_oop.geometry.pinhole_transforms import create_img_coords_t, create_img_coords_np
-from alley_oop.interpol.img_mappings import img_map_scipy, img_map_torch
-from alley_oop.utils.lib_handling import get_lib
+from core.geometry.pinhole_transforms import reverse_project, forward_project
+from core.geometry.pinhole_transforms import create_img_coords_t, create_img_coords_np
+from core.interpol.img_mappings import img_map_scipy, img_map_torch
+from core.utils.lib_handling import get_lib
 
 
 def synth_view(

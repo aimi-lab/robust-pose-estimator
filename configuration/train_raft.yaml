@@ -1,5 +1,5 @@
 model:
-  pretrained: ../alley_oop/RAFT/pretrained/raft-things.pth
+  pretrained: ../core/RAFT/pretrained/raft-things.pth
   iters: 12
   dropout: 0.0
   small: False

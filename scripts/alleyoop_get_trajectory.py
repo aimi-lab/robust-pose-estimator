@@ -5,10 +5,10 @@ from tqdm import tqdm
 import wandb
 from torch.utils.data import DataLoader
 
-from alley_oop.fusion.surfel_map_deformable import *
-from alley_oop.utils.trajectory import save_trajectory, read_freiburg
-from alley_oop.pose.pose_estimator import PoseEstimator
-from alley_oop.utils.logging import InferenceLogger
+from core.fusion.surfel_map_deformable import *
+from core.utils.trajectory import save_trajectory, read_freiburg
+from core.pose.pose_estimator import PoseEstimator
+from core.utils.logging import InferenceLogger
 
 from dataset.preprocess.segmentation_network.seg_model import SemanticSegmentationModel
 from dataset.dataset_utils import get_data, StereoVideoDataset, SequentialSubSampler

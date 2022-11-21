@@ -6,7 +6,7 @@ from dataset.transforms import ResizeStereo, Compose
 from typing import Tuple, Callable
 import numpy as np
 import torch
-from alley_oop.utils.trajectory import read_freiburg
+from core.utils.trajectory import read_freiburg
 from dataset.semantic_dataset import mask_specularities
 
 

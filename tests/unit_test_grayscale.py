@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-from alley_oop.utils.rgb2gray import rgb2gray_t
+from core.utils.rgb2gray import rgb2gray_t
 
 
 class GrayscaleTester(unittest.TestCase):

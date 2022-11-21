@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 import torch
 
-from alley_oop.geometry.lie_3d import lie_so3_to_SO3, lie_SO3_to_so3, is_SO3, lie_SE3_to_se3, lie_se3_to_SE3
+from core.geometry.lie_3d import lie_so3_to_SO3, lie_SO3_to_so3, is_SO3, lie_SE3_to_se3, lie_se3_to_SE3
 
 class Lie3DTester(unittest.TestCase):
 

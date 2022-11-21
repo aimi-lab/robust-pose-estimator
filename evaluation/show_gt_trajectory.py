@@ -1,12 +1,12 @@
 import sys
 sys.path.append('../')
-from alley_oop.slam import SLAM
+from core.slam import SLAM
 import os
 import torch
 import numpy as np
 from tqdm import tqdm
-from alley_oop.fusion.surfel_map import SurfelMap, Frame
-from alley_oop.utils.trajectory import read_freiburg
+from core.fusion.surfel_map import SurfelMap, Frame
+from core.utils.trajectory import read_freiburg
 from dataset.dataset_utils import get_data, StereoVideoDataset, SequentialSubSampler, RGBDDataset
 from dataset.transforms import Compose
 import warnings

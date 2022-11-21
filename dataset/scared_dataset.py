@@ -1,6 +1,6 @@
 from typing import Tuple, List
 import json
-from alley_oop.utils.trajectory import save_freiburg
+from core.utils.trajectory import save_freiburg
 import cv2
 import os
 import numpy as np

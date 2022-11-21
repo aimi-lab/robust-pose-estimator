@@ -2,13 +2,13 @@ import unittest
 import numpy as np
 from pathlib import Path
 
-from alley_oop.pose.icp_rgb_pose_estimation import RGBICPPoseEstimator, FrameClass
-from alley_oop.fusion.surfel_map import SurfelMap
+from core.pose.icp_rgb_pose_estimation import RGBICPPoseEstimator, FrameClass
+from core.fusion.surfel_map import SurfelMap
 import cv2
 import torch
 from scipy.spatial.transform import Rotation as R
-from alley_oop.utils.pfm_handler import load_pfm
-from alley_oop.geometry.lie_3d import lie_se3_to_SE3
+from core.utils.pfm_handler import load_pfm
+from core.geometry.lie_3d import lie_se3_to_SE3
 
 class RGBICPPoseEstimatorTester(unittest.TestCase):
 

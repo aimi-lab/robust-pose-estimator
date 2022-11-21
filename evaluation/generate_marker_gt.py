@@ -11,8 +11,8 @@ import wandb
 import cv2
 from scipy.spatial.distance import cdist
 from scipy.optimize import linear_sum_assignment
-from alley_oop.fusion.surfel_map import SurfelMap, Frame
-from alley_oop.metrics.point_cloud_metrics import pcl_absolute_error
+from core.fusion.surfel_map import SurfelMap, Frame
+from core.metrics.point_cloud_metrics import pcl_absolute_error
 from dataset.preprocess.disparity.disparity_model import DisparityModel
 import pickle
 import open3d

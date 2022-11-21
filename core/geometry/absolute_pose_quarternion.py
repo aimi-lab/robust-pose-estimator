@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from alley_oop.geometry.lie_3d import lie_SE3_to_se3, lie_se3_to_SE3_batch
+from core.geometry.lie_3d import lie_SE3_to_se3, lie_se3_to_SE3_batch
 
 
 def align(reference, query, estimate_scale=False, ret_homogenous=False):

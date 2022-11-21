@@ -1,4 +1,4 @@
-from alley_oop.fusion.surfel_map import *
+from core.fusion.surfel_map import *
 
 
 class SurfelMapFlow(SurfelMap):

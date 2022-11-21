@@ -3,7 +3,7 @@ sys.path.append('../..')
 from ElasticFusion import pyElasticFusion
 import os
 from tqdm import tqdm
-from alley_oop.utils.trajectory import save_trajectory, read_freiburg
+from core.utils.trajectory import save_trajectory, read_freiburg
 from dataset.dataset_utils import get_data, StereoVideoDataset, SequentialSubSampler, TUMDataset, RGBDDataset
 from dataset.preprocess.segmentation_network.seg_model import SemanticSegmentationModel
 from scipy.spatial.transform import Rotation as R
@@ -13,7 +13,7 @@ import torch
 import wandb
 import numpy as np
 from evaluation.evaluate_ate_freiburg import eval
-from alley_oop.pose.pose_net import DepthNet
+from core.pose.pose_net import DepthNet
 
 
 def main(input_path, outpath, config, device_sel, start, stop, step, log, generate_map):

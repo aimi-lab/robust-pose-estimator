@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from alley_oop.geometry.quaternions import euler2quat, quat2euler
+from core.geometry.quaternions import euler2quat, quat2euler
 
 
 class QuaternionConversionTester(unittest.TestCase):

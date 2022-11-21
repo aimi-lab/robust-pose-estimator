@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-from alley_oop.interpol.gauss_pyramid import GaussPyramid
+from core.interpol.gauss_pyramid import GaussPyramid
 
 
 class GaussPyramidTester(unittest.TestCase):

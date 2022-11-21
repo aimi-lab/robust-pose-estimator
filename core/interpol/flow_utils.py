@@ -1,5 +1,5 @@
 import torch
-from alley_oop.utils.pytorch import grid_sample
+from core.utils.pytorch import grid_sample
 
 def remap_from_flow(x, flow):
     # get optical flow correspondences

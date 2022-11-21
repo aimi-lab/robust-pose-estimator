@@ -1,6 +1,6 @@
-from alley_oop.geometry.pinhole_transforms import forward_project, reverse_project
+from core.geometry.pinhole_transforms import forward_project, reverse_project
 from scipy.interpolate import NearestNDInterpolator, LinearNDInterpolator
-from alley_oop.geometry.pinhole_transforms import create_img_coords_t, create_img_coords_np
+from core.geometry.pinhole_transforms import create_img_coords_t, create_img_coords_np
 
 
 class PinholeCamera(object):

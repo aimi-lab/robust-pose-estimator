@@ -3,7 +3,7 @@ import numpy
 import torch
 import matplotlib.pyplot as plt
 
-from alley_oop.interpol.synth_view import synth_view
+from core.interpol.synth_view import synth_view
 
 
 class PhotoLossTest(unittest.TestCase):

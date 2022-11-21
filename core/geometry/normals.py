@@ -3,7 +3,7 @@ from sklearn.decomposition import PCA
 import numpy as np
 import torch
 from typing import Union, Tuple
-from alley_oop.utils.lib_handling import get_lib
+from core.utils.lib_handling import get_lib
 
 
 def normals_from_regular_grid(oarr: Union[np.ndarray, torch.Tensor], pad_opt: bool = False) -> Union[np.ndarray, torch.Tensor]:

@@ -2,11 +2,11 @@ import torch
 import sd_defslam
 import os
 from tqdm import tqdm
-from alley_oop.utils.trajectory import save_trajectory, read_freiburg
+from core.utils.trajectory import save_trajectory, read_freiburg
 from dataset.dataset_utils import get_data, StereoVideoDataset, SequentialSubSampler
 from dataset.preprocess.disparity.disparity_model import DisparityModel
 from dataset.preprocess.segmentation_network.seg_model import SemanticSegmentationModel
-from alley_oop.fusion.surfel_map import SurfelMap, Frame
+from core.fusion.surfel_map import SurfelMap, Frame
 from scipy.spatial.transform import Rotation as R
 from torch.utils.data import DataLoader
 import warnings

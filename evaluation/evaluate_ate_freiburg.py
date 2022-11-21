@@ -1,6 +1,6 @@
 import numpy as np
-from alley_oop.metrics.trajectory_metrics import absolute_trajectory_error, relative_pose_error
-from alley_oop.utils.trajectory import read_freiburg
+from core.metrics.trajectory_metrics import absolute_trajectory_error, relative_pose_error
+from core.utils.trajectory import read_freiburg
 
 
 def eval(gt_list:str, pred_list:str, delta:int=1, offset:int=0, ret_align_T=False):

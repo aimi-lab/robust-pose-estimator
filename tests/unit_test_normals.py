@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from alley_oop.geometry.normals import normals_from_pca, normals_from_regular_grid, get_ray_surfnorm_angle
+from core.geometry.normals import normals_from_pca, normals_from_regular_grid, get_ray_surfnorm_angle
 
 
 class NormalsTester(unittest.TestCase):
@@ -17,7 +17,7 @@ class NormalsTester(unittest.TestCase):
         self.name_list = sorted((self.data_path).rglob('*rgbd.npz'))
 
         # create tilted plane
-        from alley_oop.geometry.pinhole_transforms import create_img_coords_np
+        from core.geometry.pinhole_transforms import create_img_coords_np
         ipts = create_img_coords_np(480, 640)[:2]
         self.wall_init = np.vstack([ipts, np.repeat(np.arange(480), 640)-1000])
         self.wall_init = self.wall_init.T.reshape(480, 640, 3)

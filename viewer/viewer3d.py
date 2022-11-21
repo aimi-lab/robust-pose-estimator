@@ -4,7 +4,7 @@ try:
     import matplotlib.pyplot as plt
 except:
     pass
-from alley_oop.geometry.pinhole_transforms import inv_transform
+from core.geometry.pinhole_transforms import inv_transform
 
 
 class Viewer3D(object):

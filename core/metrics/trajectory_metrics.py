@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from typing import Union, Tuple
-from alley_oop.utils.lib_handling import get_lib
+from core.utils.lib_handling import get_lib
 
 
 def _align(model, data):

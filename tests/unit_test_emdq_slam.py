@@ -3,7 +3,7 @@ import numpy as np
 import cv2
 
 from other_slam_methods.emdq_slam import EmdqSLAM
-from alley_oop.geometry.camera import PinholeCamera
+from core.geometry.camera import PinholeCamera
 
 
 class EMDQSlamTester(unittest.TestCase):

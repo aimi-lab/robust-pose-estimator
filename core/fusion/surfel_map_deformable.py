@@ -1,7 +1,7 @@
-from alley_oop.fusion.surfel_map_flow import *
-from alley_oop.utils.pytorch import MedianPool2d, image_gradient
-from alley_oop.interpol.sparse_img_interpolation import SparseMedianInterpolator
-from alley_oop.interpol.gp_warpfield import GP_WarpFieldEstimator
+from core.fusion.surfel_map_flow import *
+from core.utils.pytorch import MedianPool2d, image_gradient
+from core.interpol.sparse_img_interpolation import SparseMedianInterpolator
+from core.interpol.gp_warpfield import GP_WarpFieldEstimator
 from torch.cuda.amp import autocast
 
 

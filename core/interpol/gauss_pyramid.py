@@ -1,7 +1,7 @@
 import torch
 from torch.nn.functional import conv2d, pad, max_pool2d
 from typing import List
-from alley_oop.utils.frame_class import Frame
+from core.utils.frame_class import Frame
 
 
 class GaussPyramid(torch.nn.Module):

@@ -5,9 +5,9 @@ import torch
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-from alley_oop.geometry.pinhole_transforms import forward_project, reverse_project, compose_projection_matrix, decompose_projection_matrix, create_img_coords_np
-from alley_oop.geometry.quaternions import quat2rmat, euler2quat
-from alley_oop.interpol.img_mappings import img_map_scipy
+from core.geometry.pinhole_transforms import forward_project, reverse_project, compose_projection_matrix, decompose_projection_matrix, create_img_coords_np
+from core.geometry.quaternions import quat2rmat, euler2quat
+from core.interpol.img_mappings import img_map_scipy
 
 
 class PinholeTransformTester(unittest.TestCase):

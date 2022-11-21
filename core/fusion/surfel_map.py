@@ -4,12 +4,12 @@ from typing import Union, Tuple
 import numpy as np
 import warnings
 
-from alley_oop.geometry.pinhole_transforms import forward_project2image, reverse_project, create_img_coords_t, forward_project
-from alley_oop.interpol.sparse_img_interpolation import SparseImgInterpolator
-from alley_oop.geometry.normals import normals_from_regular_grid, resize_normalmap
-from alley_oop.utils.pytorch import batched_dot_product
-from alley_oop.utils.frame_class import Frame
-from alley_oop.utils.save_ply import save_ply
+from core.geometry.pinhole_transforms import forward_project2image, reverse_project, create_img_coords_t, forward_project
+from core.interpol.sparse_img_interpolation import SparseImgInterpolator
+from core.geometry.normals import normals_from_regular_grid, resize_normalmap
+from core.utils.pytorch import batched_dot_product
+from core.utils.frame_class import Frame
+from core.utils.save_ply import save_ply
 
 
 class SurfelMap(object):
