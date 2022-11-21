@@ -82,9 +82,10 @@ class PoseEstimator(torch.nn.Module):
         if self.last_frame is None:
             # if this is the first frame, we don't need to compute the relative pose
             rel_pose_se3 = torch.zeros(6, dtype=torch.float64, device=self.last_pose.device)
-            depth, _, valid = self.model.flow2depth(self.frame.img, self.frame.rimg,self.baseline*self.scale)
+            depth, flow, valid = self.model.flow2depth(self.frame.img, self.frame.rimg,self.baseline*self.scale)
             self.frame.depth = depth/self.scale
             self.frame.mask &= valid
+            self.frame.flow = flow
             ret_frame = None
         else:
             # get pose
