@@ -6,21 +6,18 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, SubsetRandomSampler
-
+from torch.utils.data import DataLoader
+from torch.cuda.amp import GradScaler
+import wandb
 
 from alley_oop.pose.pose_net import PoseNet
-import alley_oop.network_core.raft.core.datasets as datasets
 from alley_oop.network_core.raft.losses import supervised_pose_loss
-from alley_oop.network_core.raft.utils.logger import Logger
-from alley_oop.network_core.raft.utils.plotting import plot_res, plot_3d
-import wandb
-from torch.cuda.amp import GradScaler
-
-from alley_oop.geometry.lie_3d_pseudo import pseudo_lie_se3_to_SE3, pseudo_lie_se3_to_SE3_batch
+from alley_oop.utils.logging import TrainLogger as Logger
+from alley_oop.utils.plotting import plot_res
+from alley_oop.geometry.lie_3d_pseudo import pseudo_lie_se3_to_SE3_batch
+import dataset.train_datasets as datasets
 
 
-# exclude extremly large displacements
 SUM_FREQ = 100
 VAL_FREQ = 1000
 
@@ -134,8 +131,6 @@ def main(args, config, force_cpu):
                                        pseudo_lie_se3_to_SE3_batch(-pose), conf1, conf2, intrinsics)
                     import matplotlib.pyplot as plt
                     plt.show()
-                    plot_3d(ref_img, trg_img, ref_depth * config['depth_scale'], trg_depth * config['depth_scale'],
-                            pseudo_lie_se3_to_SE3_batch(pose).detach(), intrinsics)
 
             pose_change = (torch.abs(gt_pose).sum(dim=-1, keepdim=True) + 1e-12).detach().cpu()
             metrics = {"train/loss_rot": loss_cpu[:,:3].mean().item(),
