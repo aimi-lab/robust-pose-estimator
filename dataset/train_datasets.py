@@ -8,7 +8,7 @@ from typing import Tuple
 import cv2
 from core.utils.pfm_handler import load_pfm
 from core.utils.trajectory import read_freiburg
-from core.geometry.lie_3d_pseudo import pseudo_lie_SE3_to_se3
+from core.geometry.lie_3d_small_angle import small_angle_lie_SE3_to_se3
 from torchvision.transforms import Resize, InterpolationMode
 from torch.utils.data import Dataset
 from dataset.rectification import StereoRectifier
@@ -95,7 +95,7 @@ class PoseDataset(Dataset):
 
         pose = torch.from_numpy(self.rel_pose_list[index]).clone()
         pose[:3,3] /= self.depth_cutoff  # normalize translation
-        pose_se3 = pseudo_lie_SE3_to_se3(pose)
+        pose_se3 = small_angle_lie_SE3_to_se3(pose)
 
         # generate mask
         mask1 = self._read_mask(self.mask_list[index][0])
@@ -243,7 +243,7 @@ class TUMDataset(Dataset):
 
         pose = torch.from_numpy(self.rel_pose_list[index]).clone()
         pose[:3, 3] /= self.depth_cutoff  # normalize translation
-        pose_se3 = pseudo_lie_SE3_to_se3(pose)
+        pose_se3 = small_angle_lie_SE3_to_se3(pose)
         depth_conf1 = torch.exp(-.5 * depth1 ** 2*10 )
         depth_conf2 = torch.exp(-.5 * depth2 ** 2*10 )
         # generate mask
@@ -299,7 +299,7 @@ class TartainAirSubset(Dataset):
 
         pose = torch.from_numpy(self.rel_pose_list[index]).clone()
         pose[:3, 3] /= self.depth_cutoff  # normalize translation
-        pose_se3 = pseudo_lie_SE3_to_se3(pose)
+        pose_se3 = small_angle_lie_SE3_to_se3(pose)
         depth_conf1 = torch.exp(-.5 * depth1 ** 2*10 )
         depth_conf2 = torch.exp(-.5 * depth2 ** 2*10 )
         # generate mask

@@ -1,6 +1,6 @@
 from core.geometry.pinhole_transforms import create_img_coords_t, transform, homogeneous, project
 from core.ddn.ddn.pytorch.node import *
-from core.geometry.lie_3d_pseudo import pseudo_lie_se3_to_SE3_batch_small
+from core.geometry.lie_3d_small_angle import small_angle_lie_se3_to_SE3_batch_lin
 
 
 class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
@@ -15,7 +15,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         """
         n, _, h, w = flow.shape
         img_coordinates = create_img_coords_t(y=pcl1.shape[-2], x=pcl1.shape[-1]).to(pcl1.device)
-        pose = pseudo_lie_se3_to_SE3_batch_small(-y)  # invert transform to be consistent with other pose estimators
+        pose = small_angle_lie_se3_to_SE3_batch_lin(-y)  # invert transform to be consistent with other pose estimators
         # project 3D-pcl to image plane
         warped_pts = project(pcl1.view(n,3,-1), pose, intrinsics)
         flow_off = self.img_coordinates[None, :2] + flow.view(n, 2, -1)
@@ -40,7 +40,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         """
         n, _, h, w = pcl1.shape
         # se(3) to SE(3)
-        pose = pseudo_lie_se3_to_SE3_batch_small(y)
+        pose = small_angle_lie_se3_to_SE3_batch_lin(y)
         # transform point cloud given the pose
         pcl2_aligned = transform(homogeneous(pcl2.view(n, 3, -1)), pose).reshape(n, 4, h, w)[:, :3]
         # compute residuals

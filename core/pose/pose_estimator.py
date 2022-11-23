@@ -2,7 +2,7 @@ from core.pose.pose_net import PoseNet
 from core.geometry.pinhole_transforms import inv_transform
 import torch
 from core.fusion.surfel_map import SurfelMap, Frame
-from core.geometry.lie_3d_pseudo import pseudo_lie_se3_to_SE3
+from core.geometry.lie_3d_small_angle import small_angle_lie_se3_to_SE3
 from collections import OrderedDict
 import warnings
 from typing import Tuple
@@ -67,7 +67,7 @@ class PoseEstimator(torch.nn.Module):
             rel_pose = torch.eye(4, dtype=torch.float64, device=self.last_pose.device)
             success = False
         else:
-            rel_pose = pseudo_lie_se3_to_SE3(rel_pose_se3.double())
+            rel_pose = small_angle_lie_se3_to_SE3(rel_pose_se3.double())
             success = True
         self.last_frame = ret_frame
         # chain relative pose with last pose estimation to obtain absolute pose

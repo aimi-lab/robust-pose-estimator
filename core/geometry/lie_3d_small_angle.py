@@ -1,10 +1,11 @@
 # Lie group for so3, SO3 and se3, SE3 spaces
+# Small angle version for better numerical stability
 # implementations follow https://ethaneade.com/lie.pdf
 
 from core.geometry.lie_3d import *
 
 
-def pseudo_lie_se3_to_SE3(
+def small_angle_lie_se3_to_SE3(
         pvec: Union[np.ndarray, torch.Tensor] = None,
         tol: float = 1e-12,
     ) -> Union[np.ndarray, torch.Tensor]:
@@ -44,7 +45,7 @@ def pseudo_lie_se3_to_SE3(
     return pmat
 
 
-def pseudo_lie_se3_to_SE3_batch(
+def small_angle_lie_se3_to_SE3_batch(
         pvec: Union[np.ndarray, torch.Tensor] = None,
         tol: float = 10e-12,
     ) -> Union[np.ndarray, torch.Tensor]:
@@ -85,7 +86,7 @@ def pseudo_lie_se3_to_SE3_batch(
     return pmat
 
 
-def pseudo_lie_se3_to_SE3_batch_small(
+def small_angle_lie_se3_to_SE3_batch_lin(
         pvec: Union[np.ndarray, torch.Tensor] = None,
     ) -> Union[np.ndarray, torch.Tensor]:
     """
@@ -112,7 +113,7 @@ def pseudo_lie_se3_to_SE3_batch_small(
     return pmat
 
 
-def pseudo_lie_SE3_to_se3(
+def small_angle_lie_SE3_to_se3(
         pmat: Union[np.ndarray, torch.Tensor] = None, 
         tol: float = 10e-12,
     ) -> Union[np.ndarray, torch.Tensor]:

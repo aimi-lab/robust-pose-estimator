@@ -13,7 +13,7 @@ import wandb
 from core.pose.pose_net import PoseNet
 from core.utils.logging import TrainLogger as Logger
 from core.utils.plotting import plot_res
-from core.geometry.lie_3d_pseudo import pseudo_lie_se3_to_SE3_batch
+from core.geometry.lie_3d_small_angle import small_angle_lie_se3_to_SE3_batch
 import dataset.train_datasets as datasets
 
 
@@ -48,7 +48,7 @@ def val(model, dataloader, device, intrinsics, logger, key):
             logger.push(metrics, len(dataloader))
         logger.flush()
         logger.log_plot(plot_res(ref_img, trg_img, flow_predictions, trg_depth,
-                                 pseudo_lie_se3_to_SE3_batch(-pose_predictions), conf1, conf2, intrinsics)[0])
+                                 small_angle_lie_se3_to_SE3_batch(-pose_predictions), conf1, conf2, intrinsics)[0])
     model.train()
     return loss.detach().mean().cpu().item()
 
@@ -132,7 +132,7 @@ def main(args, config, force_cpu):
                     pose = pose_predictions.clone()
                     pose[:, 3:] *= config['depth_scale']
                     fig, ax = plot_res(ref_img, trg_img, flow_predictions, trg_depth * config['depth_scale'],
-                                       pseudo_lie_se3_to_SE3_batch(-pose), conf1, conf2, intrinsics)
+                                       small_angle_lie_se3_to_SE3_batch(-pose), conf1, conf2, intrinsics)
                     import matplotlib.pyplot as plt
                     plt.show()
 
