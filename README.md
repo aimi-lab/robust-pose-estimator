@@ -3,8 +3,10 @@
 
 Visual Odometry for stereo endoscopic videos with breathing and tool deformations.
 
+
 [![tests @ develop](https://github.com/aimi-lab/alley-oop/workflows/tests/badge.svg?branch=develop&event=push)](https://github.com/aimi-lab/alley-oop/actions/workflows/tests.yaml)
 
+![Alt text](./system_overview.svg)<img src="./system_overview.svg">
 ## Installation
 
 you will need Python 3.8, which can be checked with
@@ -48,6 +50,18 @@ You can infer the camera trajectory for a sequence with
 ``` 
 $ cd scripts
 $ python infer_trajectory.py path/to/input
+```
+
+benchmark on surgical scenarios with
+``` 
+$ cd scripts
+$ python benchmark_scenarios.py path/to/test_set
+```
+
+benchmark on test set with
+``` 
+$ cd scripts
+$ python benchmark_test.py path/to/test_set
 ```
 
 
