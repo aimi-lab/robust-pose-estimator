@@ -3,7 +3,7 @@ import numpy as np
 import argparse
 import matplotlib as mpl
 mpl.use('Qt5Agg')
-from core.pose.trajectory_analyzer import TrajectoryAnalyzer
+from core.utils.trajectory_analyzer import TrajectoryAnalyzer
 from core.utils.trajectory import read_freiburg
 from evaluation.evaluate_ate_freiburg import eval
 
