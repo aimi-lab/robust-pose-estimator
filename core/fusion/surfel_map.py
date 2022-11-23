@@ -4,10 +4,8 @@ from typing import Union, Tuple
 import numpy as np
 import warnings
 
-from core.geometry.pinhole_transforms import forward_project2image, reverse_project, create_img_coords_t, forward_project
+from core.geometry.pinhole_transforms import project2image, reproject, create_img_coords_t, project, transform
 from core.interpol.sparse_img_interpolation import SparseImgInterpolator
-from core.geometry.normals import normals_from_regular_grid, resize_normalmap
-from core.utils.pytorch import batched_dot_product
 from core.utils.frame_class import Frame
 from core.utils.save_ply import save_ply
 
@@ -31,14 +29,12 @@ class SurfelMap(object):
         self.average_points = kwargs['average_pts'] if 'average_pts' in kwargs else True
         # either provide opts, normals and color or a frame class
         if 'opts' in kwargs:
-            assert 'normals' in kwargs
             assert 'rgb' in kwargs
             self.kmat = kwargs['kmat']
             self.opts = kwargs['opts']
             self.device = self.opts.device
             dtype = self.opts.dtype
             self.rgb = kwargs['rgb']
-            self.nrml = kwargs['normals']
             self.img_shape = kwargs['img_shape'] if 'img_shape' in kwargs else None
             # initialize confidence
             if 'conf' in kwargs:
@@ -56,15 +52,14 @@ class SurfelMap(object):
             self.img_shape = frame.shape
             # check ignore mask option, this is important if points are required in 2D grid shape
             ignore_mask = kwargs['ignore_mask'] if 'ignore_mask' in kwargs else False
-            mask = torch.ones_like(frame.depth).to(torch.bool) if ignore_mask else frame.mask
+            mask = torch.ones_like(frame.depth).to(torch.bool) if ignore_mask else frame.mask.bool()
             # calculate object points
             ipts = create_img_coords_t(y=self.img_shape[-2], x=self.img_shape[-1]).to(self.device).to(dtype)
-            self.opts = reverse_project(ipts=ipts, kmat=self.kmat.to(self.device).to(dtype), rmat=self.pmat[:3, :3].to(self.device).to(dtype),
-                                        tvec=self.pmat[:3, 3][..., None].to(self.device).to(dtype),
-                                        dpth=frame.depth.squeeze())[:, mask.view(-1)]
+
+            opts = reproject(img_coords=ipts, intrinsics=self.kmat.to(self.device).to(dtype), depth=frame.depth)
+            self.opts = transform(opts, self.pmat.to(self.device).to(dtype).unsqueeze(0)).squeeze()[:3, mask.view(-1)]
 
             self.rgb = frame.img.view(3, -1)[:, mask.view(-1)]
-            self.nrml = frame.normals.view(3, -1)[:, mask.view(-1)]
             self.conf = frame.confidence[mask].view(1, -1) / self.conf_thr  # normalize confidence
 
         self.kmat = self.kmat.to(self.device).to(dtype)
@@ -86,14 +81,12 @@ class SurfelMap(object):
         rgb = frame.img
         depth = frame.depth
         mask = frame.mask
-        normals = frame.normals
         dtype = depth.dtype
 
         if self.upscale > 1:
             # consider upsampling
             rgb = torch.nn.functional.interpolate(rgb, scale_factor=self.upscale, mode='bilinear', align_corners=None)
             depth = torch.nn.functional.interpolate(depth, scale_factor=self.upscale, mode='bilinear', align_corners=None)
-            mask = torch.nn.functional.interpolate(mask.float(), scale_factor=self.upscale, mode='nearest', align_corners=None).to(torch.bool)
             kmat[:2] *= self.upscale
 
         # prepare image and object coordinates
@@ -102,26 +95,18 @@ class SurfelMap(object):
         # project depth to 3d-points in world coordinates
         opts = reverse_project(ipts=ipts, dpth=depth, rmat=pmat[:3, :3], tvec=pmat[:3, -1][..., None], kmat=kmat)
 
-        # update normals (if necessary)
-        if normals is None or self.upscale > 1:
-            normals = normals_from_regular_grid(opts.T.reshape((self.img_shape[0]*self.upscale, self.img_shape[1]*self.upscale, 3)), pad_opt=True).T
-
         # consider masked surfels and enforce channel x samples shape
         rgb = rgb.view(3, -1)
-        normals = normals.reshape(3, -1)
-
-        # rotate image normals to world-coordinates
-        normals = pmat[:3, :3] @ normals
 
         # project all surfels to current image frame
-        global_ipts = forward_project(self.opts, kmat=kmat, rmat=pmat_inv[:3, :3], tvec=pmat_inv[:3, -1][:, None])
+        global_ipts = project(self.opts, intrinsics=kmat, pmat=pmat_inv)
         bidx = (global_ipts[0, :] >= 0) & (global_ipts[1, :] >= 0) & (global_ipts[0, :] < self.img_shape[1]*self.upscale-1) & (global_ipts[1, :] < self.img_shape[0]*self.upscale-1)
 
         # get correspondence by assigning projected points to image coordinates
         midx = self.get_match_indices(global_ipts[:, bidx])
 
         # compute mask that rejects depth and normal outliers and detects duplicated surface patches
-        vidx, midx, dmask = self.filter_surfels_by_correspondence(opts=opts, vidx=bidx, midx=midx, normals=normals,
+        vidx, midx, dmask = self.filter_surfels_by_correspondence(opts=opts, vidx=bidx, midx=midx,
                                                                   d_thresh=self.d_thresh, check_duplicate_surfaces=True)
 
         # apply frame mask to reject invalid pixels
@@ -138,7 +123,6 @@ class SurfelMap(object):
         if self.average_points:
             self.opts[:, vidx] = (conf_idx*self.opts[:, vidx] + ccor*opts[:, midx]) / (conf_idx + ccor)
             self.rgb[:, vidx] = (conf_idx * self.rgb[:, vidx] + ccor * rgb[:, midx]) / (conf_idx + ccor)
-            self.nrml[:, vidx] = (conf_idx*self.nrml[:, vidx] + ccor*normals[:, midx]) / (conf_idx + ccor)
         self.conf[:, vidx] = torch.clamp(conf_idx + ccor, 0.0, 1.0)  # saturate confidence to 1
 
         # create mask identifying unmatched indices
@@ -156,7 +140,6 @@ class SurfelMap(object):
         # concatenate unmatched points, intensities, normals, radii and confidences
         self.opts = torch.cat((self.opts, self._downsample(opts)[:, mask]), dim=-1)
         self.rgb = torch.cat((self.rgb, self._downsample(rgb)[:, mask]), dim=-1)
-        self.nrml = torch.cat((self.nrml, self._downsample(normals)[:, mask]), dim=-1)
         self.conf = torch.cat((self.conf, self._downsample(conf)[:, mask]), dim=-1)
         self.t_created = torch.cat((self.t_created, self.tick*torch.ones(1, mask.sum()).to(self.device)), dim=-1)
 
@@ -171,7 +154,6 @@ class SurfelMap(object):
         ok_pts = ((self.conf >= 1.0) | ((self.tick - self.t_created) < self.t_max)).squeeze()
         self.opts = self.opts[:, ok_pts]
         self.rgb = self.rgb[:, ok_pts]
-        self.nrml = self.nrml[:, ok_pts]
         self.conf = self.conf[:, ok_pts]
         self.t_created = self.t_created[:, ok_pts]
         return ok_pts
@@ -202,11 +184,7 @@ class SurfelMap(object):
         opts: torch.Tensor,
         midx: torch.Tensor,
         vidx: torch.Tensor = None,
-        normals: torch.Tensor = None,
         d_thresh: float = 0.05,
-        n_thresh: float = 20,
-        remove_duplicates: bool = False,
-        check_duplicate_surfaces: bool = False
         ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         filter correspondences by depth and normal angle
@@ -214,96 +192,16 @@ class SurfelMap(object):
 
         # parameter init
         vidx = torch.ones(self.opts.shape[1], dtype=bool) if vidx is None else vidx
-        normals = torch.ones_like(opts) if normals is None else normals
-        angle_threshold = torch.cos(torch.tensor(n_thresh)/180*torch.pi)
 
         # 1. depth distance constraint
         depth_diff = opts[2, midx] - self.opts[2, vidx]
         valid_depth = torch.abs(depth_diff) < d_thresh
 
-        # 2. normals constraint (degrees threshold)
-        valid_normals = torch.abs(batched_dot_product(normals[:, midx].T, self.nrml[:, vidx].T)).squeeze() > angle_threshold
-
-        # 3. check for duplicated surfaces
-        if check_duplicate_surfaces:
-            invidx = vidx.clone()
-            invidx[vidx] &= ~valid_depth
-            duplicate_mask = self.detect_duplicated_surfaces(normals, invidx, depth_diff, midx)
-            if duplicate_mask.float().mean() < 0.0:
-                warnings.warn('fusion failed', RuntimeWarning)
-                valid_depth[...] = False
-                valid_normals[...] = False
-                duplicate_mask[...] = False
-        else:
-            duplicate_mask = torch.ones(self.img_shape[0]*self.img_shape[1], device=self.device, dtype=torch.bool)
-
         # combine constraints and update indices
-        vidx[vidx.clone()] &= valid_depth & valid_normals
-        midx = midx[valid_depth & valid_normals]
+        vidx[vidx.clone()] &= valid_depth
+        midx = midx[valid_depth]
 
-        if remove_duplicates:
-            # identify duplicates
-            oidx, inv_idx, bins = torch.unique(midx, sorted=False, return_counts=True, return_inverse=True)
-            duplicates = oidx[bins>1]
-            candidate_mask = torch.ones_like(midx).to(torch.bool)
-            kidx = vidx.clone()
-            # TODO vectorize for-loop , this is too slow
-            for d in duplicates:
-                candidates = midx == d
-                candidates &= ~(self.conf[:,vidx] == torch.max(self.conf[:,vidx][:,candidates])).squeeze()
-                kidx[vidx] &= ~candidates
-                candidate_mask &= ~candidates
-            midx = midx[candidate_mask]
-        else:
-            kidx = vidx
-        return kidx, midx, duplicate_mask
-
-    @property
-    def normals(self):
-        return self.nrml
-
-    @normals.setter
-    def normals(self, normals):
-        self.nrml = normals
-
-    def detect_duplicated_surfaces(
-            self,
-            normals: torch.tensor,
-            invidx: torch.tensor,
-            depth_diff: torch.tensor,
-            midx: torch.tensor,
-            angle_threshold:float=45.0):
-        """
-            Detect duplicated surfaces and exclude them from surfel creation.
-        """
-        angle_threshold = torch.cos(torch.tensor(angle_threshold) / 180 * torch.pi)
-
-        # 2. check if invalid surfels correspond to true occlusion by checking the normal directions
-
-        # generate low-resolution normal maps from input frame and rendered scene
-        patch_size = (self.img_shape[0]//32, self.img_shape[1]//32)
-        normals_lowscale = resize_normalmap(normals.reshape(1,3,self.img_shape[0], self.img_shape[1]), patch_size)
-
-        # rotate, translate and forward-project points
-        pts_h = torch.vstack([self.opts[:, invidx], torch.ones(self.opts[:, invidx].shape[1], dtype=self.opts.dtype, device=self.device)])
-        npts, idx = forward_project2image(pts_h, img_shape=self.img_shape, kmat=self.kmat)
-
-        # generate sparse img maps and interpolate missing values
-        img_coords = npts[1, idx].long() * self.img_shape[1] + npts[0, idx].long()
-        scene_normals_low_scale = torch.zeros((3,*self.img_shape), device=self.device).view(3,-1)
-        scene_normals_low_scale[:, img_coords] = self.normals[:, invidx][:, idx]
-
-        scene_normals_low_scale = resize_normalmap(scene_normals_low_scale.view(1,3,*self.img_shape), patch_size)
-
-        # check if normals are pointing in same direction
-        duplicate_mask = torch.abs(batched_dot_product(normals_lowscale.view(3,-1).T, scene_normals_low_scale.view(3,-1).T)) < angle_threshold
-
-        duplicate_mask = torch.nn.functional.interpolate(duplicate_mask.float().view(1,1,*patch_size), self.img_shape, mode='nearest')
-
-        # 1. check if invalid surfels lie behind object such that they cannot be visible
-        duplicate_mask = duplicate_mask.to(torch.bool).view(-1)
-        duplicate_mask[midx] &= depth_diff < 0
-        return duplicate_mask
+        return vidx, midx
 
     def transform(self, transform:torch.tensor):
         """
@@ -312,7 +210,6 @@ class SurfelMap(object):
         """
         assert transform.shape == (4,4)
         self.opts = transform[:3,:3]@self.opts + transform[:3,3,None]
-        self.nrml = transform[:3,:3] @ self.nrml
 
     def transform_cpy(self, transform:torch.tensor):
         """
@@ -321,8 +218,7 @@ class SurfelMap(object):
         """
         assert transform.shape == (4, 4)
         opts = transform[:3,:3]@self.opts + transform[:3,3,None]
-        normals = transform[:3,:3] @ self.nrml
-        return self._constructor(opts=opts, normals=normals, kmat=self.kmat, rgb=self.rgb, img_shape=self.img_shape,
+        return self._constructor(opts=opts, kmat=self.kmat, rgb=self.rgb, img_shape=self.img_shape,
                          depth_scale=self.depth_scale, conf=self.conf).to(self.device)
 
     @property
@@ -330,10 +226,6 @@ class SurfelMap(object):
         assert self.img_shape is not None
         return self.opts.T.view((*self.img_shape, 3))
 
-    @property
-    def grid_normals(self):
-        assert self.img_shape is not None
-        return self.nrml.T.view((*self.img_shape, 3))
     @property
     def confidence(self):
         return self.conf.view(-1)
@@ -352,9 +244,9 @@ class SurfelMap(object):
         # rotate, translate and forward-project points
         sort_idx = torch.argsort(self.conf, dim=1)[0]
         pts_h = torch.vstack([self.opts[:, sort_idx], torch.ones(self.opts.shape[1], dtype=self.opts.dtype, device=self.device)])
-        npts, valid = forward_project2image(pts_h, img_shape=self.img_shape, kmat=intrinsics, rmat=extrinsics[:3, :3],
-                               tvec=extrinsics[:3, -1][..., None])
-
+        npts, valid = project2image(pts_h.unsqueeze(0), img_shape=self.img_shape, intrinsics=intrinsics.unsqueeze(0), pmat=extrinsics.unsqueeze(0))
+        npts = npts.squeeze()
+        valid = valid.squeeze()
         # generate sparse img maps and interpolate missing values
         img_coords = npts[1, valid].long(), npts[0, valid].long()
         confidence = torch.zeros(self.img_shape, dtype=self.opts.dtype, device=self.device)
@@ -372,7 +264,7 @@ class SurfelMap(object):
         colors[2][img_coords] = self.rgb[2, sort_idx][valid]
         colors = self.interpolate(colors[None,...])
 
-        return Frame(colors, depth=depth, intrinsics=intrinsics, mask=mask, confidence=confidence[None, None, ...]).to(intrinsics.device), None
+        return Frame(colors, depth=depth, mask=mask, confidence=confidence[None, None, ...]).to(intrinsics.device), None
 
     def pcl2open3d(self, stable: bool=True, filter: torch.Tensor=None):
         """
@@ -408,7 +300,6 @@ class SurfelMap(object):
             save_ply(opts, rgb, path)
 
     def to(self, d: Union[torch.device, torch.dtype]):
-        self.nrml = self.nrml.to(d)
         self.rgb = self.rgb.to(d)
         self.kmat = self.kmat.to(d)
         self.opts = self.opts.to(d)
@@ -418,10 +309,6 @@ class SurfelMap(object):
         self.conf = self.conf.to(d)
         self.t_created = self.t_created.to(d)
         return self
-
-    def __getitem__(self, item):
-        return self._constructor(opts=self.opts[:, item], normals=self.nrml[:, item], kmat=self.kmat, gray=self.gray[:, item], img_shape=self.img_shape,
-                         depth_scale=self.depth_scale, conf=self.conf[:, item]).to(self.device)
 
     @property
     def _constructor(self):
