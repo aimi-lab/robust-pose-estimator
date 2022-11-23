@@ -1,18 +1,25 @@
-from core.pose.pose_net import PoseNet
-from core.geometry.pinhole_transforms import inv_transform
 import torch
-from core.fusion.surfel_map import SurfelMap, Frame
-from core.geometry.lie_3d_small_angle import small_angle_lie_se3_to_SE3
 from collections import OrderedDict
 import warnings
 from typing import Tuple
 
+from core.pose.pose_net import PoseNet
+from core.geometry.pinhole_transforms import inv_transform
+from core.fusion.surfel_map import SurfelMap, Frame
+from core.geometry.lie_3d_small_angle import small_angle_lie_se3_to_SE3
+
 
 class PoseEstimator(torch.nn.Module):
-    def __init__(self, config, intrinsics: torch.Tensor, baseline: float, checkpoint: str, img_shape: Tuple,
+    def __init__(self, config: dict, intrinsics: torch.Tensor, baseline: float, checkpoint: str, img_shape: Tuple,
                  init_pose: torch.tensor=torch.eye(4)):
         """
-
+            Stereo Camera Pose Estimator
+        :param config: pose estimator config dictionary
+        :param intrinsics: rectified camera intrinsics
+        :param baseline: stereo-rig baseline in pixels
+        :param checkpoint: pytorch poseNet model checkpoint
+        :param img_shape: img-shape (height, width)
+        :param init_pose: initial pose, shape (1,4,4)
         """
         super(PoseEstimator, self).__init__()
 
@@ -40,7 +47,16 @@ class PoseEstimator(torch.nn.Module):
         self.frame = None
         self.config = config
 
-    def forward(self, limg, rimg, mask):
+    def forward(self, limg: torch.Tensor, rimg: torch.Tensor, mask: torch.Tensor) \
+            -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+            estimate camera pose
+
+        :param limg: left-rectified image, range 0 to 255 , shape(1,3,h,w)
+        :param rimg: right-rectified image, range 0 to 255 , shape(1,3,h,w)
+        :param mask: valid mask for limg (True=valid), shape(1,1,h,w)
+        :return absolute camera pose, canonical scene model, optical flow from last to current limg
+        """
         # update frame
         self.last_frame = self.frame
         self.frame = Frame(limg, rimg, mask=mask)
