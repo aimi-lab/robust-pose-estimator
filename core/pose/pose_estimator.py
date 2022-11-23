@@ -38,6 +38,7 @@ class PoseEstimator(torch.nn.Module):
         self.frame2frame = config['frame2frame']
         self.scene = None
         self.frame = None
+        self.config = config
 
     def forward(self, limg, rimg, mask):
         # update frame
@@ -51,7 +52,7 @@ class PoseEstimator(torch.nn.Module):
                 # initialize scene with first frame
                 self.scene = SurfelMap(frame=self.frame, kmat=self.intrinsics.squeeze(), upscale=1,
                                        d_thresh=self.config['dist_thr'],
-                                       pmat=self.init_pose, average_pts=self.config['average_pts']).to(self.device)
+                                       pmat=self.last_pose.data.float(), average_pts=self.config['average_pts']).to(self.device)
             rel_pose_se3, ret_frame, flow = self.get_pose_f2m()
 
         # check if pose is valid
