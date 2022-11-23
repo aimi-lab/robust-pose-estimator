@@ -52,11 +52,11 @@ class StereoVideoDataset(IterableDataset):
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             img_left, img_right = self._split_stereo_img(img)
             pose = self.poses[counter-1] if self.poses is not None else np.eye(4)
-            mask = mask_specularities(img_left)
+            mask = torch.tensor(mask_specularities(img_left)).unsqueeze(0)
             img_left = torch.tensor(img_left).permute(2, 0, 1).float()
             img_right = torch.tensor(img_right).permute(2, 0, 1).float()
             if self.transform is not None:
-                img_left, img_right = self.transform(img_left, img_right)[:2]
+                img_left, img_right, mask = self.transform(img_left, img_right, mask)
             if self.rectify is not None:
                 img_left, img_right = self.rectify(img_left, img_right)
             img_number = self.timestamps[counter-1] if self.timestamps is not None else counter

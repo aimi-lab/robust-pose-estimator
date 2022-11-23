@@ -5,9 +5,7 @@ import os
 import torch
 import numpy as np
 from tqdm import tqdm
-from dataset.preprocess.segmentation_network.seg_model import SemanticSegmentationModel
 from dataset.dataset_utils import get_data, StereoVideoDataset
-from dataset.semantic_dataset import RGBDecoder
 import warnings
 from torch.utils.data import DataLoader
 import wandb
@@ -46,24 +44,16 @@ def main(input_path, output_path, device_sel, step, log, rect_mode):
 
     loader = DataLoader(dataset, num_workers=1, pin_memory=True)
 
-    seg_model = SemanticSegmentationModel('../dataset/preprocess/segmentation_network/trained/deepLabv3plus_trained_intuitive.pth',
-                                          device, (1280, 1024))
-
-    rgb_decoder = RGBDecoder()
-
     os.makedirs(os.path.join(output_path, 'video_frames'), exist_ok=True)
-    os.makedirs(os.path.join(output_path, 'semantic_predictions'), exist_ok=True)
     os.makedirs(os.path.join(output_path, 'depth'), exist_ok=True)
 
     with torch.inference_mode():
         for i, data in enumerate(tqdm(loader, total=len(dataset))):
             limg, rimg, pose_kinematics, img_number = data
-            segmentation = seg_model.segment(limg.to(device)/255.0)[1]
-            segmentation = rgb_decoder.colorize(segmentation.squeeze().cpu().numpy()).astype(np.uint8)
             depth, flow, _ = pose_estimator.flow2depth(limg.to(device), rimg.to(device), pose_estimator.baseline)
             depth = depth.squeeze().cpu().numpy()
 
-            # store images and depth and semantics
+            # store images and depth and mask
             if torch.is_tensor(img_number):
                 img_name = f'{img_number.item():06d}'
             else:
@@ -71,7 +61,6 @@ def main(input_path, output_path, device_sel, step, log, rect_mode):
             cv2.imwrite(os.path.join(output_path, 'video_frames', img_name+'l.png'), cv2.cvtColor(255.0*limg.squeeze().permute(1,2,0).cpu().numpy(), cv2.COLOR_RGB2BGR).astype(np.uint8))
             cv2.imwrite(os.path.join(output_path, 'video_frames', img_name + 'r.png'),
                         cv2.cvtColor(255.0*rimg.squeeze().permute(1,2,0).cpu().numpy(), cv2.COLOR_RGB2BGR).astype(np.uint8))
-            cv2.imwrite(os.path.join(output_path, 'semantic_predictions', img_name + 'l.png'), cv2.cvtColor(segmentation, cv2.COLOR_RGB2BGR))
             save_pfm(depth, os.path.join(output_path,'depth', f'{img_number[0]}l.pfm'))
         print('finished')
 
