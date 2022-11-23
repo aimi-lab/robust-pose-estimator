@@ -1,14 +1,13 @@
 try:
+    import open3d as o3d
     import matplotlib.pyplot as plt
     SHOW = True
 except ImportError:
     import matplotlib as mpl
     mpl.use('Agg')
     import matplotlib.pyplot as plt
-
     SHOW = False
 import os
-import numpy as np
 from torchvision.utils import flow_to_image
 
 

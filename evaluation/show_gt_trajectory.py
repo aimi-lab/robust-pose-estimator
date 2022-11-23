@@ -61,7 +61,7 @@ def main(input_path, output_path, config, device_sel, stop, start, step, log, fi
                 limg, depth, tool_mask, semantic, img_number = data
             else:
                 limg, rimg, tool_mask, semantics, img_number = data
-                depth, flow, _ = slam.pose_estimator.estimate_depth(limg.to(device), rimg.to(device))
+                depth, flow, _ = pose_estimator.flow2depth(limg.to(device), rimg.to(device), pose_estimator.baseline)
             frame = Frame(limg, limg, depth)
 
             pose_gt = torch.tensor(gt_trajectory[int(img_number[0])]).float()

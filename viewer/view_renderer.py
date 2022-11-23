@@ -1,4 +1,7 @@
-import open3d as o3d
+try:
+    import open3d as o3d
+except:
+    pass
 import numpy as np
 import cv2
 import os

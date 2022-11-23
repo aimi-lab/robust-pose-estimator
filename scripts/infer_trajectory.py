@@ -3,9 +3,11 @@ sys.path.append('../')
 import os
 from tqdm import tqdm
 import wandb
+import torch
 from torch.utils.data import DataLoader
+import warnings
 
-from core.fusion.surfel_map_deformable import *
+from core.fusion.surfel_map import SurfelMap
 from core.utils.trajectory import save_trajectory, read_freiburg
 from core.pose.pose_estimator import PoseEstimator
 from core.utils.logging import InferenceLogger
