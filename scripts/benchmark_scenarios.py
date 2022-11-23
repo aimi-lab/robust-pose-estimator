@@ -3,8 +3,6 @@ import argparse
 import yaml
 import pandas as pd
 import sys
-from multiprocessing import Process
-import multiprocessing as mp
 sys.path.append('../')
 from scripts.infer_trajectory import main as infer_trajectory
 

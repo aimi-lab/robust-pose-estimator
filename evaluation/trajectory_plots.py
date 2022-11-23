@@ -62,6 +62,5 @@ if __name__ == '__main__':
         n = meth.split('/')[-1]
         pose_plotter.add_pose_trajectory(pose_arrs, label="ORB-SLAM2" if n == 'orbslam2' else n, color=colors[n][0], linewidth=colors[n][1], linestyle=colors[n][2])
     pose_plotter.legend()
-    #pose_plotter.get_rmse_by_idx(idx_a=-1, idx_b=-2, plot_opt=True) if len(args.base_path) > 1 else None
-    pose_plotter.write_file(os.path.join('/home/mhayoz/Intuitive/05-Submissions/IPCAI-2022/trajectories', os.path.basename(args.base_path) + '.pdf'))
+    pose_plotter.write_file(os.path.basename(args.base_path) + '.pdf')
     pose_plotter.show()
