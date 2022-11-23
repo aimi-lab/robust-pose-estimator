@@ -9,7 +9,7 @@ from scripts.infer_trajectory import main as infer_trajectory
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description='script to run Raft Pose SLAM')
+    parser = argparse.ArgumentParser(description='script to benchmark pose estimation on test set')
 
     parser.add_argument(
         'input',
@@ -19,7 +19,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--checkpoint',
         type=str,
-        required=True,
+        default='../trained/poseNet_2xf8up4b.pth',
         help='Path to trained Pose Estimator Checkpoint.'
     )
     parser.add_argument(
@@ -30,13 +30,13 @@ if __name__ == '__main__':
     parser.add_argument(
         '--config',
         type=str,
-        default='../configuration/alleyoop_slam.yaml',
+        default='../configuration/infer_f2f.yaml',
         help='Configuration file.'
     )
     parser.add_argument(
         '--device',
         choices=['cpu', 'gpu'],
-        default='cpu',
+        default='gpu',
         help='select cpu or gpu to run slam.'
     )
     parser.add_argument(
@@ -54,11 +54,6 @@ if __name__ == '__main__':
         '--force_video',
         action="store_true",
         help='force to use video input and recompute depth'
-    )
-    parser.add_argument(
-        '--store_map',
-        action="store_true",
-        help='store intermediate maps'
     )
     parser.add_argument(
         '--viewer',
