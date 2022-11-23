@@ -12,6 +12,7 @@ from core.utils.trajectory import save_trajectory, read_freiburg
 from core.pose.pose_estimator import PoseEstimator
 from core.utils.logging import InferenceLogger
 
+from dataset.preprocess.segmentation_network.seg_model import SemanticSegmentationModel
 from dataset.dataset_utils import get_data, StereoVideoDataset, SequentialSubSampler
 from evaluation.evaluate_ate_freiburg import eval
 from viewer.viewer3d import Viewer3D
@@ -40,7 +41,7 @@ def main(args, config):
             args.outpath = os.path.join(args.input, 'data', 'infer_trajectory')
     os.makedirs(args.outpath, exist_ok=True)
 
-    dataset, calib = get_data(args.input, config['img_size'], rect_mode=config['rect_mode'])
+    dataset, calib = get_data(args.input, config['img_size'], force_stereo=True, rect_mode=config['rect_mode'])
     # check for ground-truth pose data for logging purposes
     gt_file = os.path.join(args.input, 'groundtruth.txt')
     gt_trajectory = read_freiburg(gt_file) if os.path.isfile(gt_file) else None
@@ -54,6 +55,10 @@ def main(args, config):
         warnings.warn('start/stop arguments not supported for video dataset. ignored.', UserWarning)
         sampler = None
     loader = DataLoader(dataset, num_workers=0 if config['slam']['debug'] else 1, pin_memory=True, sampler=sampler)
+
+    if isinstance(dataset, StereoVideoDataset):
+        seg_model = SemanticSegmentationModel('../dataset/preprocess/segmentation_network/trained/deepLabv3plus_trained_intuitive.pth',
+                                              device, config['img_size'])
 
     recorder = InferenceLogger()
     recorder.set_gt(gt_trajectory)
@@ -70,8 +75,10 @@ def main(args, config):
         for i, data in enumerate(tqdm(loader, total=min(len(dataset), (args.stop-args.start)//args.step))):
             if isinstance(dataset, StereoVideoDataset):
                 limg, rimg, mask, pose_kinematics, img_number = data
+                tool_mask, semantics = seg_model.get_mask(limg.to(device))
+                mask &= tool_mask
             else:
-                limg, rimg, mask, img_number = data
+                limg, rimg, mask, semantics, img_number = data
 
             pose, scene, flow = pose_estimator(limg.to(device), rimg.to(device), mask.to(device))
 

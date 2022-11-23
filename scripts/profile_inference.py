@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 from collections import OrderedDict
 import numpy as np
+from dataset.preprocess.segmentation_network.seg_model import SemanticSegmentationModel
 from dataset.dataset_utils import get_data
 from core.pose.pose_net import PoseNet
 
@@ -15,7 +16,7 @@ def main(args):
     MEASUREMENT_CYCLES = 100  # perform inference on 1000 frames and average inference time
 
     # load data and model
-    dataset, calib = get_data(args.input, (640, 512), rect_mode='conventional')
+    dataset, calib = get_data(args.input, (640, 512), force_stereo=True, rect_mode='conventional')
     checkp = torch.load('../trained/poseNet_2xf8up4b.pth')
     checkp['config']['model']['image_shape'] = (640, 512)
     checkp['config']['model']['amp'] = True if args.amp else False
@@ -32,7 +33,10 @@ def main(args):
     intrinsics = torch.tensor(calib['intrinsics']['left']).to(device).unsqueeze(0).float()
     baseline = torch.tensor(calib['bf']).unsqueeze(0).float().to(intrinsics.device)/250.0
     loader = DataLoader(dataset, num_workers=0, pin_memory=True)
-
+    if args.with_seg:
+        print("profile with Segmentation Model")
+        seg_model = SemanticSegmentationModel('../dataset/preprocess/segmentation_network/trained/deepLabv3plus_trained_intuitive.pth',
+                                              device, (640, 512))
     print(' Profiling Inference')
     print(' running on: ', torch.cuda.get_device_properties(0))
 
@@ -49,6 +53,9 @@ def main(args):
         def infer(data, last_img, last_depth, last_flow, last_valid):
             limg, rimg, tool_mask = data
             tool_mask = tool_mask.bool()
+            with torch.inference_mode():
+                if args.with_seg:
+                    tool_mask = seg_model.get_mask(limg/255.0)[0].to(torch.bool)
             # pose estimation
             model.infer(last_img, limg, intrinsics, baseline, depth1=last_depth, image2r=rimg,
                   mask1=last_valid, mask2=tool_mask, stereo_flow1=last_flow)
@@ -87,6 +94,11 @@ if __name__ == '__main__':
         'input',
         type=str,
         help='Path to input folder.'
+    )
+    parser.add_argument(
+        '--with_seg',
+        action="store_true",
+        help='include segmentation in profiling.'
     )
     parser.add_argument(
         '--iters',

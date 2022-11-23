@@ -26,7 +26,8 @@ class ScaredDataset(Dataset):
         img_l = torch.tensor(img_l).permute(2,0,1).float()/255.0
         img_r = torch.tensor(img_r).permute(2, 0, 1).float() / 255.0
         mask = torch.ones((1, *img_l.shape[-2:]), dtype=torch.bool)
-        data = self.transform(img_l, img_r, mask)
+        semantics = torch.zeros((1, *img_l.shape[-2:]), dtype=torch.long)
+        data = self.transform(img_l, img_r, mask, semantics)
         return (*data, img_number)
 
     def __len__(self):
