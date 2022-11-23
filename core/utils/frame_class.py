@@ -25,7 +25,7 @@ class Frame:
 
         if mask is None:
             mask = torch.ones((1,1,*self.shape), dtype=torch.bool, device=self.device)
-        self.mask = mask
+        self.mask = mask.bool()
 
         if depth is None:
             self.depth = torch.ones((1,1,*self.shape), device=self.device)

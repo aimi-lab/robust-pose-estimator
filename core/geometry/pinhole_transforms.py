@@ -38,21 +38,6 @@ def forward_project(
 
     return ipts
 
-
-def forward_project2image(
-        opts: Union[np.ndarray, torch.Tensor],
-        kmat: Union[np.ndarray, torch.Tensor],
-        img_shape: Tuple,
-        rmat: Union[np.ndarray, torch.Tensor] = None,
-        tvec: Union[np.ndarray, torch.Tensor] = None,
-                    ):
-    assert len(img_shape) == 2
-    ipts = forward_project(opts, kmat, rmat, tvec)
-    # filter points that are not in the image
-    valid = (ipts[1] < img_shape[0]) & (ipts[0] < img_shape[1]) & (ipts[1] >= 0) & (ipts[0] >= 0)
-    return ipts, valid
-
-
 def reverse_project(
         ipts: Union[np.ndarray, torch.Tensor],
         kmat: Union[np.ndarray, torch.Tensor],
@@ -196,8 +181,8 @@ def homogeneous(opts: torch.Tensor):
     return opts
 
 
-def transform(opts: torch.Tensor, T:torch.tensor):
-    return torch.bmm(T, opts)
+def transform(opts: torch.Tensor, pmat:torch.tensor):
+    return torch.bmm(pmat, opts)
 
 
 def reproject(depth: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.Tensor):
@@ -211,10 +196,27 @@ def reproject(depth: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.T
     return opts
 
 
-def project(opts: torch.Tensor, pmat:torch.tensor, kmat:torch.tensor):
-    p = kmat @ pmat[:, :3]
+def project(opts: torch.Tensor, pmat:torch.tensor, intrinsics:torch.tensor):
+    p = intrinsics @ pmat[:, :3]
     # pinhole projection
-    ipts = torch.bmm(p, homogeneous(opts))
+    if opts.shape[1] == 3:
+        opts = homogeneous(opts)
+    ipts = torch.bmm(p, opts)
     # inhomogenization
     ipts = ipts[:, :3] / torch.clamp(ipts[:, -1], 1e-12, None).unsqueeze(1)
     return ipts[:, :2]
+
+
+def project2image(
+        opts: torch.Tensor,
+        intrinsics: torch.Tensor,
+        img_shape: Tuple,
+        pmat: torch.Tensor = None
+                    ):
+    assert len(img_shape) == 2
+    if pmat is None:
+        pmat = torch.eye(4, device=opts.device, dtype=opts.dtype).unsqueeze(0)
+    ipts = project(opts, pmat, intrinsics)
+    # filter points that are not in the image
+    valid = (ipts[:, 1] < img_shape[0]) & (ipts[:, 0] < img_shape[1]) & (ipts[:, 1] >= 0) & (ipts[:, 0] >= 0)
+    return ipts, valid

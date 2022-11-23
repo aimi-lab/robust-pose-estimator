@@ -52,7 +52,7 @@ class SurfelMap(object):
             self.img_shape = frame.shape
             # check ignore mask option, this is important if points are required in 2D grid shape
             ignore_mask = kwargs['ignore_mask'] if 'ignore_mask' in kwargs else False
-            mask = torch.ones_like(frame.depth).to(torch.bool) if ignore_mask else frame.mask.bool()
+            mask = torch.ones_like(frame.depth).to(torch.bool) if ignore_mask else frame.mask
             # calculate object points
             ipts = create_img_coords_t(y=self.img_shape[-2], x=self.img_shape[-1]).to(self.device).to(dtype)
 
@@ -93,26 +93,25 @@ class SurfelMap(object):
         ipts = create_img_coords_t(y=self.img_shape[-2]*self.upscale, x=self.img_shape[-1]*self.upscale).to(dtype).to(self.device)
 
         # project depth to 3d-points in world coordinates
-        opts = reverse_project(ipts=ipts, dpth=depth, rmat=pmat[:3, :3], tvec=pmat[:3, -1][..., None], kmat=kmat)
+        opts = reproject(img_coords=ipts, intrinsics=self.kmat, depth=depth)
+        opts = transform(opts, pmat.unsqueeze(0)).squeeze()[:3]
 
         # consider masked surfels and enforce channel x samples shape
         rgb = rgb.view(3, -1)
 
         # project all surfels to current image frame
-        global_ipts = project(self.opts, intrinsics=kmat, pmat=pmat_inv)
+        global_ipts = project(self.opts.unsqueeze(0), intrinsics=kmat.unsqueeze(0), pmat=pmat_inv.unsqueeze(0)).squeeze()
         bidx = (global_ipts[0, :] >= 0) & (global_ipts[1, :] >= 0) & (global_ipts[0, :] < self.img_shape[1]*self.upscale-1) & (global_ipts[1, :] < self.img_shape[0]*self.upscale-1)
 
         # get correspondence by assigning projected points to image coordinates
         midx = self.get_match_indices(global_ipts[:, bidx])
 
         # compute mask that rejects depth and normal outliers and detects duplicated surface patches
-        vidx, midx, dmask = self.filter_surfels_by_correspondence(opts=opts, vidx=bidx, midx=midx,
-                                                                  d_thresh=self.d_thresh, check_duplicate_surfaces=True)
+        vidx, midx = self.filter_surfels_by_correspondence(opts=opts, vidx=bidx, midx=midx, d_thresh=self.d_thresh)
 
         # apply frame mask to reject invalid pixels
         bidx[vidx.clone()] &= (frame.mask.view(-1)[(midx/self.upscale**2).long()]).type(torch.bool)
         midx = midx[frame.mask.view(-1)[(midx/self.upscale**2).long()]]
-
 
         # pre-select confidence elements
         conf = torch.ones_like(frame.confidence.view(1, -1)) / self.conf_thr
@@ -131,7 +130,7 @@ class SurfelMap(object):
         # bring mask back to original shape
         mask = ~max_pool2d(mask.view(1,1,self.img_shape[0]*self.upscale, self.img_shape[1]*self.upscale), self.upscale, stride=self.upscale).view(-1).to(torch.bool)
         # avoid fusion with invalid pixels
-        mask &= frame.mask.view(-1) & dmask
+        mask &= frame.mask.view(-1)
         if self.dbug_opt:
             # print ratio of added points vs frame resolution
             ratio = mask.float().mean()
@@ -283,7 +282,7 @@ class SurfelMap(object):
         pcd.points = open3d.utility.Vector3dVector(self.opts.T[filter][stable_pts].cpu().numpy()/self.depth_scale)
         if self.rgb.numel() > 0:
             rgb = self.rgb.T[filter][stable_pts]
-            pcd.colors = open3d.utility.Vector3dVector(rgb.cpu().numpy())
+            pcd.colors = open3d.utility.Vector3dVector(rgb.cpu().numpy()/255.0)
         return pcd
 
     def save_ply(self, path:str, stable:bool=True):

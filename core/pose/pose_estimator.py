@@ -50,6 +50,11 @@ class PoseEstimator(torch.nn.Module):
         else:
             if self.scene is None:
                 # initialize scene with first frame
+                depth, stereo_flow, valid = self.model.flow2depth(self.frame.img, self.frame.rimg,
+                                                                  self.baseline * self.scale)
+                self.frame.depth = depth / self.scale
+                self.frame.mask &= valid
+                self.frame.flow = stereo_flow
                 self.scene = SurfelMap(frame=self.frame, kmat=self.intrinsics.squeeze(), upscale=1,
                                        d_thresh=self.config['dist_thr'],
                                        pmat=self.last_pose.data.float(), average_pts=self.config['average_pts']).to(self.device)
@@ -71,7 +76,7 @@ class PoseEstimator(torch.nn.Module):
 
         # update scene model
         if success & (flow is not None) & (self.scene is not None):
-            self.scene.fuse(self.frame, self.last_pose.data)
+            self.scene.fuse(self.frame, self.last_pose.data.float())
 
         return self.last_pose.data, self.scene, flow
 
@@ -115,7 +120,7 @@ class PoseEstimator(torch.nn.Module):
         # render frame from scene
         model_frame = scene_tlast.render(self.intrinsics.squeeze())[0]
         # get pose
-        flow, rel_pose_se3, depth1, depth2, conf_1, conf_2 = self.model.infer(model_frame.img, self.frame.img,
+        rel_pose_se3, depth1, depth2, conf_1, conf_2, flow, stereo_flow = self.model.infer(model_frame.img, self.frame.img,
                                                                               self.intrinsics,
                                                                               self.baseline * self.scale,
                                                                               depth1=model_frame.depth*self.scale,
@@ -127,6 +132,7 @@ class PoseEstimator(torch.nn.Module):
         # assign values for visualization purpose
         self.frame.confidence = conf_2
         self.frame.depth = depth2/self.scale
+        self.frame.flow = stereo_flow
         model_frame.confidence = conf_1
         return rel_pose_se3.double(), model_frame, flow
 
