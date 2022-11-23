@@ -1,7 +1,3 @@
-try:
-    import open3d as o3d
-except:
-    pass
 import numpy as np
 import cv2
 import os
@@ -11,6 +7,7 @@ from core.geometry.pinhole_transforms import inv_transform
 class ViewRenderer(object):
     def __init__(self, image_shape, outpath):
         super().__init__()
+        import open3d as o3d
         self.image_height = image_shape[0]
         self.image_width = image_shape[1]
         self.viewer = o3d.visualization.VisualizerWithKeyCallback()

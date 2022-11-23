@@ -1,5 +1,4 @@
 try:
-    import open3d as o3d
     import numpy as np
     import matplotlib.pyplot as plt
 except:
@@ -10,6 +9,7 @@ from core.geometry.pinhole_transforms import inv_transform
 class Viewer3D(object):
     def __init__(self, image_shape, blocking=False):
         super().__init__()
+        import open3d as o3d
         self.blocking = blocking
         self.exit_loop = not blocking
         self.image_height = image_shape[0]
