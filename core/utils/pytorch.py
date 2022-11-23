@@ -3,7 +3,6 @@ from typing import Iterable
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules.utils import _pair, _quadruple
-from torch.nn.functional import conv2d, pad
 
 
 def batched_dot_product(t1:torch.tensor, t2:torch.tensor):
@@ -27,33 +26,6 @@ def beye(shape:Iterable, device=None, dtype=None):
 def beye_like(t:torch.tensor):
     assert t.ndim == 3
     return beye(t.shape[:2], t.device, t.dtype)
-
-
-class Dilation2d(nn.Module):
-    '''
-    Base class for morpholigical operators
-    For now, only supports stride=1, dilation=1, kernel_size H==W, and padding='same'.
-    '''
-
-    def __init__(self, channels, kernel_size=5):
-        '''
-        in_channels: scalar
-        out_channels: scalar, the number of the morphological neure.
-        kernel_size: scalar, the spatial size of the morphological neure.
-        soft_max: bool, using the soft max rather the torch.max(), ref: Dense Morphological Networks: An Universal Function Approximator (Mondal et al. (2019)).
-        beta: scalar, used by soft_max.
-        type: str, dilation2d or erosion2d.
-        '''
-        super(Dilation2d, self).__init__()
-        self.kernel = nn.Parameter(torch.ones(1,channels,kernel_size, kernel_size), requires_grad=False)
-
-    def forward(self, x):
-        '''
-        x: tensor of shape (B,C,H,W)
-        '''
-        x = torch.clamp(torch.nn.functional.conv2d(x, self.kernel, padding='same'), 0, 1)
-
-        return x
 
 
 def grid_sample(image, optical):
@@ -153,17 +125,3 @@ class MedianPool2d(nn.Module):
         x = x.unfold(2, self.k[0], self.stride[0]).unfold(3, self.k[1], self.stride[1])
         x = x.contiguous().view(x.size()[:4] + (-1,)).median(dim=-1)[0]
         return x
-
-def image_gradient(img: torch.Tensor):
-    sobel = [[-0.125, -0.25, -0.125], [0, 0, 0], [0.125, 0.25, 0.125]]
-    batch, channels, h, w = img.shape
-    sobel_kernely = torch.tensor(sobel, dtype=img.dtype, device=img.device).unsqueeze(0).expand(1, channels, 3, 3)
-    sobel_kernelx = torch.tensor(sobel, dtype=img.dtype, device=img.device).unsqueeze(0).expand(1, channels, 3,
-                                                                                                3).transpose(2,
-                                                                                                             3)
-    x_grad = pad(conv2d(img, sobel_kernelx, stride=1, padding='valid', groups=channels)[..., 1:-1, 1:-1],
-                 (2, 2, 2, 2)).reshape(batch, channels, -1)
-    y_grad = pad(conv2d(img, sobel_kernely, stride=1, padding='valid', groups=channels)[..., 1:-1, 1:-1],
-                 (2, 2, 2, 2)).reshape(batch, channels, -1)
-    gradient = torch.stack((x_grad, y_grad), dim=-1)
-    return gradient
