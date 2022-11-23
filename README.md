@@ -41,7 +41,7 @@ $ python preprocess_video_data.py path/to/input
 Train the pose estimator with
 ``` 
 $ cd scripts
-$ python train_posenet.py --log
+$ python train_posenet.py
 ```
 you need to adapt the path to the train and validation data in the configuration file in *configuration/train.yaml*   
 
