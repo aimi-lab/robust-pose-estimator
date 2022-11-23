@@ -6,7 +6,7 @@ Visual Odometry for stereo endoscopic videos with breathing and tool deformation
 
 [![tests @ develop](https://github.com/aimi-lab/alley-oop/workflows/tests/badge.svg?branch=develop&event=push)](https://github.com/aimi-lab/alley-oop/actions/workflows/tests.yaml)
 
-![Alt text](./system_overview.svg)
+![Alt text](./system_overview.png)
 ## Installation
 
 you will need Python 3.8, which can be checked with
