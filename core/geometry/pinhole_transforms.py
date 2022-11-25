@@ -1,5 +1,6 @@
 import torch
 from typing import Tuple
+from lietorch import SE3
 
 
 def create_img_coords_t(
@@ -30,8 +31,9 @@ def homogeneous(opts: torch.Tensor):
     return opts
 
 
-def transform(opts: torch.Tensor, pmat:torch.tensor):
-    return torch.bmm(pmat, opts)
+def transform(opts: torch.Tensor, T:SE3):
+    opts = T.act(opts)
+    return opts
 
 
 def reproject(depth: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.Tensor):
@@ -45,12 +47,10 @@ def reproject(depth: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.T
     return opts
 
 
-def project(opts: torch.Tensor, pmat:torch.tensor, intrinsics:torch.tensor):
-    p = intrinsics @ pmat[:, :3]
+def project(opts: torch.Tensor, T:SE3, intrinsics:torch.tensor):
     # pinhole projection
-    if opts.shape[1] == 3:
-        opts = homogeneous(opts)
-    ipts = torch.bmm(p, opts)
+    opts = T.act(opts)
+    ipts = torch.bmm(intrinsics, opts)
     # inhomogenization
     ipts = ipts[:, :3] / torch.clamp(ipts[:, -1], 1e-12, None).unsqueeze(1)
     return ipts[:, :2]
@@ -60,12 +60,12 @@ def project2image(
         opts: torch.Tensor,
         intrinsics: torch.Tensor,
         img_shape: Tuple,
-        pmat: torch.Tensor = None
+        T: SE3 = None
                     ):
     assert len(img_shape) == 2
-    if pmat is None:
-        pmat = torch.eye(4, device=opts.device, dtype=opts.dtype).unsqueeze(0)
-    ipts = project(opts, pmat, intrinsics)
+    if T is None:
+        T = SE3.Identity()
+    ipts = project(opts, T, intrinsics)
     # filter points that are not in the image
     valid = (ipts[:, 1] < img_shape[0]) & (ipts[:, 0] < img_shape[1]) & (ipts[:, 1] >= 0) & (ipts[:, 0] >= 0)
     return ipts, valid
