@@ -6,7 +6,7 @@ from typing import Tuple
 from core.pose.pose_net import PoseNet
 from core.geometry.pinhole_transforms import inv_transform
 from core.fusion.surfel_map import SurfelMap, Frame
-from core.geometry.lie_3d_small_angle import small_angle_lie_se3_to_SE3
+from lietorch import SE3
 
 
 class PoseEstimator(torch.nn.Module):
@@ -39,7 +39,7 @@ class PoseEstimator(torch.nn.Module):
         self.model = model
         self.intrinsics = intrinsics.unsqueeze(0).float()
         self.scale = 1 / config['depth_clipping'][1]
-        self.register_buffer("last_pose",init_pose.double(), persistent=False)
+        self.register_buffer("last_pose",SE3.log(init_pose), persistent=False)
         self.register_buffer("baseline", torch.tensor(baseline).unsqueeze(0).float(), persistent=False)
         self.last_frame = None
         self.frame2frame = config['frame2frame']
@@ -80,15 +80,14 @@ class PoseEstimator(torch.nn.Module):
         if (torch.isnan(rel_pose_se3).any()) | (torch.abs(rel_pose_se3) > 1.0e-1).any():
             # pose estimation failed, keep last image as reference and skip this one
             warnings.warn('pose estimation not converged, skip.', RuntimeWarning)
-            rel_pose = torch.eye(4, dtype=torch.float64, device=self.last_pose.device)
+            rel_pose = SE3.Identity()
             success = False
         else:
-            rel_pose = small_angle_lie_se3_to_SE3(rel_pose_se3.double())
             success = True
         self.last_frame = ret_frame
         # chain relative pose with last pose estimation to obtain absolute pose
-        rel_pose[:3, 3] /= self.scale # de-normalize depth scaling
-        self.last_pose.data = self.last_pose.data @ rel_pose
+        rel_pose = rel_pose.scale(self.scale) # de-normalize depth scaling
+        self.last_pose.data = self.last_pose.data * rel_pose
 
         # update scene model
         if success & (flow is not None) & (self.scene is not None):
