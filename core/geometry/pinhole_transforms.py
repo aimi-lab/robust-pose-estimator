@@ -18,13 +18,6 @@ def create_img_coords_t(
     return ipts
 
 
-def inv_transform(mat:torch.Tensor):
-    mat_inv = torch.eye(4, device=mat.device, dtype=mat.dtype)
-    mat_inv[:3, :3] = mat[:3, :3].T
-    mat_inv[:3, 3] = -mat[:3, :3].T @ mat[:3, 3]
-    return mat_inv
-
-
 def homogeneous(opts: torch.Tensor):
     n = opts.shape[0]
     opts = torch.cat((opts, torch.ones((n, 1, opts.shape[-1]), device=opts.device, dtype=opts.dtype)), dim=1)

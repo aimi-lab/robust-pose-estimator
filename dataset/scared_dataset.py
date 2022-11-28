@@ -1,6 +1,6 @@
 from typing import Tuple, List
 import json
-from core.utils.trajectory import save_freiburg
+from core.utils.trajectory import save_trajectory
 import cv2
 import os
 import numpy as np
@@ -49,6 +49,6 @@ def scared2freiburg(folder:str):
     fnames = sorted(glob.glob(os.path.join(folder, '*.json')))
     pose_list = load_scared_kinematics(fnames)
 
-    save_freiburg(pose_list, folder)
+    save_trajectory(pose_list, folder)
     import shutil
     shutil.move(os.path.join(folder, 'trajectory.freiburg'), os.path.join(folder, '..', '..', 'groundtruth.txt'))

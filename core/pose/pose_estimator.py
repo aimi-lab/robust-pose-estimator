@@ -4,7 +4,6 @@ import warnings
 from typing import Tuple
 
 from core.pose.pose_net import PoseNet
-from core.geometry.pinhole_transforms import inv_transform
 from core.fusion.surfel_map import SurfelMap, Frame
 from lietorch import SE3
 
@@ -87,7 +86,7 @@ class PoseEstimator(torch.nn.Module):
         self.last_frame = ret_frame
         # chain relative pose with last pose estimation to obtain absolute pose
         rel_pose = rel_pose.scale(self.scale) # de-normalize depth scaling
-        self.last_pose.data = self.last_pose.data * rel_pose
+        self.last_pose.data = self.last_pose.data.mul(rel_pose)  # chain transforms
 
         # update scene model
         if success & (flow is not None) & (self.scene is not None):
@@ -131,7 +130,7 @@ class PoseEstimator(torch.nn.Module):
             estimate relative pose between current and canocial scene model
         """
         # transform scene to last camera pose coordinates
-        scene_tlast = self.scene.transform_cpy(inv_transform(self.last_pose.float()))
+        scene_tlast = self.scene.transform_cpy(self.last_pose.inv().float())
         # render frame from scene
         model_frame = scene_tlast.render(self.intrinsics.squeeze())[0]
         # get pose
