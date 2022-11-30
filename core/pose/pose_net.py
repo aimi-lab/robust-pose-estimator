@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from lietorch import SE3
 from collections import OrderedDict
 from core.geometry.pinhole_transforms import create_img_coords_t
 from core.RAFT.core.raft import RAFT
@@ -14,7 +15,6 @@ class PoseNet(nn.Module):
         super(PoseNet, self).__init__()
         self.config = config
         H, W = config["image_shape"]
-        self.pose_scale = config['pose_scale']
         self.register_buffer("img_coords", create_img_coords_t(y=H, x=W), persistent=False)
         self.use_weights = config["use_weights"]
         self.flow = RAFT(config)
@@ -53,9 +53,10 @@ class PoseNet(nn.Module):
         # estimate relative pose
         n = image1l.shape[0]
         pose_se3 = self.pose_head(time_flow, pcl1, pcl2, conf1, conf2, mask1.bool(), mask2.bool(), self.loss_weight.repeat(n, 1), intrinsics)
+        pose_se3 = SE3(pose_se3)
         if ret_confmap:
-            return time_flow, pose_se3.float() / self.pose_scale, depth1, depth2, conf1, conf2
-        return time_flow, pose_se3.float()/self.pose_scale, depth1, depth2
+            return time_flow, pose_se3, depth1, depth2, conf1, conf2
+        return time_flow, pose_se3, depth1, depth2
 
     def infer(self, image1l, image2l, intrinsics, baseline, depth1, image2r, mask1, mask2, stereo_flow1, ret_details=False):
         with torch.inference_mode():
@@ -85,7 +86,7 @@ class PoseNet(nn.Module):
         n = image1l.shape[0]
         pose_se3 = self.pose_head(time_flow, pcl1, pcl2, conf1, conf2, mask1.bool(), mask2.bool(),
                                   self.loss_weight.repeat(n, 1), intrinsics)
-        pose_se3 = (pose_se3 / self.pose_scale).squeeze(0)
+        pose_se3 = SE3(pose_se3)
         if ret_details:
             return pose_se3, depth1, depth2, conf1, conf2, time_flow, stereo_flow2
         return pose_se3

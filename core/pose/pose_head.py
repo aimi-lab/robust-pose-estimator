@@ -1,3 +1,5 @@
+from lietorch import SE3, LieGroupParameter
+
 from core.geometry.pinhole_transforms import create_img_coords_t, transform, homogeneous, project
 from core.ddn.ddn.pytorch.node import *
 
@@ -58,23 +60,23 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
 
     def solve(self, *xs):
         self.img_coordinates = self.img_coordinates.to(xs[0].device)
-        xs = [x.detach().clone() for x in xs]
+        xs = [x.detach().clone()for x in xs]
+        xs = [x.double() if x.dtype==torch.float32 else x for x in xs]
         with torch.enable_grad():
             n = xs[0].shape[0]
             # Solve using LBFGS optimizer:
-            y = torch.zeros((n,6), device=xs[0].device, requires_grad=True)
-            torch.backends.cuda.matmul.allow_tf32 = False
+            y = LieGroupParameter(SE3.Identity(n, device=xs[0].device, requires_grad=True, dtype=torch.float64))
             optimizer = torch.optim.LBFGS([y], lr=1.0, max_iter=self.lbgfs_iters, line_search_fn="strong_wolfe", )
 
             def fun():
                 optimizer.zero_grad()
                 loss = self.objective(*xs, y=y).sum()
+                print(loss.item(), y.group.vec())
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(y, 100)
                 return loss
             optimizer.step(fun)
-        torch.backends.cuda.matmul.allow_tf32 = True
-        return y.detach(), None
+        return y.group.detach().vec(), None
 
     # we re-implement the gradient function with more error-handling to catch failed optimization runs
     def gradient(self, *xs, y=None, v=None, ctx=None):

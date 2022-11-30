@@ -25,8 +25,14 @@ def homogeneous(opts: torch.Tensor):
 
 
 def transform(opts: torch.Tensor, T:SE3):
-    opts = T.act(opts)
-    return opts
+    # lietorch expects (mx4) inputs
+    # opts = T * opts # ToDo how can we make it broadcastable?
+    # broadcast workaround
+    opts_tr = []
+    for n in range(opts.shape[0]):
+        opts_tr.append((T[None, n] * opts[n].T).T)
+    opts_tr = torch.stack(opts_tr, dim=0)
+    return opts_tr
 
 
 def reproject(depth: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.Tensor):
@@ -42,7 +48,7 @@ def reproject(depth: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.T
 
 def project(opts: torch.Tensor, T:SE3, intrinsics:torch.tensor):
     # pinhole projection
-    opts = T.act(opts)
+    opts = transform(opts, T)
     ipts = torch.bmm(intrinsics, opts)
     # inhomogenization
     ipts = ipts[:, :3] / torch.clamp(ipts[:, -1], 1e-12, None).unsqueeze(1)
