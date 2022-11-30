@@ -1,4 +1,4 @@
-from core.geometry.pinhole_transforms import create_img_coords_t, transform, homogeneous, project
+from core.geometry.pinhole_transforms import transform, homogeneous, project
 from core.ddn.ddn.pytorch.node import *
 from core.geometry.lie_3d_small_angle import small_angle_lie_se3_to_SE3_batch_lin
 
@@ -14,7 +14,6 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
             r2D - reprojection residuals
         """
         n, _, h, w = flow.shape
-        img_coordinates = create_img_coords_t(y=pcl1.shape[-2], x=pcl1.shape[-1]).to(pcl1.device)
         pose = small_angle_lie_se3_to_SE3_batch_lin(-y)  # invert transform to be consistent with other pose estimators
         # project 3D-pcl to image plane
         warped_pts = project(pcl1.view(n,3,-1), pose, intrinsics)
@@ -30,7 +29,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         residuals[valid] = 0.0
         loss = torch.mean(residuals, dim=1) / (h*w)  # normalize with width and height
         if ret_res:
-            flow = warped_pts - img_coordinates[None, :2]
+            flow = warped_pts - self.img_coordinates[None, :2]
             return loss, residuals, flow
         return loss
 
