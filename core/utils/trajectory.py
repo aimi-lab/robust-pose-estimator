@@ -42,9 +42,9 @@ def read_freiburg(path: str, ret_stamps=False, no_stamp=False):
         list = [[v.strip() for v in line.split(" ") if v.strip() != ""] for line in lines if
                 len(line) > 0 and line[0] != "#"]
     if no_stamp:
-        trans = torch.tensor([l[0:3] for l in list if len(l) > 0])
+        trans = torch.from_numpy(np.asarray([l[0:3] for l in list if len(l) > 0], dtype=float))
         trans *= 1000.0  #m to mm
-        quat = torch.tensor([l[3:] for l in list if len(l) > 0])
+        quat = torch.from_numpy(np.asarray([l[3:] for l in list if len(l) > 0], dtype=float))
         pose_se3 = SE3.InitFromVec(torch.cat((trans, quat), dim=-1))
     else:
         time_stamp = [l[0] for l in list if len(l) > 0]
@@ -52,9 +52,9 @@ def read_freiburg(path: str, ret_stamps=False, no_stamp=False):
             time_stamp = np.asarray([int(l.split('.')[0] + l.split('.')[1]) for l in time_stamp])*100
         except IndexError:
             time_stamp = np.asarray([int(l) for l in time_stamp])
-        trans = torch.tensor([l[1:4] for l in list if len(l) > 0])
+        trans = torch.from_numpy(np.asarray([l[1:4] for l in list if len(l) > 0], dtype=float))
         trans *= 1000.0  # m to mm
-        quat = torch.tensor([l[4:] for l in list if len(l) > 0])
+        quat = torch.from_numpy(np.asarray([l[4:] for l in list if len(l) > 0], dtype=float))
         pose_se3 = SE3.InitFromVec(torch.cat((trans, quat), dim=-1))
         if ret_stamps:
             return pose_se3, time_stamp
