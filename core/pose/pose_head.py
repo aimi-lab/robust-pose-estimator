@@ -71,7 +71,6 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
             def fun():
                 optimizer.zero_grad()
                 loss = self.objective(*xs, y=y).sum()
-                print(loss.item(), y.group.vec())
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(y, 100)
                 return loss
