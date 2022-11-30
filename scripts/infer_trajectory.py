@@ -6,6 +6,7 @@ import wandb
 import torch
 from torch.utils.data import DataLoader
 import warnings
+from lietorch import SE3
 
 from core.fusion.surfel_map import SurfelMap
 from core.utils.trajectory import save_trajectory, read_freiburg
@@ -45,7 +46,7 @@ def main(args, config):
     # check for ground-truth pose data for logging purposes
     gt_file = os.path.join(args.input, 'groundtruth.txt')
     gt_trajectory = read_freiburg(gt_file) if os.path.isfile(gt_file) else None
-    init_pose = torch.tensor(gt_trajectory[args.start]) if gt_trajectory is not None else torch.eye(4)
+    init_pose = gt_trajectory[None, args.start] if gt_trajectory is not None else SE3.Identity(1)
 
     pose_estimator = PoseEstimator(config['slam'], torch.tensor(calib['intrinsics']['left']).to(device), baseline=calib['bf'],
                                     checkpoint=args.checkpoint, img_shape=config['img_size'], init_pose=init_pose).to(device)
@@ -71,7 +72,7 @@ def main(args, config):
         elif args.viewer == 'video':
             viewer = ViewRenderer((2*config['img_size'][1], 2*config['img_size'][0]), outpath=args.outpath)
 
-        trajectory = [{'camera-pose': init_pose.tolist(), 'timestamp': args.start, 'residual': 0.0, 'key_frame': True}]
+        trajectory = [{'camera-pose': init_pose, 'timestamp': args.start}]
         for i, data in enumerate(tqdm(loader, total=min(len(dataset), (args.stop-args.start)//args.step))):
             if isinstance(dataset, StereoVideoDataset):
                 limg, rimg, mask, pose_kinematics, img_number = data
@@ -94,7 +95,7 @@ def main(args, config):
             elif isinstance(viewer, ViewRenderer) & (i > 0):
                 canonical_scene = scene.pcl2open3d(stable=True)
                 viewer(pose.cpu(), canonical_scene)
-            trajectory.append({'camera-pose': pose.tolist(), 'timestamp': img_number[0], 'residual': 0.0, 'key_frame': True})
+            trajectory.append({'camera-pose': pose, 'timestamp': img_number[0]})
 
             # logging
             if (args.log is not None) & (i > 0):

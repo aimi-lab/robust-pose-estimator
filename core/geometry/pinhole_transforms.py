@@ -57,7 +57,7 @@ def project2image(
                     ):
     assert len(img_shape) == 2
     if T is None:
-        T = SE3.Identity()
+        T = SE3.Identity(1)
     ipts = project(opts, T, intrinsics)
     # filter points that are not in the image
     valid = (ipts[:, 1] < img_shape[0]) & (ipts[:, 0] < img_shape[1]) & (ipts[:, 1] >= 0) & (ipts[:, 0] >= 0)
