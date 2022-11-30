@@ -1,6 +1,6 @@
 from lietorch import SE3, LieGroupParameter
 
-from core.geometry.pinhole_transforms import create_img_coords_t, transform, homogeneous, project
+from core.geometry.pinhole_transforms import transform, homogeneous, project
 from core.ddn.ddn.pytorch.node import *
 
 
@@ -15,7 +15,6 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
             r2D - reprojection residuals
         """
         n, _, h, w = flow.shape
-        img_coordinates = create_img_coords_t(y=pcl1.shape[-2], x=pcl1.shape[-1]).to(pcl1.device)
         # project 3D-pcl to image plane
         warped_pts = project(pcl1.view(n,3,-1), y.inv(), intrinsics)
         flow_off = self.img_coordinates[None, :2] + flow.view(n, 2, -1)
@@ -30,7 +29,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         residuals[valid] = 0.0
         loss = torch.mean(residuals, dim=1) / (h*w)  # normalize with width and height
         if ret_res:
-            flow = warped_pts - img_coordinates[None, :2]
+            flow = warped_pts - self.img_coordinates[None, :2]
             return loss, residuals, flow
         return loss
 
