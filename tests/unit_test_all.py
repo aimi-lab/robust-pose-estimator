@@ -1,7 +1,7 @@
-from tests.unit_test_lie import Lie3DTester
+from tests.unit_test_pinhole_transforms import PinholeTransformTester
 
 test_classes = [
-    Lie3DTester
+    PinholeTransformTester
     ]
 
 for test_class in test_classes:
