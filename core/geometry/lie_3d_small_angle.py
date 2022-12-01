@@ -131,3 +131,24 @@ def small_angle_lie_SE3_to_se3(
     pvec = lib.hstack([wvec, uvec])
 
     return pvec
+
+
+def small_angle_lie_SE3_to_se3_batch(
+        pmat: Union[np.ndarray, torch.Tensor] = None,
+        tol: float = 10e-12,
+) -> Union[np.ndarray, torch.Tensor]:
+    """
+    create projection vector in se(3) from SE(3) projection matrix
+
+    :param pmat: concatenated rotation matrix in SO(3) and translation vector R^3
+    :return: concatenated Lie angle 3-vector and Lie translation 3-vector
+    """
+
+    lib = get_lib(pmat)
+    pvec = []
+    for n in range(pmat.shape[0]):
+        wvec = lie_SO3_to_so3(pmat[n, :3, :3])
+        uvec = pmat[n, :3, -1]
+        pvec.append(lib.hstack([wvec, uvec]))
+    pvec = lib.stack(pvec)
+    return pvec
