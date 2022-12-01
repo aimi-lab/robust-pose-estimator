@@ -23,7 +23,6 @@ class PinholeTransformTester(unittest.TestCase):
 
     def test_transform(self):
 
-        self.setUp()
         poses = SE3.Random(20)
         pcl2_transformed_lie = transform(self.pcl, poses)
 
