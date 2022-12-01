@@ -13,7 +13,6 @@ import wandb
 from core.pose.pose_net import PoseNet
 from core.utils.logging import TrainLogger as Logger
 from core.utils.plotting import plot_res
-from core.geometry.lie_3d_small_angle import small_angle_lie_se3_to_SE3_batch
 import dataset.train_datasets as datasets
 
 
@@ -22,7 +21,7 @@ VAL_FREQ = 1000
 
 
 def supervised_pose_loss(pose_pred, pose_gt):
-    l1 = (pose_pred - pose_gt).abs()
+    l1 = (pose_pred.log() - pose_gt.log()).abs()
     return l1
 
 
@@ -47,8 +46,6 @@ def val(model, dataloader, device, intrinsics, logger, key):
                        f"{key}/loss_total": loss_cpu.nanmean().item()}
             logger.push(metrics, len(dataloader))
         logger.flush()
-        logger.log_plot(plot_res(ref_img, trg_img, flow_predictions, trg_depth,
-                                 small_angle_lie_se3_to_SE3_batch(-pose_predictions), conf1, conf2, intrinsics)[0])
     model.train()
     return loss.detach().mean().cpu().item()
 
@@ -128,13 +125,6 @@ def main(args, config, force_cpu):
                 print(f"gt_pose: {gt_pose[0].detach().cpu().numpy()}\npred_pose: {pose_predictions[0].detach().cpu().numpy()}")
                 print(" trans loss: ", loss_cpu[:, 3:].mean().item())
                 print(" rot loss: ", loss_cpu[:, :3].mean().item())
-                if device == torch.device('cpu'):
-                    pose = pose_predictions.clone()
-                    pose[:, 3:] *= config['depth_scale']
-                    fig, ax = plot_res(ref_img, trg_img, flow_predictions, trg_depth * config['depth_scale'],
-                                       small_angle_lie_se3_to_SE3_batch(-pose), conf1, conf2, intrinsics)
-                    import matplotlib.pyplot as plt
-                    plt.show()
 
             pose_change = (torch.abs(gt_pose).sum(dim=-1, keepdim=True) + 1e-12).detach().cpu()
             metrics = {"train/loss_rot": loss_cpu[:,:3].mean().item(),
