@@ -65,13 +65,13 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
             n = xs[0].shape[0]
             # Solve using LBFGS optimizer:
             y = LieGroupParameter(SE3.Identity(n, device=xs[0].device, requires_grad=True, dtype=torch.float64))
-            optimizer = torch.optim.LBFGS([y], lr=1.0, max_iter=self.lbgfs_iters, line_search_fn="strong_wolfe", )
+            optimizer = torch.optim.LBFGS([y], lr=0.5, max_iter=self.lbgfs_iters, line_search_fn="strong_wolfe", )
 
             def fun():
                 optimizer.zero_grad()
                 loss = self.objective(*xs, y=y).sum()
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(y, 100)
+                torch.nn.utils.clip_grad_norm_(y, 10)
                 return loss
             optimizer.step(fun)
         return y.group.detach().vec(), None
