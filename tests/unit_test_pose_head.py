@@ -23,7 +23,8 @@ class PoseHeadTester(unittest.TestCase):
         self.pcl = reproject(depth, self.kmat, create_img_coords_t(180,180))[:, :3].view(n, 3, 180, 180)
 
         self.pose_head = DeclarativePoseHead3DNode(create_img_coords_t(180,180))
-        self.poses = SE3.Random(n, sigma=0.1)
+        torch.random.manual_seed(12345)
+        self.poses = SE3.Random(n, sigma=0.01)
         # compute induced flow
         flow_off = project(self.pcl.view(n,3,-1), self.poses.inv(), intrinsics=self.kmat).view(n,2,180,180)
         self.valid = (flow_off[:,0] >= 0) & (flow_off[:,0] < 180) & (flow_off[:,1] >= 0) & (flow_off[:,1] < 180)
