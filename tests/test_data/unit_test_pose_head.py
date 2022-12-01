@@ -41,13 +41,12 @@ class PoseHeadTester(unittest.TestCase):
         loss_weight = torch.tensor([[0.01, 1.0]]).repeat((n,1))
         xs = (self.flow, self.pcl, self.pcl_transformed, self.weights, self.weights, self.valid, self.masks, loss_weight, self.kmat)
         loss_gt = self.pose_head.objective(*xs, y=small_angle_lie_SE3_to_se3_batch(self.poses.matrix()))
-        #self.assertTrue(torch.allclose(loss_gt, torch.zeros_like(loss_gt)))
-
+        self.assertTrue(torch.allclose(loss_gt, torch.zeros_like(loss_gt), atol=1e-5))
         poses = self.pose_head.solve(*xs)[0].float()
         loss_pred = self.pose_head.objective(*xs, y=poses)
-        #self.assertTrue(torch.allclose(loss_pred, torch.zeros_like(loss_gt), atol=1.5))
-        supervised_loss = (poses - self.poses.log()).abs().sum()/n
-        #self.assertTrue(torch.allclose(supervised_loss, torch.zeros_like(supervised_loss), atol=0.5))
+        self.assertTrue(torch.allclose(loss_pred, torch.zeros_like(loss_gt), atol=1e-5))
+        supervised_loss = (poses - small_angle_lie_SE3_to_se3_batch(self.poses.matrix())).abs().sum()/n
+        self.assertTrue(torch.allclose(supervised_loss, torch.zeros_like(supervised_loss), atol=0.05))
         print("gt-loss: ", loss_gt)
         print("predicted loss: ", loss_pred)
         print("supervised loss: ", supervised_loss)
