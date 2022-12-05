@@ -16,7 +16,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         """
         n, _, h, w = flow.shape
         # project 3D-pcl to image plane
-        warped_pts = project(pcl1.view(n,3,-1), y.inv(), intrinsics)
+        warped_pts = project(pcl1.view(n,3,-1), y, intrinsics)
         flow_off = self.img_coordinates[None, :2] + flow.view(n, 2, -1)
         # compute residuals
         residuals = torch.sum((flow_off - warped_pts)**2, dim=1)
@@ -39,9 +39,9 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         """
         n, _, h, w = pcl1.shape
         # transform point cloud given the pose
-        pcl2_aligned = transform(homogeneous(pcl2.view(n, 3, -1)), y).reshape(n, 4, h, w)[:, :3]
+        pcl1_aligned = transform(homogeneous(pcl1.view(n, 3, -1)), y).reshape(n, 4, h, w)[:, :3]
         # compute residuals
-        residuals = torch.sum((pcl2_aligned.view(n, 3, -1) - pcl1.view(n, 3, -1)) ** 2, dim=1)
+        residuals = torch.sum((pcl1_aligned.view(n, 3, -1) - pcl2.view(n, 3, -1)) ** 2, dim=1)
         # reweighing residuals
         residuals *= weights2.view(n, -1)
         # mask out invalid residuals
