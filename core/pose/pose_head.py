@@ -39,7 +39,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         """
         n, _, h, w = pcl1.shape
         # transform point cloud given the pose
-        pcl1_aligned = transform(homogeneous(pcl1.view(n, 3, -1)), y).reshape(n, 4, h, w)[:, :3]
+        pcl1_aligned = transform(pcl1.view(n, 3, -1), y).reshape(n, 3, h, w)[:, :3]
         # compute residuals
         residuals = torch.sum((pcl1_aligned.view(n, 3, -1) - pcl2.view(n, 3, -1)) ** 2, dim=1)
         # reweighing residuals
