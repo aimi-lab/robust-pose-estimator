@@ -86,13 +86,12 @@ class PoseEstimator(torch.nn.Module):
             success = True
         self.last_frame = ret_frame
         # chain relative pose with last pose estimation to obtain absolute pose
-        rel_pose = rel_pose.scale(self.scale) # de-normalize depth scaling
+        rel_pose = rel_pose.scale(1/self.scale) # de-normalize depth scaling
         self.last_pose = self.last_pose * rel_pose  # chain transforms
 
         # update scene model
         if success & (flow is not None) & (self.scene is not None):
             self.scene.fuse(self.frame, self.last_pose.float())
-
         return self.last_pose, self.scene, flow
 
     def get_pose_f2f(self):
