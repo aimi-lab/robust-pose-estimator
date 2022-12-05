@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.utils.data as data
+from lietorch import SE3
 
 import os
 from glob import glob
@@ -8,7 +9,6 @@ from typing import Tuple
 import cv2
 from core.utils.pfm_handler import load_pfm
 from core.utils.trajectory import read_freiburg
-from core.geometry.lie_3d_small_angle import small_angle_lie_SE3_to_se3
 from torchvision.transforms import Resize, InterpolationMode
 from torch.utils.data import Dataset
 from dataset.rectification import StereoRectifier
@@ -78,7 +78,7 @@ class PoseDataset(Dataset):
         for i in sample_list:
             s = np.random.randint(*step) if step[0] < step[1] else step[0]  # select a random step in given range
             self.image_list.append([images_l[i], images_l[i+s]])
-            self.rel_pose_list.append(np.linalg.inv(poses[i+s].astype(np.float64)) @ poses[i].astype(np.float64))
+            self.rel_pose_list.append(poses[i+s].inv().mul(poses[i]))
             self.image_list_r.append([images_r[i], images_r[i+s]])
             self.mask_list.append([semantics[i], semantics[i+s]])
         self.resize = Resize(img_size)
@@ -93,15 +93,14 @@ class PoseDataset(Dataset):
         img1_r = self._read_img(self.image_list_r[index][0])
         img2_r = self._read_img(self.image_list_r[index][1])
 
-        pose = torch.from_numpy(self.rel_pose_list[index]).clone()
-        pose[:3,3] /= self.depth_cutoff  # normalize translation
-        pose_se3 = small_angle_lie_SE3_to_se3(pose)
+        pose = self.rel_pose_list[index].clone()
+        pose = pose.scale(1/self.depth_cutoff)  # normalize translation
 
         # generate mask
         mask1 = self._read_mask(self.mask_list[index][0])
         mask2 = self._read_mask(self.mask_list[index][1])
 
-        return img1, img2, img1_r, img2_r, mask1, mask2, pose_se3.float(), self.intrinsics[index], float(self.baseline[index]/self.depth_cutoff)
+        return img1, img2, img1_r, img2_r, mask1, mask2, pose, self.intrinsics[index], float(self.baseline[index]/self.depth_cutoff)
 
     def _read_img(self, path):
         img = torch.from_numpy(cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)).permute(2, 0, 1).float()

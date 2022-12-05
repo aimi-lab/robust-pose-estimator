@@ -1,6 +1,7 @@
+from lietorch import SE3, LieGroupParameter
+
 from core.geometry.pinhole_transforms import transform, homogeneous, project
 from core.ddn.ddn.pytorch.node import *
-from core.geometry.lie_3d_small_angle import small_angle_lie_se3_to_SE3_batch_lin
 
 
 class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
@@ -14,9 +15,8 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
             r2D - reprojection residuals
         """
         n, _, h, w = flow.shape
-        pose = small_angle_lie_se3_to_SE3_batch_lin(-y)  # invert transform to be consistent with other pose estimators
         # project 3D-pcl to image plane
-        warped_pts = project(pcl1.view(n,3,-1), pose, intrinsics)
+        warped_pts = project(pcl1.view(n,3,-1), y.inv(), intrinsics)
         flow_off = self.img_coordinates[None, :2] + flow.view(n, 2, -1)
         # compute residuals
         residuals = torch.sum((flow_off - warped_pts)**2, dim=1)
@@ -38,10 +38,8 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
             r3D - point-to-point 3D residuals
         """
         n, _, h, w = pcl1.shape
-        # se(3) to SE(3)
-        pose = small_angle_lie_se3_to_SE3_batch_lin(y)
         # transform point cloud given the pose
-        pcl2_aligned = transform(homogeneous(pcl2.view(n, 3, -1)), pose).reshape(n, 4, h, w)[:, :3]
+        pcl2_aligned = transform(homogeneous(pcl2.view(n, 3, -1)), y).reshape(n, 4, h, w)[:, :3]
         # compute residuals
         residuals = torch.sum((pcl2_aligned.view(n, 3, -1) - pcl1.view(n, 3, -1)) ** 2, dim=1)
         # reweighing residuals
@@ -61,23 +59,23 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
 
     def solve(self, *xs):
         self.img_coordinates = self.img_coordinates.to(xs[0].device)
-        xs = [x.detach().clone() for x in xs]
+        xs = [x.detach().clone()for x in xs]
+        xs = [x.double() if x.dtype==torch.float32 else x for x in xs]
         with torch.enable_grad():
             n = xs[0].shape[0]
             # Solve using LBFGS optimizer:
-            y = torch.zeros((n,6), device=xs[0].device, requires_grad=True)
-            torch.backends.cuda.matmul.allow_tf32 = False
-            optimizer = torch.optim.LBFGS([y], lr=1.0, max_iter=self.lbgfs_iters, line_search_fn="strong_wolfe", )
+            y = LieGroupParameter(SE3.Identity(n, device=xs[0].device, requires_grad=True, dtype=torch.float64))
+            # don't use strong-wolfe with lietorch SE3, it does not converge
+            optimizer = torch.optim.LBFGS([y], lr=1.0, max_iter=self.lbgfs_iters, line_search_fn=None, )
 
             def fun():
                 optimizer.zero_grad()
                 loss = self.objective(*xs, y=y).sum()
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(y, 100)
+                torch.nn.utils.clip_grad_norm_(y, 10)
                 return loss
             optimizer.step(fun)
-        torch.backends.cuda.matmul.allow_tf32 = True
-        return y.detach(), None
+        return y.group.detach().vec(), None
 
     # we re-implement the gradient function with more error-handling to catch failed optimization runs
     def gradient(self, *xs, y=None, v=None, ctx=None):

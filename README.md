@@ -25,6 +25,7 @@ checkout thirdparty code with
 
 ``` $ git submodule update --init --recursive ```
 
+``` $ pip install git+https://github.com/princeton-vl/lietorch.git ```
 
 ## Prepare the data
 

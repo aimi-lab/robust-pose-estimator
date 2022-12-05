@@ -3,7 +3,6 @@ try:
     import matplotlib.pyplot as plt
 except:
     pass
-from core.geometry.pinhole_transforms import inv_transform
 
 
 class Viewer3D(object):
@@ -32,7 +31,7 @@ class Viewer3D(object):
         self.is_deformed = False
 
     def pose2view(self, pose):
-        self.ref_view.extrinsic = inv_transform(pose).numpy()
+        self.ref_view.extrinsic = pose.inv().matrix.numpy()
         return self.ref_view
 
     def exit_loop_callback(self, dummy):

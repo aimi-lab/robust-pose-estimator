@@ -18,8 +18,8 @@ def eval(gt_list:str, pred_list:str, delta:int=1, offset:int=0, ret_align_T=Fals
     gt_poses = []
     for k in pred_keys:
         if (k+offset > 0) & (k+offset < max(gt_keys)):
-            pred_poses.append(pred_list[k])
-            gt_poses.append(gt_list[k+offset])
+            pred_poses.append(pred_list[k].matrix())
+            gt_poses.append(gt_list[k+offset].matrix())
     pred_poses = np.stack(pred_poses)
     gt_poses = np.stack(gt_poses)
 
