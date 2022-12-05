@@ -19,7 +19,7 @@ def save_trajectory(trajectory: list, path: str):
         for tr in trajectory:
             assert isinstance(tr['camera-pose'], SE3)
             vec = tr['camera-pose'].vec().cpu().squeeze().numpy()
-            t = (vec[0]/1000.0, vec[1]/1000.0, vec[2]/100.0)
+            t = (vec[0]/1000.0, vec[1]/1000.0, vec[2]/1000.0)
             f.write(f"{tr['timestamp']} {t[0]} {t[1]} {t[2]} {vec[3]} {vec[4]} {vec[5]} {vec[6]}\n")
 
 
