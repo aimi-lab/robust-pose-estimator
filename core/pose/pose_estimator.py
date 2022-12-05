@@ -77,7 +77,7 @@ class PoseEstimator(torch.nn.Module):
             rel_pose, ret_frame, flow = self.get_pose_f2m()
 
         # check if pose is valid
-        if (torch.isnan(rel_pose.vec()).any()) | (torch.abs(rel_pose.vec()) > 1.0e-1).any():
+        if (torch.isnan(rel_pose.vec()).any()) | (torch.abs(rel_pose.log()) > 1.0e-1).any():
             # pose estimation failed, keep last image as reference and skip this one
             warnings.warn('pose estimation not converged, skip.', RuntimeWarning)
             rel_pose = SE3.IdentityLike(self.last_pose)
