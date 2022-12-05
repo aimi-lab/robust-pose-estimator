@@ -100,7 +100,7 @@ class PoseDataset(Dataset):
         mask1 = self._read_mask(self.mask_list[index][0])
         mask2 = self._read_mask(self.mask_list[index][1])
 
-        return img1, img2, img1_r, img2_r, mask1, mask2, pose, self.intrinsics[index], float(self.baseline[index]/self.depth_cutoff)
+        return img1, img2, img1_r, img2_r, mask1, mask2, pose.vec(), self.intrinsics[index], float(self.baseline[index]/self.depth_cutoff)
 
     def _read_img(self, path):
         img = torch.from_numpy(cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)).permute(2, 0, 1).float()
