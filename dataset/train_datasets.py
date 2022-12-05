@@ -93,8 +93,8 @@ class PoseDataset(Dataset):
         img1_r = self._read_img(self.image_list_r[index][0])
         img2_r = self._read_img(self.image_list_r[index][1])
 
-        pose = self.rel_pose_list[index].clone()
-        pose = pose.scale(1/self.depth_cutoff)  # normalize translation
+        pose = self.rel_pose_list[index]
+        pose = pose.scale(torch.tensor(1/self.depth_cutoff))  # normalize translation
 
         # generate mask
         mask1 = self._read_mask(self.mask_list[index][0])

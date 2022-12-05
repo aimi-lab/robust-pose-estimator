@@ -25,7 +25,7 @@ def supervised_pose_loss(pose_pred, pose_gt):
     return l1
 
 
-def val(model, dataloader, device, intrinsics, logger, key):
+def val(model, dataloader, device, logger, key):
     model.eval()
     with torch.no_grad():
         for i_batch, data_blob in enumerate(dataloader):
@@ -142,8 +142,8 @@ def main(args, config, force_cpu):
                 logger.flush()
 
             if (total_steps % VAL_FREQ) == 0:
-                val_loss = val(model, val_loader, device, intrinsics, logger, 'val')
-                val_loss2 = val(model, val2_loader, device, intrinsics, logger, 'val2')
+                val_loss = val(model, val_loader, device, logger, 'val')
+                val_loss2 = val(model, val2_loader, device, logger, 'val2')
                 val_loss += val_loss2
                 if torch.isnan(torch.tensor(val_loss)):
                     should_keep_training = False
