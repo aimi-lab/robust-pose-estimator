@@ -1,6 +1,6 @@
 import torch
-from typing import Tuple
-from lietorch import SE3
+from typing import Tuple, Union
+from lietorch import SE3, LieGroupParameter
 
 
 def create_img_coords_t(
@@ -24,15 +24,11 @@ def homogeneous(opts: torch.Tensor):
     return opts
 
 
-def transform(opts: torch.Tensor, T:SE3):
-    # lietorch expects (mx4) inputs
-    # opts = T * opts # ToDo how can we make it broadcastable?
-    # broadcast workaround
-    opts_tr = []
-    for n in range(opts.shape[0]):
-        opts_tr.append((T[None, n] * opts[n].T).T)
-    opts_tr = torch.stack(opts_tr, dim=0)
-    return opts_tr
+def transform(opts: torch.Tensor, T:Union[SE3, LieGroupParameter]):
+    if (isinstance(T, SE3) & (len(T.shape) == 1)) | (isinstance(T, LieGroupParameter) & (len(T.shape) == 2)):
+        T = T[:, None, :]  # broadcast dim
+    opts_tr = T * opts.permute(0, 2, 1)
+    return opts_tr.permute(0, 2, 1)
 
 
 def reproject(depth: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.Tensor):
@@ -46,7 +42,7 @@ def reproject(depth: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.T
     return opts
 
 
-def project(opts: torch.Tensor, T:SE3, intrinsics:torch.tensor):
+def project(opts: torch.Tensor, T:Union[SE3, LieGroupParameter], intrinsics:torch.tensor):
     # pinhole projection
     opts = transform(opts, T)
     ipts = torch.bmm(intrinsics, opts)
@@ -59,7 +55,7 @@ def project2image(
         opts: torch.Tensor,
         intrinsics: torch.Tensor,
         img_shape: Tuple,
-        T: SE3 = None
+        T:Union[SE3, LieGroupParameter] = None
                     ):
     assert len(img_shape) == 2
     if T is None:
