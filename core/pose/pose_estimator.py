@@ -38,7 +38,7 @@ class PoseEstimator(torch.nn.Module):
         self.model = model
         self.intrinsics = intrinsics.unsqueeze(0).float()
         self.register_buffer("scale", torch.tensor(1 / config['depth_clipping'][1]), persistent=False)
-        self.last_pose = init_pose
+        self.last_pose = init_pose.float('api bug')
         self.register_buffer("baseline", torch.tensor(baseline).unsqueeze(0).float(), persistent=False)
         self.last_frame = None
         self.frame2frame = config['frame2frame']
@@ -73,7 +73,7 @@ class PoseEstimator(torch.nn.Module):
                 self.frame.flow = stereo_flow
                 self.scene = SurfelMap(frame=self.frame, kmat=self.intrinsics.squeeze(), upscale=1,
                                        d_thresh=self.config['dist_thr'],
-                                       pmat=self.last_pose.float(), average_pts=self.config['average_pts']).to(self.device)
+                                       pmat=self.last_pose, average_pts=self.config['average_pts']).to(self.device)
             rel_pose, ret_frame, flow = self.get_pose_f2m()
 
         # check if pose is valid
@@ -91,7 +91,7 @@ class PoseEstimator(torch.nn.Module):
 
         # update scene model
         if success & (flow is not None) & (self.scene is not None):
-            self.scene.fuse(self.frame, self.last_pose.float())
+            self.scene.fuse(self.frame, self.last_pose)
         return self.last_pose, self.scene, flow
 
     def get_pose_f2f(self):
@@ -130,7 +130,7 @@ class PoseEstimator(torch.nn.Module):
             estimate relative pose between current and canocial scene model
         """
         # transform scene to last camera pose coordinates
-        scene_tlast = self.scene.transform_cpy(self.last_pose.inv().float())
+        scene_tlast = self.scene.transform_cpy(self.last_pose.inv())
         # render frame from scene
         model_frame = scene_tlast.render(self.intrinsics.squeeze())[0]
         # get pose
@@ -148,7 +148,7 @@ class PoseEstimator(torch.nn.Module):
         self.frame.depth = depth2/self.scale
         self.frame.flow = stereo_flow
         model_frame.confidence = conf_1
-        return rel_pose_se3.double(), model_frame, flow
+        return rel_pose_se3, model_frame, flow
 
     @property
     def device(self):

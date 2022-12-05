@@ -53,6 +53,8 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
 
     def objective(self, *xs, y):
         flow, pcl1, pcl2, weights1, weights2, mask1, mask2, loss_weight, intrinsics= xs
+        if not (isinstance(y, SE3) | isinstance(y, LieGroupParameter)):
+            y = SE3(y)
         loss3d = self.depth_objective(pcl1, pcl2, weights2, mask1, mask2, y)
         loss2d = self.reprojection_objective(flow, pcl1, weights1,mask1, intrinsics, y)
         return loss_weight[:, 1]*loss2d + loss_weight[:, 0]*loss3d
@@ -75,7 +77,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
                 torch.nn.utils.clip_grad_norm_(y, 10)
                 return loss
             optimizer.step(fun)
-        return y.group.detach().vec(), None
+        return y.group.detach().vec().float(), None
 
     # we re-implement the gradient function with more error-handling to catch failed optimization runs
     def gradient(self, *xs, y=None, v=None, ctx=None):
