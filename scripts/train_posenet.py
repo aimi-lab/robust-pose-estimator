@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.cuda.amp import GradScaler
+from lietorch import SE3
 import wandb
 
 from core.pose.pose_net import PoseNet
@@ -25,12 +26,13 @@ def supervised_pose_loss(pose_pred, pose_gt):
     return l1
 
 
-def val(model, dataloader, device, intrinsics, logger, key):
+def val(model, dataloader, device, logger, key):
     model.eval()
     with torch.no_grad():
         for i_batch, data_blob in enumerate(dataloader):
             ref_img, trg_img, ref_img_r, trg_img_r, ref_mask, trg_mask, gt_pose, intrinsics, baseline = [x.to(device) for x in
                                                                                               data_blob]
+            gt_pose = SE3(gt_pose)
             flow_predictions, pose_predictions, trg_depth, ref_depth, conf1, conf2 = model(trg_img, ref_img,
                                                                                            intrinsics.float(), baseline.float(),
                                                                                            image1r=trg_img_r,
@@ -101,7 +103,7 @@ def main(args, config, force_cpu):
             ref_img, trg_img, ref_img_r, trg_img_r, ref_mask, trg_mask, gt_pose, intrinsics, baseline = [
                 x.to(device) for x in
                 data_blob]
-
+            gt_pose = SE3(gt_pose)
             # forward pass
             flow_predictions, pose_predictions, trg_depth, ref_depth, conf1, conf2 = model(trg_img, ref_img,
                                                                                            intrinsics.float(), baseline.float(),
@@ -126,11 +128,7 @@ def main(args, config, force_cpu):
                 print(" trans loss: ", loss_cpu[:, 3:].mean().item())
                 print(" rot loss: ", loss_cpu[:, :3].mean().item())
 
-            pose_change = (torch.abs(gt_pose).sum(dim=-1, keepdim=True) + 1e-12).detach().cpu()
             metrics = {"train/loss_rot": loss_cpu[:,:3].mean().item(),
-                       "train/loss_rot_rel": (loss_cpu[:, :3] / pose_change).mean().item(),
-                       "train/loss_trans_rel": (loss_cpu[:, 3:] / pose_change).mean().item(),
-                       "train/loss_rel": (loss_cpu/pose_change).mean().item(),
                       "train/loss_trans": loss_cpu[:, 3:].mean().item(),
                       "train/loss_total": loss_cpu.mean().item()}
 
@@ -142,8 +140,8 @@ def main(args, config, force_cpu):
                 logger.flush()
 
             if (total_steps % VAL_FREQ) == 0:
-                val_loss = val(model, val_loader, device, intrinsics, logger, 'val')
-                val_loss2 = val(model, val2_loader, device, intrinsics, logger, 'val2')
+                val_loss = val(model, val_loader, device, logger, 'val')
+                val_loss2 = val(model, val2_loader, device, logger, 'val2')
                 val_loss += val_loss2
                 if torch.isnan(torch.tensor(val_loss)):
                     should_keep_training = False
