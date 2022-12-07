@@ -23,7 +23,7 @@ class PoseEstimator(torch.nn.Module):
         super(PoseEstimator, self).__init__()
 
         # load model from checkpoint
-        checkp = torch.load(checkpoint)
+        checkp = torch.load(checkpoint, map_location='cpu')
         checkp['config']['model']['image_shape'] = (img_shape[1], img_shape[0])
         checkp['config']['model']['lbgfs_iters'] = config['lbgfs_iters']
         model = PoseNet(checkp['config']['model'])
