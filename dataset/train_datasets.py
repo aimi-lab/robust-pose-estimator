@@ -49,7 +49,7 @@ class PoseDataset(Dataset):
         super(PoseDataset, self).__init__()
         images_l = sorted(glob(os.path.join(root, 'video_frames', '*l.png')))
         images_r = sorted(glob(os.path.join(root, 'video_frames', '*r.png')))
-        masks = sorted(glob(os.path.join(root, 'tool_masks', '*l.png')))
+        masks = sorted(glob(os.path.join(root, 'masks', '*l.png')))
         gt_file = os.path.join(root, 'groundtruth.txt')
         poses = read_freiburg(gt_file)
         assert len(images_l) == len(images_r)
@@ -100,7 +100,7 @@ class PoseDataset(Dataset):
     def _read_mask(self, path):
         mask = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
         mask = mask > 0
-        mask = torch.from_numpy(mask).unsqueeze(0).unsqueeze(0)
+        mask = torch.from_numpy(mask).unsqueeze(0)
         return self.resize_msk(mask)
 
     def __len__(self):
