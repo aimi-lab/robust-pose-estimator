@@ -54,7 +54,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
     def objective(self, *xs, y):
         flow, pcl1, pcl2, weights1, weights2, mask1, mask2, loss_weight, intrinsics= xs
         if not (isinstance(y, SE3) | isinstance(y, LieGroupParameter)):
-            y = SE3(y)
+            y = SE3.InitFromVec(y)
         loss3d = self.depth_objective(pcl1, pcl2, weights2, mask1, mask2, y)
         loss2d = self.reprojection_objective(flow, pcl1, weights1,mask1, intrinsics, y)
         return loss_weight[:, 1]*loss2d + loss_weight[:, 0]*loss3d

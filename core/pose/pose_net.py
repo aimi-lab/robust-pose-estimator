@@ -53,7 +53,7 @@ class PoseNet(nn.Module):
         # estimate relative pose
         n = image1l.shape[0]
         pose_se3 = self.pose_head(time_flow, pcl1, pcl2, conf1, conf2, mask1.bool(), mask2.bool(), self.loss_weight.repeat(n, 1), intrinsics)
-        pose_se3 = SE3(pose_se3)
+        pose_se3 = SE3.InitFromVec(pose_se3)
         if ret_confmap:
             return time_flow, pose_se3, depth1, depth2, conf1, conf2
         return time_flow, pose_se3, depth1, depth2
@@ -86,7 +86,7 @@ class PoseNet(nn.Module):
         n = image1l.shape[0]
         pose_se3 = self.pose_head(time_flow, pcl1, pcl2, conf1, conf2, mask1.bool(), mask2.bool(),
                                   self.loss_weight.repeat(n, 1), intrinsics)
-        pose_se3 = SE3(pose_se3)
+        pose_se3 = SE3.InitFromVec(pose_se3)
         if ret_details:
             return pose_se3, depth1, depth2, conf1, conf2, time_flow, stereo_flow2
         return pose_se3
