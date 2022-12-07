@@ -147,6 +147,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
                 gradients.append(gradient.reshape(x_size))
             else:
                 gradients.append(None)
+        print('good gradient')
         return tuple(gradients)
 
     def zero_grad(self, *xs):
