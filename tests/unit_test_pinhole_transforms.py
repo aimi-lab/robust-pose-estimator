@@ -1,7 +1,7 @@
 import unittest
 import torch
 from lietorch import SE3, LieGroupParameter
-from core.geometry.pinhole_transforms import transform, project, project2image, reproject, transform_forward
+from core.geometry.pinhole_transforms import transform, project, project2image, reproject, transform_forward, Transform
 
 
 class PinholeTransformTester(unittest.TestCase):
@@ -51,6 +51,10 @@ class PinholeTransformTester(unittest.TestCase):
             transformed.sum().backward()
             self.assertTrue(torch.allclose(pose_grad, param.grad))
             self.assertTrue(torch.allclose(pcl_grad, pcl.grad))
+            # import torchviz
+            # transformed_custom = transform(pcl, param)
+            # grad_x, = torch.autograd.grad(transformed_custom.sum(), param, create_graph=True)
+            # torchviz.make_dot((grad_x, param, transformed_custom), params={"grad_x": grad_x, "poses": param, "out": transformed_custom}).render('graph')
 
     def test_all(self):
 

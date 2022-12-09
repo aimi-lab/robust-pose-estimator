@@ -52,14 +52,6 @@ def transform_backward(grad_out, out, opts_grad, T):
     return grad_opts, grad_T
 
 
-def transform_backward_backward(grad_out, sav_grad_out, x):
-    return grad_out * sav_grad_out * 6 * x
-
-
-def transform_backward_backward_grad_out(grad_out, x):
-    return grad_out * 3 * x**2
-
-
 class Transform(torch.autograd.Function):
     @staticmethod
     def forward(ctx, opts, T):
@@ -72,20 +64,7 @@ class Transform(torch.autograd.Function):
     def backward(ctx, grad_out):
         opts, T, out = ctx.saved_tensors
         return transform_backward(grad_out, out, opts.requires_grad, T)
-        #return TransformBackward.apply(grad_out, out)
 
-class TransformBackward(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, grad_out, x):
-        ctx.save_for_backward(x, grad_out)
-        return transform_backward(grad_out, x)
-
-    @staticmethod
-    def backward(ctx, grad_out):
-        x, sav_grad_out = ctx.saved_tensors
-        dx = transform_backward_backward(grad_out, sav_grad_out, x)
-        dgrad_out = transform_backward_backward_grad_out(grad_out, x)
-        return dgrad_out, dx
 
 def transform(opts: torch.Tensor, T:Union[SE3, LieGroupParameter]):
     return Transform.apply(opts, T)
