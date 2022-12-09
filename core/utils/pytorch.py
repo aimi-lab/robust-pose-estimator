@@ -167,3 +167,24 @@ def image_gradient(img: torch.Tensor):
                  (2, 2, 2, 2)).reshape(batch, channels, -1)
     gradient = torch.stack((x_grad, y_grad), dim=-1)
     return gradient
+
+
+def skewmat(vec: torch.Tensor = None) -> torch.Tensor:
+    """
+    create hat-map in so(3) from Euler vector in R^3
+    :param wvec: Euler vector in R^3
+    :return: hat-map in so(3)
+    """
+
+    if vec.ndim == 1:
+        vec = vec.unsqueeze(0)
+    assert vec.shape[1] == 3, 'argument must be a 3-vector'
+
+    W_row0 = torch.tensor([0, 0, 0, 0, 0, 1, 0, -1, 0.0], device=vec.device, dtype=vec.dtype).view(3, 3)
+    W_row1 = torch.tensor([0, 0, -1, 0, 0, 0, 1, 0, 0.0], device=vec.device, dtype=vec.dtype).view(3, 3)
+    W_row2 = torch.tensor([0, 1, 0, -1, 0, 0, 0, 0, 0.0], device=vec.device, dtype=vec.dtype).view(3, 3)
+
+    wmat = torch.stack(
+        [torch.matmul(vec, W_row0.T), torch.matmul(vec, W_row1.T), torch.matmul(vec, W_row2.T)], dim=-1)
+
+    return wmat

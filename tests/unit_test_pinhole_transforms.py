@@ -1,7 +1,7 @@
 import unittest
 import torch
-from lietorch import SE3
-from core.geometry.pinhole_transforms import transform, project, project2image, reproject
+from lietorch import SE3, LieGroupParameter
+from core.geometry.pinhole_transforms import transform, project, project2image, reproject, transform_forward
 
 
 class PinholeTransformTester(unittest.TestCase):
@@ -32,10 +32,30 @@ class PinholeTransformTester(unittest.TestCase):
         pcl2_transformed_mat = torch.bmm(poses.matrix(), torch.cat((self.pcl, torch.ones((self.pcl.shape[0], 1, self.pcl.shape[-1]))), dim=1))
         self.assertTrue(torch.allclose(pcl2_transformed_mat[:,:3], pcl2_transformed_lie, rtol=1e-3, atol=1e-6))
 
+    def test_transform_backward(self):
+        with torch.enable_grad():
+            poses = SE3.Random(20)
+            poses = poses[:, None, :]
+            param = LieGroupParameter(poses)
+            pcl = torch.nn.Parameter(self.pcl)
+
+            transformed_custom = transform(pcl, param)
+            transformed_custom.sum().backward()
+            pose_grad = param.grad.clone()
+            pcl_grad = pcl.grad.clone()
+            param.grad.detach_()
+            param.grad.zero_()
+            pcl.grad.detach_()
+            pcl.grad.zero_()
+            transformed = transform_forward(pcl, param)
+            transformed.sum().backward()
+            self.assertTrue(torch.allclose(pose_grad, param.grad))
+            self.assertTrue(torch.allclose(pcl_grad, pcl.grad))
+
     def test_all(self):
 
         self.test_transform()
-
+        self.test_transform_backward()
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,6 +1,7 @@
 import torch
 from typing import Tuple, Union
 from lietorch import SE3, LieGroupParameter
+from core.utils.pytorch import skewmat
 
 
 def create_img_coords_t(
@@ -24,11 +25,70 @@ def homogeneous(opts: torch.Tensor):
     return opts
 
 
-def transform(opts: torch.Tensor, T:Union[SE3, LieGroupParameter]):
+def transform_forward(opts: torch.Tensor, T:Union[SE3, LieGroupParameter]):
     if (isinstance(T, SE3) & (len(T.shape) == 1)) | (isinstance(T, LieGroupParameter) & (len(T.shape) == 2)):
         T = T[:, None, :]  # broadcast dim
     opts_tr = T * opts.permute(0, 2, 1)
     return opts_tr.permute(0, 2, 1)
+
+
+def transform_backward(grad_out, out, opts_grad, T):
+    # (I | -out_x) \in R^(3x6)
+    n = grad_out.shape[0]
+    grad_out = grad_out.movedim(1, -1).reshape(-1, 1,3)
+    out = out.movedim(1, -1).reshape(-1, 3)
+    if T.requires_grad:
+        grad_T = torch.bmm(grad_out,torch.cat((torch.eye(3).repeat(grad_out.shape[0], 1, 1), skewmat(-out)), dim=-1))
+        grad_T = grad_T.reshape(n, -1, 6)
+    else:
+        grad_T = None
+    if opts_grad:
+        # 3x3 rot matrix
+        m = grad_out.shape[0]//n//T.shape[1]
+        grad_opts = torch.bmm(grad_out,T.group.matrix().repeat(1,m,1,1).view(-1,4,4)[:, :3, :3])
+        grad_opts = grad_opts.reshape(n, -1, 3).permute(0, 2, 1)
+    else:
+        grad_opts = None
+    return grad_opts, grad_T
+
+
+def transform_backward_backward(grad_out, sav_grad_out, x):
+    return grad_out * sav_grad_out * 6 * x
+
+
+def transform_backward_backward_grad_out(grad_out, x):
+    return grad_out * 3 * x**2
+
+
+class Transform(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, opts, T):
+        with torch.no_grad():
+            out = transform_forward(opts, T)
+        ctx.save_for_backward(opts, T, out)
+        return out
+
+    @staticmethod
+    def backward(ctx, grad_out):
+        opts, T, out = ctx.saved_tensors
+        return transform_backward(grad_out, out, opts.requires_grad, T)
+        #return TransformBackward.apply(grad_out, out)
+
+class TransformBackward(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, grad_out, x):
+        ctx.save_for_backward(x, grad_out)
+        return transform_backward(grad_out, x)
+
+    @staticmethod
+    def backward(ctx, grad_out):
+        x, sav_grad_out = ctx.saved_tensors
+        dx = transform_backward_backward(grad_out, sav_grad_out, x)
+        dgrad_out = transform_backward_backward_grad_out(grad_out, x)
+        return dgrad_out, dx
+
+def transform(opts: torch.Tensor, T:Union[SE3, LieGroupParameter]):
+    return Transform.apply(opts, T)
 
 
 def reproject(depth: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.Tensor):
