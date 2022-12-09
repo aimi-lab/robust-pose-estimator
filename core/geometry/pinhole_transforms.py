@@ -26,26 +26,28 @@ def homogeneous(opts: torch.Tensor):
 
 
 def transform_forward(opts: torch.Tensor, T:Union[SE3, LieGroupParameter]):
-    if (isinstance(T, SE3) & (len(T.shape) == 1)) | (isinstance(T, LieGroupParameter) & (len(T.shape) == 2)):
-        T = T[:, None, :]  # broadcast dim
     opts_tr = T * opts.permute(0, 2, 1)
     return opts_tr.permute(0, 2, 1)
 
 
 def transform_backward(grad_out, out, opts_grad, T):
-    # (I | -out_x) \in R^(3x6)
+    # custom backward function to enable double backward
     n = grad_out.shape[0]
     grad_out = grad_out.movedim(1, -1).reshape(-1, 1,3)
     out = out.movedim(1, -1).reshape(-1, 3)
     if T.requires_grad:
+        # (I | -out_x) \in R^(3x6)
         grad_T = torch.bmm(grad_out,torch.cat((torch.eye(3).repeat(grad_out.shape[0], 1, 1), skewmat(-out)), dim=-1))
         grad_T = grad_T.reshape(n, -1, 6)
     else:
         grad_T = None
     if opts_grad:
         # 3x3 rot matrix
+        if isinstance(T, LieGroupParameter):
+            T = T.group
         m = grad_out.shape[0]//n//T.shape[1]
-        grad_opts = torch.bmm(grad_out,T.group.matrix().repeat(1,m,1,1).view(-1,4,4)[:, :3, :3])
+
+        grad_opts = torch.bmm(grad_out,T.matrix().repeat(1,m,1,1).view(-1,4,4)[:, :3, :3])
         grad_opts = grad_opts.reshape(n, -1, 3).permute(0, 2, 1)
     else:
         grad_opts = None
@@ -66,8 +68,11 @@ class Transform(torch.autograd.Function):
         return transform_backward(grad_out, out, opts.requires_grad, T)
 
 
-def transform(opts: torch.Tensor, T:Union[SE3, LieGroupParameter]):
-    return Transform.apply(opts, T)
+def transform(opts: torch.Tensor, T:Union[SE3, LieGroupParameter], double_backward:bool=False):
+    if double_backward:
+        return Transform.apply(opts, T)
+    else:
+        return transform_forward(opts, T)
 
 
 def reproject(depth: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.Tensor):

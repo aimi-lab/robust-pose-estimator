@@ -33,13 +33,13 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
             return loss, residuals, flow
         return loss
 
-    def depth_objective(self, pcl1, pcl2, weights2, mask1, mask2, y, ret_res=False):
+    def depth_objective(self, pcl1, pcl2, weights2, mask1, mask2, y, backward=False, ret_res=False):
         """
             r3D - point-to-point 3D residuals
         """
         n, _, h, w = pcl1.shape
         # transform point cloud given the pose
-        pcl1_aligned = transform(pcl1.view(n, 3, -1), y).reshape(n, 3, h, w)[:, :3]
+        pcl1_aligned = transform(pcl1.view(n, 3, -1), y, double_backward=backward).reshape(n, 3, h, w)[:, :3]
         # compute residuals
         residuals = torch.sum((pcl1_aligned.view(n, 3, -1) - pcl2.view(n, 3, -1)) ** 2, dim=1)
         # reweighing residuals
@@ -51,12 +51,12 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
             return torch.mean(residuals, dim=-1), residuals
         return torch.mean(residuals, dim=-1)
 
-    def objective(self, *xs, y):
+    def objective(self, *xs, y, backward=False):
         flow, pcl1, pcl2, weights1, weights2, mask1, mask2, loss_weight, intrinsics= xs
         if not (isinstance(y, SE3) | isinstance(y, LieGroupParameter)):
             y = SE3.InitFromVec(y)
             raise NotImplementedError("second order derivatives of Lietorch not implemented")
-        loss3d = self.depth_objective(pcl1, pcl2, weights2, mask1, mask2, y)
+        loss3d = self.depth_objective(pcl1, pcl2, weights2, mask1, mask2, y, backward)
         loss2d = self.reprojection_objective(flow, pcl1, weights1,mask1, intrinsics, y)
         return loss_weight[:, 1]*loss2d + loss_weight[:, 0]*loss3d
 
@@ -67,7 +67,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         with torch.enable_grad():
             n = xs[0].shape[0]
             # Solve using LBFGS optimizer:
-            y = LieGroupParameter(SE3.Identity(n, device=xs[0].device, requires_grad=True, dtype=torch.float64))
+            y = LieGroupParameter(SE3.Identity(n, 1, device=xs[0].device, requires_grad=True, dtype=torch.float64))
             # don't use strong-wolfe with lietorch SE3, it does not converge
             optimizer = torch.optim.LBFGS([y], lr=1.0, max_iter=self.lbgfs_iters, line_search_fn=None, )
 
@@ -78,7 +78,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
                 torch.nn.utils.clip_grad_norm_(y, 10)
                 return loss
             optimizer.step(fun)
-        return y.group.detach().vec().float(), None
+        return y.group.vec().detach().float(), None
 
     # we re-implement the gradient function with more error-handling to catch failed optimization runs
     def gradient(self, *xs, y=None, v=None, ctx=None):
@@ -160,3 +160,26 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
             else:
                 gradients.append(None)
         return tuple(gradients)
+
+    def _get_objective_derivatives(self, xs, y):
+        # Evaluate objective function at (xs,y):
+        y = LieGroupParameter(SE3(y))
+        f = torch.enable_grad()(self.objective)(*xs, y=y, backward=True)  # b
+
+        # Compute partial derivative of f wrt y at (xs,y):
+        fY = grad(f, y, grad_outputs=torch.ones_like(f), create_graph=True)[0]
+        fY = torch.enable_grad()(fY.reshape)(self.b, -1)  # bxm
+        if not fY.requires_grad:  # if fY is independent of y
+            fY.requires_grad = True
+
+        # Compute second-order partial derivative of f wrt y at (xs,y):
+        fYY = self._batch_jacobian(fY, y)  # bxmxm
+        fYY = fYY.detach() if fYY is not None else y.new_zeros(
+            self.b, self.m, self.m)
+
+        # Create function that returns generator expression for fXY given input:
+        fXY = lambda x: (fXiY.detach()
+                         if fXiY is not None else torch.zeros_like(fY).unsqueeze(-1)
+                         for fXiY in (self._batch_jacobian(fY, xi) for xi in x))
+
+        return fY, fYY, fXY
