@@ -75,7 +75,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
                 torch.nn.utils.clip_grad_norm_(y, 10)
                 return loss
             optimizer.step(fun)
-        return y.group.vec().detach().float(), None
+        return y.group.vec().detach().float(), y.log().detach().float(), None
 
     # we re-implement the gradient function with more error-handling to catch failed optimization runs
     def gradient(self, *xs, y=None, v=None, ctx=None):
@@ -145,7 +145,6 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
                 gradients.append(gradient.reshape(x_size))
             else:
                 gradients.append(None)
-        print('good gradient')
         return tuple(gradients)
 
     def zero_grad(self, *xs):
@@ -173,6 +172,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         fYY = self._batch_jacobian(fY, y)  # bxmxm
         fYY = fYY.detach() if fYY is not None else y.new_zeros(
             self.b, self.m, self.m)
+        print(fYY)
 
         # Create function that returns generator expression for fXY given input:
         fXY = lambda x: (fXiY.detach()
@@ -180,3 +180,49 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
                          for fXiY in (self._batch_jacobian(fY, xi) for xi in x))
 
         return fY, fYY, fXY
+
+
+class DeclarativeFunctionLie(DeclarativeFunction):
+    """Generic declarative autograd function.
+    Defines the forward and backward functions. Saves all inputs and outputs,
+    which may be memory-inefficient for the specific problem.
+
+    Assumptions:
+    * All inputs are PyTorch tensors
+    * All inputs have a single batch dimension (b, ...)
+    """
+    @staticmethod
+    def forward(ctx, problem, *inputs):
+        output_vec, output_tan, solve_ctx = torch.no_grad()(problem.solve)(*inputs)
+        ctx.save_for_backward(output_vec, *inputs)
+        ctx.problem = problem
+        ctx.solve_ctx = solve_ctx
+        return (output_vec.clone(), output_tan,)
+
+    @staticmethod
+    def backward(ctx, grad_output_vec, grad_output_tan):
+        output, *inputs = ctx.saved_tensors
+        problem = ctx.problem
+        solve_ctx = ctx.solve_ctx
+        output.requires_grad = True
+        inputs = tuple(inputs)
+        grad_inputs = problem.gradient(*inputs, y=output, v=grad_output_tan,
+                                       ctx=solve_ctx)
+        return (None, *grad_inputs)
+
+
+class DeclarativeLayerLie(DeclarativeLayer):
+    """Generic declarative layer.
+
+    Assumptions:
+    * All inputs are PyTorch tensors
+    * All inputs have a single batch dimension (b, ...)
+
+    Usage:
+        problem = <derived class of *DeclarativeNode>
+        declarative_layer = DeclarativeLayer(problem)
+        y = declarative_layer(x1, x2, ...)
+    """
+
+    def forward(self, *inputs):
+        return DeclarativeFunctionLie.apply(self.problem, *inputs)

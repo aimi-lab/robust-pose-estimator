@@ -2,7 +2,7 @@ import unittest
 import torch
 from lietorch import SE3
 from core.geometry.pinhole_transforms import transform, project, project2image, reproject, create_img_coords_t
-from core.pose.pose_head import DeclarativePoseHead3DNode, DeclarativeLayer
+from core.pose.pose_head import DeclarativePoseHead3DNode, DeclarativeLayerLie
 
 
 class PoseHeadTester(unittest.TestCase):
@@ -23,7 +23,7 @@ class PoseHeadTester(unittest.TestCase):
         self.pcl = reproject(depth, self.kmat, create_img_coords_t(180,180))[:, :3].view(n, 3, 180, 180)
 
         self.pose_head = DeclarativePoseHead3DNode(create_img_coords_t(180,180))
-        self.pose_head_layer = DeclarativeLayer(self.pose_head)
+        self.pose_head_layer = DeclarativeLayerLie(self.pose_head)
         torch.random.manual_seed(12345)
         self.poses = SE3.Random(n,1, sigma=0.01)
         # compute induced flow
@@ -61,8 +61,8 @@ class PoseHeadTester(unittest.TestCase):
             self.flow, self.pcl, self.pcl_transformed, self.weights, self.weights, self.valid, self.masks, loss_weight,
             self.kmat)
 
-            poses = SE3(self.pose_head_layer(*xs)[0])
-            supervised_loss = (poses.log() - self.poses.log()).abs().sum() / n
+            poses = self.pose_head_layer(*xs)[1]
+            supervised_loss = (poses - self.poses.log()).abs().sum() / n
             grad_x, = torch.autograd.grad(supervised_loss, loss_weight, create_graph=True)
             #torchviz.make_dot((grad_x, self.pcl, poses.data), params={"grad_x": grad_x, "x": self.pcl, "out": poses.data}).render("graph")
 

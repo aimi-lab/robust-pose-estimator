@@ -4,8 +4,7 @@ from lietorch import SE3
 from collections import OrderedDict
 from core.geometry.pinhole_transforms import create_img_coords_t
 from core.RAFT.core.raft import RAFT
-from core.ddn.ddn.pytorch.node import DeclarativeLayer
-from core.pose.pose_head import DeclarativePoseHead3DNode
+from core.pose.pose_head import DeclarativePoseHead3DNode, DeclarativeLayerLie
 from core.interpol.flow_utils import remap_from_flow, remap_from_flow_nearest
 from core.unet.unet import TinyUNet
 
@@ -20,7 +19,7 @@ class PoseNet(nn.Module):
         self.flow = RAFT(config)
         self.flow.freeze_bn()
         self.loss_weight = nn.Parameter(torch.tensor([1.0, 1.0]))  # 3d vs 2d loss weights
-        self.pose_head = DeclarativeLayer(DeclarativePoseHead3DNode(self.img_coords, config['lbgfs_iters']))
+        self.pose_head = DeclarativeLayerLie(DeclarativePoseHead3DNode(self.img_coords, config['lbgfs_iters']))
         self.weight_head_2d = nn.Sequential(TinyUNet(in_channels=128 + 128 + 8, output_size=(H, W)), nn.Sigmoid())
         self.weight_head_3d = nn.Sequential(TinyUNet(in_channels=128 + 128 + 8 + 8, output_size=(H, W)), nn.Sigmoid())
 
@@ -52,11 +51,10 @@ class PoseNet(nn.Module):
 
         # estimate relative pose
         n = image1l.shape[0]
-        pose_se3 = self.pose_head(time_flow, pcl1, pcl2, conf1, conf2, mask1.bool(), mask2.bool(), self.loss_weight.repeat(n, 1), intrinsics)
-        pose_se3 = SE3.InitFromVec(pose_se3)
+        pose_se3_vec, pose_se3_tan = self.pose_head(time_flow, pcl1, pcl2, conf1, conf2, mask1.bool(), mask2.bool(), self.loss_weight.repeat(n, 1), intrinsics)
         if ret_confmap:
-            return time_flow, pose_se3, depth1, depth2, conf1, conf2
-        return time_flow, pose_se3, depth1, depth2
+            return pose_se3_tan, depth1, depth2, conf1, conf2
+        return pose_se3_tan, depth1, depth2
 
     def infer(self, image1l, image2l, intrinsics, baseline, depth1, image2r, mask1, mask2, stereo_flow1, ret_details=False):
         with torch.inference_mode():
@@ -85,8 +83,8 @@ class PoseNet(nn.Module):
 
         n = image1l.shape[0]
         pose_se3 = self.pose_head(time_flow, pcl1, pcl2, conf1, conf2, mask1.bool(), mask2.bool(),
-                                  self.loss_weight.repeat(n, 1), intrinsics)
-        pose_se3 = SE3.InitFromVec(pose_se3)
+                                  self.loss_weight.repeat(n, 1), intrinsics)[0]
+        pose_se3 = SE3(pose_se3)
         if ret_details:
             return pose_se3, depth1, depth2, conf1, conf2, time_flow, stereo_flow2
         return pose_se3

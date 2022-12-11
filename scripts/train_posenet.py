@@ -22,7 +22,7 @@ VAL_FREQ = 1000
 
 
 def supervised_pose_loss(pose_pred, pose_gt):
-    l1 = (pose_pred.log() - pose_gt.log()).abs()
+    l1 = (pose_pred - pose_gt.log()).abs()
     return l1
 
 
@@ -33,7 +33,7 @@ def val(model, dataloader, device, logger, key):
             ref_img, trg_img, ref_img_r, trg_img_r, ref_mask, trg_mask, gt_pose, intrinsics, baseline = [x.to(device) for x in
                                                                                               data_blob]
             gt_pose = SE3(gt_pose)
-            flow_predictions, pose_predictions, trg_depth, ref_depth, conf1, conf2 = model(trg_img, ref_img,
+            pose_predictions, trg_depth, ref_depth, conf1, conf2 = model(trg_img, ref_img,
                                                                                            intrinsics.float(), baseline.float(),
                                                                                            image1r=trg_img_r,
                                                                                            image2r=ref_img_r,
@@ -105,7 +105,7 @@ def main(args, config, force_cpu):
                 data_blob]
             gt_pose = SE3(gt_pose)
             # forward pass
-            flow_predictions, pose_predictions, trg_depth, ref_depth, conf1, conf2 = model(trg_img, ref_img,
+            pose_predictions, trg_depth, ref_depth, conf1, conf2 = model(trg_img, ref_img,
                                                                                            intrinsics.float(), baseline.float(),
                                                                                            image1r=trg_img_r,
                                                                                            image2r=ref_img_r,
