@@ -2,7 +2,7 @@ import unittest
 import torch
 from lietorch import SE3
 from core.geometry.pinhole_transforms import transform, project, project2image, reproject, create_img_coords_t
-from core.pose.pose_head import DeclarativePoseHead3DNode
+from core.pose.pose_head import DeclarativePoseHead3DNode, DeclarativeLayer
 
 
 class PoseHeadTester(unittest.TestCase):
@@ -23,8 +23,9 @@ class PoseHeadTester(unittest.TestCase):
         self.pcl = reproject(depth, self.kmat, create_img_coords_t(180,180))[:, :3].view(n, 3, 180, 180)
 
         self.pose_head = DeclarativePoseHead3DNode(create_img_coords_t(180,180))
+        self.pose_head_layer = DeclarativeLayer(self.pose_head)
         torch.random.manual_seed(12345)
-        self.poses = SE3.Random(n, sigma=0.01)
+        self.poses = SE3.Random(n,1, sigma=0.01)
         # compute induced flow
         flow_off = project(self.pcl.view(n,3,-1), self.poses, intrinsics=self.kmat).view(n,2,180,180)
         self.valid = (flow_off[:,0] >= 0) & (flow_off[:,0] < 180) & (flow_off[:,1] >= 0) & (flow_off[:,1] < 180)
@@ -34,7 +35,7 @@ class PoseHeadTester(unittest.TestCase):
         self.masks = torch.ones((n,1,180,180), dtype=torch.bool)
         self.weights = torch.ones((n,1,180,180))
 
-    def test_transform(self):
+    def test_forward(self):
 
         n = self.flow.shape[0]
         loss_weight = torch.tensor([[0.01, 1.0]]).repeat((n,1))
@@ -47,15 +48,29 @@ class PoseHeadTester(unittest.TestCase):
         self.assertTrue(torch.allclose(loss_pred, torch.zeros_like(loss_gt), atol=1e-5))
         supervised_loss = (poses.log() - self.poses.log()).abs().sum()/n
         self.assertTrue(torch.allclose(supervised_loss, torch.zeros_like(supervised_loss), atol=0.05))
-        print("gt-loss: ", loss_gt)
-        print("predicted loss: ", loss_pred)
-        print("supervised loss: ", supervised_loss)
+        #print("gt-loss: ", loss_gt)
+        #print("predicted loss: ", loss_pred)
+        #print("supervised loss: ", supervised_loss)
+
+    def test_backward(self):
+
+        with torch.enable_grad():
+            n = self.flow.shape[0]
+            loss_weight = torch.nn.Parameter(torch.tensor([[0.01, 1.0]]).repeat((n, 1)), requires_grad=True)
+            xs = (
+            self.flow, self.pcl, self.pcl_transformed, self.weights, self.weights, self.valid, self.masks, loss_weight,
+            self.kmat)
+
+            poses = SE3(self.pose_head_layer(*xs)[0])
+            supervised_loss = (poses.log() - self.poses.log()).abs().sum() / n
+            grad_x, = torch.autograd.grad(supervised_loss, loss_weight, create_graph=True)
+            #torchviz.make_dot((grad_x, self.pcl, poses.data), params={"grad_x": grad_x, "x": self.pcl, "out": poses.data}).render("graph")
 
 
     def test_all(self):
 
-        self.test_transform()
-
+        self.test_forward()
+        self.test_backward()
 
 if __name__ == '__main__':
     unittest.main()
