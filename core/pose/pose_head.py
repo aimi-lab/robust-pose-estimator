@@ -10,13 +10,13 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         self.img_coordinates = img_coordinates
         self.lbgfs_iters = lbgfs_iters
 
-    def reprojection_objective(self, flow, pcl1, weights1, mask1, intrinsics, y, ret_res=False):
+    def reprojection_objective(self, flow, pcl1, weights1, mask1, intrinsics, y, backward=False, ret_res=False):
         """
             r2D - reprojection residuals
         """
         n, _, h, w = flow.shape
         # project 3D-pcl to image plane
-        warped_pts = project(pcl1.view(n,3,-1), y, intrinsics)
+        warped_pts = project(pcl1.view(n,3,-1), y, intrinsics, double_backward=backward)
         flow_off = self.img_coordinates[None, :2] + flow.view(n, 2, -1)
         # compute residuals
         residuals = torch.sum((flow_off - warped_pts)**2, dim=1)
@@ -54,7 +54,7 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
     def objective(self, *xs, y, backward=False):
         flow, pcl1, pcl2, weights1, weights2, mask1, mask2, loss_weight, intrinsics= xs
         loss3d = self.depth_objective(pcl1, pcl2, weights2, mask1, mask2, y, backward)
-        loss2d = self.reprojection_objective(flow, pcl1, weights1,mask1, intrinsics, y)
+        loss2d = self.reprojection_objective(flow, pcl1, weights1,mask1, intrinsics, y, backward)
         return loss_weight[:, 1]*loss2d + loss_weight[:, 0]*loss3d
 
     def solve(self, *xs):

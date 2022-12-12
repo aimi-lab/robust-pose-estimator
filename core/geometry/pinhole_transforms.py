@@ -86,9 +86,9 @@ def reproject(depth: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.T
     return opts
 
 
-def project(opts: torch.Tensor, T:Union[SE3, LieGroupParameter], intrinsics:torch.tensor):
+def project(opts: torch.Tensor, T:Union[SE3, LieGroupParameter], intrinsics:torch.tensor, double_backward:bool=False):
     # pinhole projection
-    opts = transform(opts, T)
+    opts = transform(opts, T, double_backward=double_backward)
     ipts = torch.bmm(intrinsics, opts)
     # inhomogenization
     ipts = ipts[:, :3] / torch.clamp(ipts[:, -1], 1e-12, None).unsqueeze(1)
