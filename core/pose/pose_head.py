@@ -1,6 +1,6 @@
 from lietorch import SE3, LieGroupParameter
 
-from core.geometry.pinhole_transforms import transform, homogeneous, project
+from core.geometry.pinhole_transforms import transform, project
 from core.ddn.ddn.pytorch.node import *
 
 
@@ -183,9 +183,12 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
 
 
 class DeclarativeFunctionLie(DeclarativeFunction):
-    """Generic declarative autograd function.
+    """Lie declarative autograd function.
+    Backpropagation in tangent space.
     Defines the forward and backward functions. Saves all inputs and outputs,
     which may be memory-inefficient for the specific problem.
+
+    returns unit-quaternions for inference and tangent space vector for back-propagation
 
     Assumptions:
     * All inputs are PyTorch tensors
@@ -197,7 +200,7 @@ class DeclarativeFunctionLie(DeclarativeFunction):
         ctx.save_for_backward(output_vec, *inputs)
         ctx.problem = problem
         ctx.solve_ctx = solve_ctx
-        return (output_vec.clone(), output_tan,)
+        return output_vec.clone(), output_tan
 
     @staticmethod
     def backward(ctx, grad_output_vec, grad_output_tan):
@@ -212,7 +215,7 @@ class DeclarativeFunctionLie(DeclarativeFunction):
 
 
 class DeclarativeLayerLie(DeclarativeLayer):
-    """Generic declarative layer.
+    """Lie declarative layer.
 
     Assumptions:
     * All inputs are PyTorch tensors
