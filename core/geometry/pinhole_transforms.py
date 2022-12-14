@@ -37,7 +37,8 @@ def transform_backward(grad_out, out, opts_grad, T):
     out = out.movedim(1, -1).reshape(-1, 3)
     if T.requires_grad:
         # (I | -out_x) \in R^(3x6)
-        grad_T = torch.bmm(grad_out,torch.cat((torch.eye(3).repeat(grad_out.shape[0], 1, 1), skewmat(-out)), dim=-1))
+        eye = torch.eye(3, device=out.device, dtype=out.dtype).repeat(grad_out.shape[0], 1, 1)
+        grad_T = torch.bmm(grad_out,torch.cat((eye, skewmat(-out)), dim=-1))
         grad_T = grad_T.reshape(n, -1, 6)
     else:
         grad_T = None
