@@ -172,7 +172,6 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         fYY = self._batch_jacobian(fY, y)  # bxmxm
         fYY = fYY.detach() if fYY is not None else y.new_zeros(
             self.b, self.m, self.m)
-        print(fYY)
 
         # Create function that returns generator expression for fXY given input:
         fXY = lambda x: (fXiY.detach()
