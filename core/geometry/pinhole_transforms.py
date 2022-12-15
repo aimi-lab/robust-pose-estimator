@@ -92,8 +92,10 @@ def project(opts: torch.Tensor, T:Union[SE3, LieGroupParameter], intrinsics:torc
     opts = transform(opts, T, double_backward=double_backward)
     ipts = torch.bmm(intrinsics, opts)
     # inhomogenization
-    ipts = ipts[:, :3] / torch.clamp(ipts[:, -1], 1e-12, None).unsqueeze(1)
-    return ipts[:, :2]
+    depth = torch.clamp(ipts[:, -1], 1e-12, None).unsqueeze(1)
+    ipts = torch.cat((ipts[:,:2], torch.ones_like(ipts[:,None,2])), dim=1)
+    ipts = ipts / depth
+    return ipts
 
 
 def project2image(

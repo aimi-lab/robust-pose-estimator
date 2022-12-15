@@ -18,10 +18,8 @@ class PoseNet(nn.Module):
         self.use_weights = config["use_weights"]
         self.flow = RAFT(config)
         self.flow.freeze_bn()
-        self.loss_weight = nn.Parameter(torch.tensor([1.0, 1.0]))  # 3d vs 2d loss weights
         self.pose_head = DeclarativeLayerLie(DeclarativePoseHead3DNode(self.img_coords, config['lbgfs_iters']))
-        self.weight_head_2d = nn.Sequential(TinyUNet(in_channels=128 + 128 + 8, output_size=(H, W)), nn.Sigmoid())
-        self.weight_head_3d = nn.Sequential(TinyUNet(in_channels=128 + 128 + 8 + 8, output_size=(H, W)), nn.Sigmoid())
+        self.weight_head = nn.Sequential(TinyUNet(in_channels=128 + 128 + 8 + 8, output_size=(H, W)), nn.Sigmoid())
 
     def forward(self, image1l, image2l, intrinsics, baseline, image1r, image2r, mask1=None, mask2=None, ret_confmap=False):
         """ estimate optical flow from stereo pair to get disparity map"""
@@ -46,14 +44,13 @@ class PoseNet(nn.Module):
         time_flow = time_flow[-1]
 
         """ Infer weight maps """
-        conf1, conf2, pcl2, mask2 = self.get_weight_maps(pcl1, pcl2, image1l, image2l, mask2, time_flow,
+        weights, pcl2, mask2 = self.get_weight_maps(pcl1, pcl2, image1l, image2l, mask2, time_flow,
                                                          stereo_flow1, stereo_flow2, gru_hidden_state, context)
 
         # estimate relative pose
-        n = image1l.shape[0]
-        pose_se3_vec, pose_se3_tan = self.pose_head(time_flow, pcl1, pcl2, conf1, conf2, mask1.bool(), mask2.bool(), self.loss_weight.repeat(n, 1), intrinsics)
+        pose_se3_vec, pose_se3_tan = self.pose_head(time_flow, pcl1, pcl2, weights, mask1.bool(), mask2.bool(), intrinsics)
         if ret_confmap:
-            return pose_se3_tan, depth1, depth2, conf1, conf2
+            return pose_se3_tan, depth1, depth2, weights
         return pose_se3_tan, depth1, depth2
 
     def infer(self, image1l, image2l, intrinsics, baseline, depth1, image2r, mask1, mask2, stereo_flow1, ret_details=False):
@@ -78,15 +75,13 @@ class PoseNet(nn.Module):
             pcl2 = self.proj(depth2, intrinsics)
 
             """ Infer weight maps """
-            conf1, conf2, pcl2, mask2 = self.get_weight_maps(pcl1, pcl2, image1l, image2l, mask2, time_flow,
+            weights, pcl2, mask2 = self.get_weight_maps(pcl1, pcl2, image1l, image2l, mask2, time_flow,
                                                              stereo_flow1, stereo_flow2, gru_hidden_state, context)
 
-        n = image1l.shape[0]
-        pose_se3 = self.pose_head(time_flow, pcl1, pcl2, conf1, conf2, mask1.bool(), mask2.bool(),
-                                  self.loss_weight.repeat(n, 1), intrinsics)[0]
+        pose_se3 = self.pose_head(time_flow, pcl1, pcl2, weights, mask1.bool(), mask2.bool(), intrinsics)[0]
         pose_se3 = SE3(pose_se3)
         if ret_details:
-            return pose_se3, depth1, depth2, conf1, conf2, time_flow, stereo_flow2
+            return pose_se3, depth1, depth2, weights, time_flow, stereo_flow2
         return pose_se3
 
     def get_weight_maps(self, pcl1, pcl2, image1l, image2l, mask2, time_flow, stereo_flow1, stereo_flow2, gru_hidden_state, context):
@@ -97,16 +92,12 @@ class PoseNet(nn.Module):
         mask2, valid_mapping = remap_from_flow_nearest(mask2, time_flow)
         mask2 = valid_mapping & mask2.to(bool)
         if self.use_weights:
-            inp1 = torch.nn.functional.interpolate(torch.cat((stereo_flow1, image1l, pcl1), dim=1),
+            inp = torch.nn.functional.interpolate(torch.cat((stereo_flow1, image1l, pcl1,stereo_flow2, image2l, pcl2), dim=1),
                                                    scale_factor=0.125, mode='bilinear')
-            inp2 = torch.nn.functional.interpolate(torch.cat((stereo_flow2, image2l, pcl2), dim=1),
-                                                   scale_factor=0.125, mode='bilinear')
-            conf1 = self.weight_head_2d(torch.cat((inp1, gru_hidden_state, context), dim=1))
-            conf2 = self.weight_head_3d(torch.cat((inp1, inp2, gru_hidden_state, context), dim=1))
+            weights = self.weight_head(torch.cat((inp, gru_hidden_state, context), dim=1))
         else:
-            conf1 = torch.ones_like(mask2, dtype=torch.float32)
-            conf2 = torch.ones_like(mask2, dtype=torch.float32)
-        return conf1, conf2, pcl2, mask2
+            weights = torch.ones_like(mask2, dtype=torch.float32)
+        return weights, pcl2, mask2
 
     def proj(self, depth, intrinsics):
         n = depth.shape[0]
@@ -142,7 +133,7 @@ class PoseNet(nn.Module):
                 param.requires_grad = True
             for param in self.weight_head_2d.parameters():
                 param.requires_grad = True
-            for param in self.weight_head_3d.parameters():
+            for param in self.weight_head.parameters():
                 param.requires_grad = True
             self.loss_weight.requires_grad = True
         except AttributeError:
@@ -152,7 +143,7 @@ class PoseNet(nn.Module):
 
     def train(self, mode: bool = True):
         self.weight_head_2d.train(mode)
-        self.weight_head_3d.train(mode)
+        self.weight_head.train(mode)
         self.pose_head.train(mode)
         self.flow.eval()
         return self

@@ -27,7 +27,7 @@ class PoseHeadTester(unittest.TestCase):
         torch.random.manual_seed(12345)
         self.poses = SE3.Random(n,1, sigma=0.01)
         # compute induced flow
-        flow_off = project(self.pcl.view(n,3,-1), self.poses, intrinsics=self.kmat).view(n,2,180,180)
+        flow_off = project(self.pcl.view(n,3,-1), self.poses, intrinsics=self.kmat)[:,:2].reshape(n,2,180,180)
         self.valid = (flow_off[:,0] >= 0) & (flow_off[:,0] < 180) & (flow_off[:,1] >= 0) & (flow_off[:,1] < 180)
         self.valid = self.valid.unsqueeze(1)
         self.flow = flow_off - create_img_coords_t(180,180)[:2].reshape(1,2, 180, 180)
@@ -38,8 +38,7 @@ class PoseHeadTester(unittest.TestCase):
     def test_forward(self):
 
         n = self.flow.shape[0]
-        loss_weight = torch.tensor([[0.01, 1.0]]).repeat((n,1))
-        xs = (self.flow, self.pcl, self.pcl_transformed, self.weights, self.weights, self.valid, self.masks, loss_weight, self.kmat)
+        xs = (self.flow, self.pcl, self.pcl_transformed, self.weights, self.valid, self.masks, self.kmat)
         loss_gt = self.pose_head.objective(*xs, y=self.poses)
         self.assertTrue(torch.allclose(loss_gt, torch.zeros_like(loss_gt), atol=1e-5))
 
@@ -55,16 +54,15 @@ class PoseHeadTester(unittest.TestCase):
     def test_backward(self):
 
         with torch.enable_grad():
-            n = self.flow.shape[0]
-            loss_weight = torch.nn.Parameter(torch.tensor([[0.01, 1.0]]).repeat((n, 1)), requires_grad=True)
-            xs = (
-            self.flow, self.pcl, self.pcl_transformed, self.weights, self.weights, self.valid, self.masks, loss_weight,
-            self.kmat)
+            with torch.autograd.set_detect_anomaly(True):
+                n = self.flow.shape[0]
+                flow = torch.nn.Parameter(self.flow, requires_grad=True)
+                xs = (flow, self.pcl, self.pcl_transformed, self.weights, self.valid, self.masks,self.kmat)
 
-            poses = self.pose_head_layer(*xs)[1]
-            supervised_loss = (poses - self.poses.log()).abs().sum() / n
-            grad_x, = torch.autograd.grad(supervised_loss, loss_weight, create_graph=True)
-            #torchviz.make_dot((grad_x, self.pcl, poses.data), params={"grad_x": grad_x, "x": self.pcl, "out": poses.data}).render("graph")
+                poses = self.pose_head_layer(*xs)[1]
+                supervised_loss = (poses - self.poses.log()).abs().sum() / n
+                grad_x, = torch.autograd.grad(supervised_loss, flow, create_graph=True)
+                #torchviz.make_dot((grad_x, self.pcl, poses.data), params={"grad_x": grad_x, "x": self.pcl, "out": poses.data}).render("graph")
 
 
     def test_all(self):

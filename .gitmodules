@@ -7,3 +7,6 @@
 [submodule "core/ddn"]
 	path = core/ddn
 	url = https://github.com/anucvml/ddn.git
+[submodule "core/RAFT3D"]
+	path = core/RAFT3D
+	url = https://github.com/aimi-lab/RAFT-3D.git
