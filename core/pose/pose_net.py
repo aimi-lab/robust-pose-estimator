@@ -131,8 +131,6 @@ class PoseNet(nn.Module):
         try:
             for param in self.pose_head.parameters():
                 param.requires_grad = True
-            for param in self.weight_head_2d.parameters():
-                param.requires_grad = True
             for param in self.weight_head.parameters():
                 param.requires_grad = True
             self.loss_weight.requires_grad = True
@@ -142,7 +140,6 @@ class PoseNet(nn.Module):
         return self
 
     def train(self, mode: bool = True):
-        self.weight_head_2d.train(mode)
         self.weight_head.train(mode)
         self.pose_head.train(mode)
         self.flow.eval()
