@@ -16,14 +16,14 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         n, _, h, w = flow.shape
         # project 3D-pcl to image plane
         warped_pts = project(pcl1.view(n, 3, -1), y, intrinsics, double_backward=backward)  #(x,y, 1/depth(x,y)
-        inv_depth2 = 1.0/pcl2.view(n,3,-1)[:, None, 2]
+        inv_depth2 = 1.0/torch.clamp(pcl2.view(n,3,-1)[:, None, 2], min=1e-12)
         flow_off = torch.cat((self.img_coordinates[None, :2] + flow.view(n, 2, -1), inv_depth2), dim=1)
         # compute residuals
         residuals = torch.sum((warped_pts- flow_off) ** 2, dim=1)
         residuals *= weights.view(n, -1)
         # mask out invalid residuals
         valid = (flow_off[:, 0] > 0) & (flow_off[:, 1] > 0) & (flow_off[:, 0] < w) & (flow_off[:, 1] < h)
-        valid = torch.isinf(residuals) | torch.isnan(residuals) | ~valid.view(n, -1) | ~mask1.view(n, -1)
+        valid = torch.isinf(residuals) | torch.isnan(residuals) | ~valid.view(n, -1) | ~mask1.view(n, -1) | ~mask2.view(n, -1)
 
         # weight residuals by confidences
         residuals[valid] = 0.0
