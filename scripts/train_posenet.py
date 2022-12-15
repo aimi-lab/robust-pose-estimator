@@ -33,13 +33,13 @@ def val(model, dataloader, device, logger, key):
             ref_img, trg_img, ref_img_r, trg_img_r, ref_mask, trg_mask, gt_pose, intrinsics, baseline = [x.to(device) for x in
                                                                                               data_blob]
             gt_pose = SE3(gt_pose)
-            pose_predictions, trg_depth, ref_depth, conf1, conf2 = model(trg_img, ref_img,
-                                                                                           intrinsics.float(), baseline.float(),
-                                                                                           image1r=trg_img_r,
-                                                                                           image2r=ref_img_r,
-                                                                                           mask1=trg_mask.to(torch.bool),
-                                                                                           mask2=ref_mask.to(torch.bool),
-                                                                                           ret_confmap=True)
+            pose_predictions, trg_depth, ref_depth, weights = model(trg_img, ref_img,
+                                                                   intrinsics.float(), baseline.float(),
+                                                                   image1r=trg_img_r,
+                                                                   image2r=ref_img_r,
+                                                                   mask1=trg_mask.to(torch.bool),
+                                                                   mask2=ref_mask.to(torch.bool),
+                                                                   ret_confmap=True)
             loss_pose = supervised_pose_loss(pose_predictions, gt_pose)
             loss = torch.nanmean(loss_pose)
             loss_cpu = loss_pose.detach().cpu()
@@ -105,13 +105,13 @@ def main(args, config, force_cpu):
                 data_blob]
             gt_pose = SE3(gt_pose)
             # forward pass
-            pose_predictions, trg_depth, ref_depth, conf1, conf2 = model(trg_img, ref_img,
-                                                                                           intrinsics.float(), baseline.float(),
-                                                                                           image1r=trg_img_r,
-                                                                                           image2r=ref_img_r,
-                                                                                           mask1=trg_mask.to(torch.bool),
-                                                                                           mask2=ref_mask.to(torch.bool),
-                                                                                           ret_confmap=True)
+            pose_predictions, trg_depth, ref_depth, weights = model(trg_img, ref_img,
+                                                                   intrinsics.float(), baseline.float(),
+                                                                   image1r=trg_img_r,
+                                                                   image2r=ref_img_r,
+                                                                   mask1=trg_mask.to(torch.bool),
+                                                                   mask2=ref_mask.to(torch.bool),
+                                                                   ret_confmap=True)
             # loss computations
             loss_pose = supervised_pose_loss(pose_predictions, gt_pose)
             loss = torch.mean(loss_pose)
