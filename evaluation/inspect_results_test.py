@@ -10,7 +10,7 @@ import argparse
 
 parser = argparse.ArgumentParser(description='Inspect WandB results')
 parser.add_argument(
-    'project',
+    '--project',
     type=str,
     default="hayoz/Alley-OOP",
     help='Path to input folder.'

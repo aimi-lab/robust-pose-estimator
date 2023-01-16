@@ -37,7 +37,8 @@ def _align(model, data):
 
 def absolute_trajectory_error(gt_poses: Union[np.ndarray, torch.Tensor],
                               predicted_poses: Union[np.ndarray, torch.Tensor],
-                              prealign: bool=True, ret_align_T: bool=False) -> Tuple[float, Union[np.ndarray, torch.Tensor]]:
+                              prealign: bool=True, ret_align_T: bool=False,
+                              ignore_failed_pos: bool=False) -> Tuple[float, Union[np.ndarray, torch.Tensor]]:
     """
         Absolute Trajectory Error ATE-RMSE
 
@@ -49,14 +50,22 @@ def absolute_trajectory_error(gt_poses: Union[np.ndarray, torch.Tensor],
     """
     assert len(gt_poses) == len(predicted_poses)
     lib = get_lib(gt_poses)
+    # ignore identity pose predictions as these mark failed pose estimations
+    valid = [True]
+    if ignore_failed_pos:
+        for i in range(len(predicted_poses) - 1):
+            valid.append((predicted_poses[i] - predicted_poses[i + 1]).sum() != 0)
+    else:
+        valid = lib.ones(len(predicted_poses), dtype=bool)
     T = None
     if prealign:
-        T = _align(predicted_poses[:, :3, 3].T, gt_poses[:, :3, 3].T)
+        T = _align(predicted_poses[valid, :3, 3].T, gt_poses[valid, :3, 3].T)
         predicted_poses = T[None,...] @ predicted_poses
 
     trans_err = []
-    for gt, pred in zip(gt_poses, predicted_poses):
-        trans_err.append(lib.sum((gt[:3,3].T-pred[:3, 3])**2))
+    for gt, pred, v in zip(gt_poses, predicted_poses, valid):
+        if v:
+            trans_err.append(lib.sum((gt[:3,3].T-pred[:3, 3])**2))
     trans_err = np.asarray(trans_err)
     ate_pos = lib.sqrt(lib.mean(trans_err))
     if ret_align_T:
@@ -66,7 +75,8 @@ def absolute_trajectory_error(gt_poses: Union[np.ndarray, torch.Tensor],
 
 def relative_pose_error(gt_poses: Union[np.ndarray, torch.Tensor],
                         predicted_poses: Union[np.ndarray, torch.Tensor],
-                        delta: int=1):
+                        delta: int=1,
+                        ignore_failed_pos: bool=False):
     """
             Relative Pose Error RPE (mean)
 
@@ -81,13 +91,14 @@ def relative_pose_error(gt_poses: Union[np.ndarray, torch.Tensor],
     trans_errors = []
     rot_errors = []
     for i in range(len(gt_poses)-delta):
-        gt_rel = np.linalg.inv(gt_poses[i]) @ gt_poses[i+delta]
-        pred_rel = np.linalg.inv(predicted_poses[i]) @ predicted_poses[i+delta]
-        rel_err = np.linalg.inv(gt_rel) @ pred_rel
+        if ((predicted_poses[i] - predicted_poses[i+1]).sum() != 0) | (not ignore_failed_pos):
+            gt_rel = np.linalg.inv(gt_poses[i]) @ gt_poses[i+delta]
+            pred_rel = np.linalg.inv(predicted_poses[i]) @ predicted_poses[i+delta]
+            rel_err = np.linalg.inv(gt_rel) @ pred_rel
 
-        trans_errors.append(lib.sqrt(lib.sum((rel_err[:3,3])**2)))
-        d = 0.5*(lib.trace(rel_err[:3, :3]) - 1)
-        rot_errors.append(np.arccos(max(min(d, 1.0), -1.0)))
+            trans_errors.append(lib.sqrt(lib.sum((rel_err[:3,3])**2)))
+            d = 0.5*(lib.trace(rel_err[:3, :3]) - 1)
+            rot_errors.append(np.arccos(max(min(d, 1.0), -1.0)))
 
     rpe_trans = np.asarray(trans_errors)
     rpe_rot = np.asarray(rot_errors)

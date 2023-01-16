@@ -3,7 +3,7 @@ from core.metrics.trajectory_metrics import absolute_trajectory_error, relative_
 from core.utils.trajectory import read_freiburg
 
 
-def eval(gt_list:str, pred_list:str, delta:int=1, offset:int=0, ret_align_T=False):
+def eval(gt_list:str, pred_list:str, delta:int=1, offset:int=0, ret_align_T=False, ignore_failed_pos=False):
     if not isinstance(gt_list, dict):
         gt_list, gt_stamps = read_freiburg(gt_list, ret_stamps=True)
         gt_list = {key: pose for key, pose in zip(gt_stamps, gt_list)}
@@ -23,8 +23,9 @@ def eval(gt_list:str, pred_list:str, delta:int=1, offset:int=0, ret_align_T=Fals
     pred_poses = np.stack(pred_poses)
     gt_poses = np.stack(gt_poses)
 
-    ate_rmse, trans_error, transform = absolute_trajectory_error(gt_poses, pred_poses, ret_align_T=True)
-    rpe_trans, rpe_rot = relative_pose_error(gt_poses, pred_poses, delta=delta)
+    ate_rmse, trans_error, transform = absolute_trajectory_error(gt_poses, pred_poses, ret_align_T=True,
+                                                                 ignore_failed_pos=ignore_failed_pos)
+    rpe_trans, rpe_rot = relative_pose_error(gt_poses, pred_poses, delta=delta, ignore_failed_pos=ignore_failed_pos)
     if ret_align_T:
         return ate_rmse, np.mean(rpe_trans), np.mean(rpe_rot), trans_error, rpe_trans, rpe_rot, transform, gt_poses
     return ate_rmse, np.mean(rpe_trans), np.mean(rpe_rot), trans_error, rpe_trans, rpe_rot
