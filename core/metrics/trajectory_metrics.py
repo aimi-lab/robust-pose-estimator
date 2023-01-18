@@ -69,7 +69,7 @@ def absolute_trajectory_error(gt_poses: Union[np.ndarray, torch.Tensor],
     trans_err = np.asarray(trans_err)
     ate_pos = lib.sqrt(lib.mean(trans_err))
     if ret_align_T:
-        return ate_pos, np.sqrt(trans_err), T
+        return ate_pos, np.sqrt(trans_err), T, valid
     return ate_pos, np.sqrt(trans_err)
 
 
@@ -103,3 +103,10 @@ def relative_pose_error(gt_poses: Union[np.ndarray, torch.Tensor],
     rpe_trans = np.asarray(trans_errors)
     rpe_rot = np.asarray(rot_errors)
     return rpe_trans, rpe_rot
+
+
+def total_trajectory_length(gt_list: list):
+
+    locs = np.stack([g.translation().numpy() for g in gt_list])
+    translations = np.sqrt(np.sum(np.diff(locs, axis=0)**2, axis=-1))
+    return np.sum(translations)
