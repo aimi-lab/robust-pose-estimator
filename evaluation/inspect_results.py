@@ -9,7 +9,7 @@ import argparse
 
 parser = argparse.ArgumentParser(description='Inspect WandB results')
 parser.add_argument(
-    'project',
+    '--project',
     type=str,
     default="hayoz/Alley-OOP",
     help='Path to input folder.'
@@ -19,7 +19,7 @@ parser.add_argument(
     '--methods',
     nargs='+',
     type=str,
-    default=['orbslam2_raftdepth', 'scared_efusion', 'scared_f2m_ours'],
+    default=['orbslam2_raftdepth', 'scared_efusion', 'scared_new_code'],
     help='Path to input folder.'
 )
 args = parser.parse_args()
