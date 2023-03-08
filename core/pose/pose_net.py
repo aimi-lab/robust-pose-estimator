@@ -21,8 +21,8 @@ class PoseNet(nn.Module):
         self.flow = RAFT(config)
         self.flow.freeze_bn()
         self.pose_head = DeclarativeLayerLie(DPoseSE3Head(self.img_coords, config['lbgfs_iters'], dbg=config['dbg']))
-        self.weight_head_2d = nn.Sequential(TinyUNet(in_channels=128 + 128 + 8, output_size=(H//8, W//8)), nn.Sigmoid())
-        self.weight_head_3d = nn.Sequential(TinyUNet(in_channels=128 + 128 + 8 + 8, output_size=(H//8, W//8)), nn.Sigmoid())
+        self.weight_head_2d = nn.Sequential(TinyUNet(in_channels=8, output_size=(H//8, W//8)), nn.Sigmoid())
+        self.weight_head_3d = nn.Sequential(TinyUNet(in_channels=8 + 8, output_size=(H//8, W//8)), nn.Sigmoid())
 
     def forward(self, image1l, image2l, intrinsics, baseline, image1r, image2r, mask1=None, mask2=None, ret_confmap=False):
         """ estimate optical flow from stereo pair to get disparity map"""
@@ -111,8 +111,8 @@ class PoseNet(nn.Module):
         if self.use_weights:
             inp1 = torch.cat((stereo_flow1, image1l[:,:,3::8, 3::8], pcl1), dim=1)
             inp2 = torch.cat((stereo_flow2, image2l, pcl2), dim=1)
-            conf1 = self.weight_head_2d(torch.cat((inp1, gru_hidden_state, context), dim=1))
-            conf2 = self.weight_head_3d(torch.cat((inp1, inp2, gru_hidden_state, context), dim=1))
+            conf1 = self.weight_head_2d(inp1)
+            conf2 = self.weight_head_3d(torch.cat((inp1, inp2), dim=1))
         else:
             conf1 = torch.ones_like(mask2, dtype=torch.float32)
             conf2 = torch.ones_like(mask2, dtype=torch.float32)
