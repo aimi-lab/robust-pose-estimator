@@ -104,7 +104,6 @@ class PoseEstimator(torch.nn.Module):
             rel_pose_se3 = SE3.IdentityLike(self.last_pose)
             depth, stereo_flow, valid = self.model.flow2depth(self.frame.img, self.frame.rimg,self.baseline*self.scale)
             self.frame.depth = depth/self.scale
-            self.frame.mask &= valid
             self.frame.flow = stereo_flow
             ret_frame = None
         else:

@@ -20,7 +20,7 @@ class PoseNet(nn.Module):
         self.use_weights = config["use_weights"]
         self.flow = RAFT(config)
         self.flow.freeze_bn()
-        self.pose_head = DeclarativeLayerLie(DPoseSE3Head(self.img_coords, config['lbgfs_iters'], dbg=config['dbg']))
+        self.pose_head = DeclarativeLayerLie(DPoseSE3Head(self.img_coords, config['lbgfs_iters']))
         self.weight_head_2d = nn.Sequential(TinyUNet(in_channels=8, output_size=(H//8, W//8)), nn.Sigmoid())
         self.weight_head_3d = nn.Sequential(TinyUNet(in_channels=8 + 8, output_size=(H//8, W//8)), nn.Sigmoid())
 
@@ -84,7 +84,7 @@ class PoseNet(nn.Module):
             """ Infer weight maps """
             *maps, pcl2, mask2 = self.get_weight_maps(pcl1, pcl2, image1l, image2l, mask2, time_flow,
                                                              stereo_flow1, stereo_flow2, gru_hidden_state, context)
-        pose_head_ret= self.pose_head(time_flow, pcl1, pcl2, *maps, mask1.bool(), mask2.bool(), intrinsics, self.loss_weight)
+        pose_head_ret= self.pose_head(time_flow, pcl1, pcl2, *maps, mask1.bool(), mask2.bool(), intrinsics, self.loss_weight[None,:])
         return self.infer_out(pose_head_ret, depth1, depth2, maps, time_flow, stereo_flow2, mask2, ret_details)
 
     def forward_out(self, pose_head_ret, depth1, depth2, maps, ret_confmap=False):
@@ -98,8 +98,8 @@ class PoseNet(nn.Module):
         pose_se3 = SE3(pose_se3)
 
         if ret_details:
-            return pose_se3, depth1, depth2, maps, time_flow, stereo_flow2
-        return pose_se3
+            return pose_se3[0], depth1, depth2, maps, time_flow, stereo_flow2
+        return pose_se3[0]
 
     def get_weight_maps(self, pcl1, pcl2, image1l, image2l, mask2, time_flow, stereo_flow1, stereo_flow2, gru_hidden_state, context):
         # warp reference frame using flow
