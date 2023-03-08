@@ -55,7 +55,6 @@ class PoseDataset(Dataset):
         poses = read_freiburg(gt_file)
         assert len(images_l) == len(images_r)
         assert len(images_l) > 0 , f'no images in {root}'
-        assert len(masks) == len(images_l)
         sample_list = self._random_sample(step, samples, len(images_l))
 
         self.conf_thr = conf_thr
@@ -71,12 +70,16 @@ class PoseDataset(Dataset):
             self.image_list.append([images_l[i], images_l[i+s]])
             self.rel_pose_list.append(poses[i+s].inv().mul(poses[i]))
             self.image_list_r.append([images_r[i], images_r[i+s]])
-            self.mask_list.append([masks[i], masks[i+s]])
+            if len(masks) == 0:
+                self.mask_list.append([None, None])
+            else:
+                self.mask_list.append([masks[i], masks[i+s]])
         self.resize = Resize(img_size)
         self.resize_msk = Resize(img_size, interpolation=InterpolationMode.NEAREST)
         self.scale = float(img_size[0])/float(cv2.imread(images_l[0]).shape[1])
         self.intrinsics = len(self.image_list) * [intrinsics]
         self.baseline = len(self.image_list) * [baseline]
+        self.img_size = img_size
 
     def __getitem__(self, index):
         img1 = self._read_img(self.image_list[index][0])
@@ -98,10 +101,13 @@ class PoseDataset(Dataset):
         return self.resize(img)
 
     def _read_mask(self, path):
-        mask = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
-        mask = mask > 0
-        mask = torch.from_numpy(mask).unsqueeze(0)
-        return self.resize_msk(mask)
+        if path is not None:
+            mask = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+            mask = mask > 0
+            mask = torch.from_numpy(mask).unsqueeze(0)
+            return self.resize_msk(mask)
+        else:
+            return torch.ones(1,*self.img_size)
 
     def __len__(self):
         return len(self.image_list)
@@ -135,7 +141,6 @@ class StratifiedPoseDataset(PoseDataset):
             for i, p in enumerate(probs):
                 self.probs[annotations == i] = p
         else:
-            warnings.warn(f"{os.path.join(root, 'annotions.csv')} does not exist.",RuntimeWarning)
             self.probs = np.ones(len(glob(os.path.join(root, 'video_frames', '*l.png'))))
         super(StratifiedPoseDataset, self).__init__(root, baseline, intrinsics, depth_cutoff,conf_thr, step, img_size, samples)
 
