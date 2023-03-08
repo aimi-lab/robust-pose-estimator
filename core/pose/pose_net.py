@@ -111,7 +111,7 @@ class PoseNet(nn.Module):
         if self.use_weights:
             inp1 = torch.nn.functional.interpolate(torch.cat((stereo_flow1, image1l[:,:,3::8, 3::8], pcl1), dim=1),
                                                    scale_factor=0.125, mode='bilinear')
-            inp2 = torch.nn.functional.interpolate(torch.cat((stereo_flow2, image2l[:,:,3::8, 3::8], pcl2), dim=1),
+            inp2 = torch.nn.functional.interpolate(torch.cat((stereo_flow2, image2l, pcl2), dim=1),
                                                    scale_factor=0.125, mode='bilinear')
             conf1 = self.weight_head_2d(torch.cat((inp1, gru_hidden_state, context), dim=1))
             conf2 = self.weight_head_3d(torch.cat((inp1, inp2, gru_hidden_state, context), dim=1))
