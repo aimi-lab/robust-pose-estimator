@@ -135,7 +135,6 @@ class StratifiedPoseDataset(PoseDataset):
             for i, p in enumerate(probs):
                 self.probs[annotations == i] = p
         else:
-            warnings.warn(f"{os.path.join(root, 'annotions.csv')} does not exist.",RuntimeWarning)
             self.probs = np.ones(len(glob(os.path.join(root, 'video_frames', '*l.png'))))
         super(StratifiedPoseDataset, self).__init__(root, baseline, intrinsics, depth_cutoff,conf_thr, step, img_size, samples)
 
