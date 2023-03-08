@@ -1,6 +1,4 @@
 matplotlib
-imageio
-Pillow
 scikit-image
 scikit-learn
 scipy
@@ -9,7 +7,6 @@ torch==1.11.0
 torchvision==0.12.0
 numpy==1.18.5
 opencv-python==4.3.0.38
-segmentation-models-pytorch
 plyfile
 wandb
 seaborn==0.11.2
