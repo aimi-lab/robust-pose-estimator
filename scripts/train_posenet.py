@@ -8,12 +8,12 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.cuda.amp import GradScaler
+from lietorch import SE3
 import wandb
 
 from core.pose.pose_net import PoseNet
 from core.utils.logging import TrainLogger as Logger
 from core.utils.plotting import plot_res
-from core.geometry.lie_3d_small_angle import small_angle_lie_se3_to_SE3_batch
 import dataset.train_datasets as datasets
 
 
@@ -22,33 +22,32 @@ VAL_FREQ = 1000
 
 
 def supervised_pose_loss(pose_pred, pose_gt):
-    l1 = (pose_pred - pose_gt).abs()
+    l1 = (pose_pred - pose_gt.log()).abs()
     return l1
 
 
-def val(model, dataloader, device, intrinsics, logger, key):
+def val(model, dataloader, device, logger, key):
     model.eval()
     with torch.no_grad():
         for i_batch, data_blob in enumerate(dataloader):
             ref_img, trg_img, ref_img_r, trg_img_r, ref_mask, trg_mask, gt_pose, intrinsics, baseline = [x.to(device) for x in
                                                                                               data_blob]
-            flow_predictions, pose_predictions, trg_depth, ref_depth, conf1, conf2 = model(trg_img, ref_img,
-                                                                                           intrinsics.float(), baseline.float(),
-                                                                                           image1r=trg_img_r,
-                                                                                           image2r=ref_img_r,
-                                                                                           mask1=trg_mask.to(torch.bool),
-                                                                                           mask2=ref_mask.to(torch.bool),
-                                                                                           ret_confmap=True)
+            gt_pose = SE3(gt_pose)
+            pose_predictions, trg_depth, ref_depth, weights = model(trg_img, ref_img,
+                                                                   intrinsics.float(), baseline.float(),
+                                                                   image1r=trg_img_r,
+                                                                   image2r=ref_img_r,
+                                                                   mask1=trg_mask.to(torch.bool),
+                                                                   mask2=ref_mask.to(torch.bool),
+                                                                   ret_confmap=True)
             loss_pose = supervised_pose_loss(pose_predictions, gt_pose)
             loss = torch.nanmean(loss_pose)
             loss_cpu = loss_pose.detach().cpu()
-            metrics = {f"{key}/loss_rot": loss_cpu[:, :3].nanmean().item(),
-                       f"{key}/loss_trans": loss_cpu[:, 3:].nanmean().item(),
+            metrics = {f"{key}/loss_rot": loss_cpu[:, 3:].nanmean().item(),
+                       f"{key}/loss_trans": loss_cpu[:, :3].nanmean().item(),
                        f"{key}/loss_total": loss_cpu.nanmean().item()}
             logger.push(metrics, len(dataloader))
         logger.flush()
-        logger.log_plot(plot_res(ref_img, trg_img, flow_predictions, trg_depth,
-                                 small_angle_lie_se3_to_SE3_batch(-pose_predictions), conf1, conf2, intrinsics)[0])
     model.train()
     return loss.detach().mean().cpu().item()
 
@@ -104,15 +103,15 @@ def main(args, config, force_cpu):
             ref_img, trg_img, ref_img_r, trg_img_r, ref_mask, trg_mask, gt_pose, intrinsics, baseline = [
                 x.to(device) for x in
                 data_blob]
-
+            gt_pose = SE3(gt_pose)
             # forward pass
-            flow_predictions, pose_predictions, trg_depth, ref_depth, conf1, conf2 = model(trg_img, ref_img,
-                                                                                           intrinsics.float(), baseline.float(),
-                                                                                           image1r=trg_img_r,
-                                                                                           image2r=ref_img_r,
-                                                                                           mask1=trg_mask.to(torch.bool),
-                                                                                           mask2=ref_mask.to(torch.bool),
-                                                                                           ret_confmap=True)
+            pose_predictions, trg_depth, ref_depth, weights = model(trg_img, ref_img,
+                                                                   intrinsics.float(), baseline.float(),
+                                                                   image1r=trg_img_r,
+                                                                   image2r=ref_img_r,
+                                                                   mask1=trg_mask.to(torch.bool),
+                                                                   mask2=ref_mask.to(torch.bool),
+                                                                   ret_confmap=True)
             # loss computations
             loss_pose = supervised_pose_loss(pose_predictions, gt_pose)
             loss = torch.mean(loss_pose)
@@ -126,22 +125,11 @@ def main(args, config, force_cpu):
             if args.dbg & (i_batch % SUM_FREQ == 0):
                 print("\n se3 pose")
                 print(f"gt_pose: {gt_pose[0].detach().cpu().numpy()}\npred_pose: {pose_predictions[0].detach().cpu().numpy()}")
-                print(" trans loss: ", loss_cpu[:, 3:].mean().item())
-                print(" rot loss: ", loss_cpu[:, :3].mean().item())
-                if device == torch.device('cpu'):
-                    pose = pose_predictions.clone()
-                    pose[:, 3:] *= config['depth_scale']
-                    fig, ax = plot_res(ref_img, trg_img, flow_predictions, trg_depth * config['depth_scale'],
-                                       small_angle_lie_se3_to_SE3_batch(-pose), conf1, conf2, intrinsics)
-                    import matplotlib.pyplot as plt
-                    plt.show()
+                print(" trans loss: ", loss_cpu[:, :3].mean().item())
+                print(" rot loss: ", loss_cpu[:, 3:].mean().item())
 
-            pose_change = (torch.abs(gt_pose).sum(dim=-1, keepdim=True) + 1e-12).detach().cpu()
-            metrics = {"train/loss_rot": loss_cpu[:,:3].mean().item(),
-                       "train/loss_rot_rel": (loss_cpu[:, :3] / pose_change).mean().item(),
-                       "train/loss_trans_rel": (loss_cpu[:, 3:] / pose_change).mean().item(),
-                       "train/loss_rel": (loss_cpu/pose_change).mean().item(),
-                      "train/loss_trans": loss_cpu[:, 3:].mean().item(),
+            metrics = {"train/loss_rot": loss_cpu[:,3:].mean().item(),
+                      "train/loss_trans": loss_cpu[:, :3].mean().item(),
                       "train/loss_total": loss_cpu.mean().item()}
 
             scaler.step(optimizer)
@@ -152,8 +140,8 @@ def main(args, config, force_cpu):
                 logger.flush()
 
             if (total_steps % VAL_FREQ) == 0:
-                val_loss = val(model, val_loader, device, intrinsics, logger, 'val')
-                val_loss2 = val(model, val2_loader, device, intrinsics, logger, 'val2')
+                val_loss = val(model, val_loader, device, logger, 'val')
+                val_loss2 = val(model, val2_loader, device, logger, 'val2')
                 val_loss += val_loss2
                 if torch.isnan(torch.tensor(val_loss)):
                     should_keep_training = False

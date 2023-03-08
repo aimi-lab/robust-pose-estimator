@@ -1,6 +1,7 @@
-from core.geometry.pinhole_transforms import create_img_coords_t, transform, homogeneous, project
+from lietorch import SE3, LieGroupParameter
+
+from core.geometry.pinhole_transforms import transform, project
 from core.ddn.ddn.pytorch.node import *
-from core.geometry.lie_3d_small_angle import small_angle_lie_se3_to_SE3_batch_lin
 
 
 class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
@@ -9,76 +10,45 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
         self.img_coordinates = img_coordinates
         self.lbgfs_iters = lbgfs_iters
 
-    def reprojection_objective(self, flow, pcl1, weights1, mask1, intrinsics, y, ret_res=False):
-        """
-            r2D - reprojection residuals
-        """
+    def objective(self, *xs, y, backward=False):
+        flow, pcl1, pcl2, weights, mask1, mask2, intrinsics= xs
+
         n, _, h, w = flow.shape
-        img_coordinates = create_img_coords_t(y=pcl1.shape[-2], x=pcl1.shape[-1]).to(pcl1.device)
-        pose = small_angle_lie_se3_to_SE3_batch_lin(-y)  # invert transform to be consistent with other pose estimators
         # project 3D-pcl to image plane
-        warped_pts = project(pcl1.view(n,3,-1), pose, intrinsics)
-        flow_off = self.img_coordinates[None, :2] + flow.view(n, 2, -1)
+        warped_pts = project(pcl1.view(n, 3, -1), y, intrinsics, double_backward=backward)  #(x,y, 1/depth(x,y)
+        inv_depth2 = 1.0/torch.clamp(pcl2.view(n,3,-1)[:, None, 2], min=1e-12)
+        flow_off = torch.cat((self.img_coordinates[None, :2] + flow.view(n, 2, -1), inv_depth2), dim=1)
         # compute residuals
-        residuals = torch.sum((flow_off - warped_pts)**2, dim=1)
-        residuals *= weights1.view(n, -1)
+        residuals = torch.sum((warped_pts- flow_off) ** 2, dim=1)
+        residuals *= weights.view(n, -1)
         # mask out invalid residuals
         valid = (flow_off[:, 0] > 0) & (flow_off[:, 1] > 0) & (flow_off[:, 0] < w) & (flow_off[:, 1] < h)
-        valid = torch.isinf(residuals) | torch.isnan(residuals) | ~valid.view(n,-1) | ~mask1.view(n,-1)
+        valid = torch.isinf(residuals) | torch.isnan(residuals) | ~valid.view(n, -1) | ~mask1.view(n, -1) | ~mask2.view(n, -1)
 
         # weight residuals by confidences
         residuals[valid] = 0.0
-        loss = torch.mean(residuals, dim=1) / (h*w)  # normalize with width and height
-        if ret_res:
-            flow = warped_pts - img_coordinates[None, :2]
-            return loss, residuals, flow
+        loss = torch.mean(residuals, dim=1) / (h * w)  # normalize with width and height
         return loss
-
-    def depth_objective(self, pcl1, pcl2, weights2, mask1, mask2, y, ret_res=False):
-        """
-            r3D - point-to-point 3D residuals
-        """
-        n, _, h, w = pcl1.shape
-        # se(3) to SE(3)
-        pose = small_angle_lie_se3_to_SE3_batch_lin(y)
-        # transform point cloud given the pose
-        pcl2_aligned = transform(homogeneous(pcl2.view(n, 3, -1)), pose).reshape(n, 4, h, w)[:, :3]
-        # compute residuals
-        residuals = torch.sum((pcl2_aligned.view(n, 3, -1) - pcl1.view(n, 3, -1)) ** 2, dim=1)
-        # reweighing residuals
-        residuals *= weights2.view(n, -1)
-        # mask out invalid residuals
-        valid = mask1 & mask2
-        residuals[~valid.view(n, -1)] = 0.0
-        if ret_res:
-            return torch.mean(residuals, dim=-1), residuals
-        return torch.mean(residuals, dim=-1)
-
-    def objective(self, *xs, y):
-        flow, pcl1, pcl2, weights1, weights2, mask1, mask2, loss_weight, intrinsics= xs
-        loss3d = self.depth_objective(pcl1, pcl2, weights2, mask1, mask2, y)
-        loss2d = self.reprojection_objective(flow, pcl1, weights1,mask1, intrinsics, y)
-        return loss_weight[:, 1]*loss2d + loss_weight[:, 0]*loss3d
 
     def solve(self, *xs):
         self.img_coordinates = self.img_coordinates.to(xs[0].device)
-        xs = [x.detach().clone() for x in xs]
+        xs = [x.detach().clone()for x in xs]
+        xs = [x.double() if x.dtype==torch.float32 else x for x in xs]
         with torch.enable_grad():
             n = xs[0].shape[0]
             # Solve using LBFGS optimizer:
-            y = torch.zeros((n,6), device=xs[0].device, requires_grad=True)
-            torch.backends.cuda.matmul.allow_tf32 = False
-            optimizer = torch.optim.LBFGS([y], lr=1.0, max_iter=self.lbgfs_iters, line_search_fn="strong_wolfe", )
+            y = LieGroupParameter(SE3.Identity(n, 1, device=xs[0].device, requires_grad=True, dtype=torch.float64))
+            # don't use strong-wolfe with lietorch SE3, it does not converge
+            optimizer = torch.optim.LBFGS([y], lr=1.0, max_iter=self.lbgfs_iters, line_search_fn=None, )
 
             def fun():
                 optimizer.zero_grad()
                 loss = self.objective(*xs, y=y).sum()
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(y, 100)
+                torch.nn.utils.clip_grad_norm_(y, 10)
                 return loss
             optimizer.step(fun)
-        torch.backends.cuda.matmul.allow_tf32 = True
-        return y.detach(), None
+        return y.group.vec().detach().float(), y.log().detach().float(), None
 
     # we re-implement the gradient function with more error-handling to catch failed optimization runs
     def gradient(self, *xs, y=None, v=None, ctx=None):
@@ -159,3 +129,75 @@ class DeclarativePoseHead3DNode(AbstractDeclarativeNode):
             else:
                 gradients.append(None)
         return tuple(gradients)
+
+    def _get_objective_derivatives(self, xs, y):
+        # Evaluate objective function at (xs,y):
+        y = LieGroupParameter(SE3(y))
+        f = torch.enable_grad()(self.objective)(*xs, y=y, backward=True)  # b
+
+        # Compute partial derivative of f wrt y at (xs,y):
+        fY = grad(f, y, grad_outputs=torch.ones_like(f), create_graph=True)[0]
+        fY = torch.enable_grad()(fY.reshape)(self.b, -1)  # bxm
+        if not fY.requires_grad:  # if fY is independent of y
+            fY.requires_grad = True
+
+        # Compute second-order partial derivative of f wrt y at (xs,y):
+        fYY = self._batch_jacobian(fY, y)  # bxmxm
+        fYY = fYY.detach() if fYY is not None else y.new_zeros(
+            self.b, self.m, self.m)
+
+        # Create function that returns generator expression for fXY given input:
+        fXY = lambda x: (fXiY.detach()
+                         if fXiY is not None else torch.zeros_like(fY).unsqueeze(-1)
+                         for fXiY in (self._batch_jacobian(fY, xi) for xi in x))
+
+        return fY, fYY, fXY
+
+
+class DeclarativeFunctionLie(DeclarativeFunction):
+    """Lie declarative autograd function.
+    Backpropagation in tangent space.
+    Defines the forward and backward functions. Saves all inputs and outputs,
+    which may be memory-inefficient for the specific problem.
+
+    returns unit-quaternions for inference and tangent space vector for back-propagation
+
+    Assumptions:
+    * All inputs are PyTorch tensors
+    * All inputs have a single batch dimension (b, ...)
+    """
+    @staticmethod
+    def forward(ctx, problem, *inputs):
+        output_vec, output_tan, solve_ctx = torch.no_grad()(problem.solve)(*inputs)
+        ctx.save_for_backward(output_vec, *inputs)
+        ctx.problem = problem
+        ctx.solve_ctx = solve_ctx
+        return output_vec.clone(), output_tan
+
+    @staticmethod
+    def backward(ctx, grad_output_vec, grad_output_tan):
+        output, *inputs = ctx.saved_tensors
+        problem = ctx.problem
+        solve_ctx = ctx.solve_ctx
+        output.requires_grad = True
+        inputs = tuple(inputs)
+        grad_inputs = problem.gradient(*inputs, y=output, v=grad_output_tan,
+                                       ctx=solve_ctx)
+        return (None, *grad_inputs)
+
+
+class DeclarativeLayerLie(DeclarativeLayer):
+    """Lie declarative layer.
+
+    Assumptions:
+    * All inputs are PyTorch tensors
+    * All inputs have a single batch dimension (b, ...)
+
+    Usage:
+        problem = <derived class of *DeclarativeNode>
+        declarative_layer = DeclarativeLayer(problem)
+        y = declarative_layer(x1, x2, ...)
+    """
+
+    def forward(self, *inputs):
+        return DeclarativeFunctionLie.apply(self.problem, *inputs)

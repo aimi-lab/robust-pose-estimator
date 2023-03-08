@@ -125,3 +125,38 @@ class MedianPool2d(nn.Module):
         x = x.unfold(2, self.k[0], self.stride[0]).unfold(3, self.k[1], self.stride[1])
         x = x.contiguous().view(x.size()[:4] + (-1,)).median(dim=-1)[0]
         return x
+
+def image_gradient(img: torch.Tensor):
+    sobel = [[-0.125, -0.25, -0.125], [0, 0, 0], [0.125, 0.25, 0.125]]
+    batch, channels, h, w = img.shape
+    sobel_kernely = torch.tensor(sobel, dtype=img.dtype, device=img.device).unsqueeze(0).expand(1, channels, 3, 3)
+    sobel_kernelx = torch.tensor(sobel, dtype=img.dtype, device=img.device).unsqueeze(0).expand(1, channels, 3,
+                                                                                                3).transpose(2,
+                                                                                                             3)
+    x_grad = pad(conv2d(img, sobel_kernelx, stride=1, padding='valid', groups=channels)[..., 1:-1, 1:-1],
+                 (2, 2, 2, 2)).reshape(batch, channels, -1)
+    y_grad = pad(conv2d(img, sobel_kernely, stride=1, padding='valid', groups=channels)[..., 1:-1, 1:-1],
+                 (2, 2, 2, 2)).reshape(batch, channels, -1)
+    gradient = torch.stack((x_grad, y_grad), dim=-1)
+    return gradient
+
+
+def skewmat(vec: torch.Tensor = None) -> torch.Tensor:
+    """
+    create hat-map in so(3) from Euler vector in R^3
+    :param wvec: Euler vector in R^3
+    :return: hat-map in so(3)
+    """
+
+    if vec.ndim == 1:
+        vec = vec.unsqueeze(0)
+    assert vec.shape[1] == 3, 'argument must be a 3-vector'
+
+    W_row0 = torch.tensor([0, 0, 0, 0, 0, 1, 0, -1, 0.0], device=vec.device, dtype=vec.dtype).view(3, 3)
+    W_row1 = torch.tensor([0, 0, -1, 0, 0, 0, 1, 0, 0.0], device=vec.device, dtype=vec.dtype).view(3, 3)
+    W_row2 = torch.tensor([0, 1, 0, -1, 0, 0, 0, 0, 0.0], device=vec.device, dtype=vec.dtype).view(3, 3)
+
+    wmat = torch.stack(
+        [torch.matmul(vec, W_row0.T), torch.matmul(vec, W_row1.T), torch.matmul(vec, W_row2.T)], dim=-1)
+
+    return wmat

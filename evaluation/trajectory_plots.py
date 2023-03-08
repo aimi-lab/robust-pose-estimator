@@ -20,7 +20,7 @@ if __name__ == '__main__':
         '--methods',
         type=str,
         nargs='+',
-        default=['gt'],
+        default=[ 'orbslam2', 'ours', 'ground truth'],
         help='Folder containing predictions.'
     )
     parser.add_argument(
@@ -53,7 +53,7 @@ if __name__ == '__main__':
             print('ATE-RMSE: ',ate_rmse, ' mm')
             print('RPE-trans: ', rpe_trans, ' mm')
             print('RPE_rot: ', rpe_rot)
-            pose_arrs = np.stack(read_freiburg(freiburg_paths[meth]))
+            pose_arrs = np.stack(read_freiburg(freiburg_paths[meth]).matrix())
             if args.prealign:
                 # align trajectories
                 pose_arrs = T[None, ...] @ pose_arrs

@@ -1,8 +1,7 @@
 import numpy as np
 import cv2
 import os
-from core.geometry.pinhole_transforms import inv_transform
-
+import torch
 
 class ViewRenderer(object):
     def __init__(self, image_shape, outpath):
@@ -29,7 +28,7 @@ class ViewRenderer(object):
         self.vid_writer.release()
 
     def pose2view(self, pose):
-        self.ref_view.extrinsic = inv_transform(pose).numpy()
+        self.ref_view.extrinsic = pose.inv().matrix.numpy()
         return self.ref_view
 
     def __call__(self, pose, pcd):

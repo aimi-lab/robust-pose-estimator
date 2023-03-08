@@ -1,5 +1,7 @@
 import torch
-from typing import Tuple
+from typing import Tuple, Union
+from lietorch import SE3, LieGroupParameter
+from core.utils.pytorch import skewmat
 
 
 def create_img_coords_t(
@@ -17,21 +19,61 @@ def create_img_coords_t(
     return ipts
 
 
-def inv_transform(mat:torch.Tensor):
-    mat_inv = torch.eye(4, device=mat.device, dtype=mat.dtype)
-    mat_inv[:3, :3] = mat[:3, :3].T
-    mat_inv[:3, 3] = -mat[:3, :3].T @ mat[:3, 3]
-    return mat_inv
-
-
 def homogeneous(opts: torch.Tensor):
     n = opts.shape[0]
     opts = torch.cat((opts, torch.ones((n, 1, opts.shape[-1]), device=opts.device, dtype=opts.dtype)), dim=1)
     return opts
 
 
-def transform(opts: torch.Tensor, pmat:torch.tensor):
-    return torch.bmm(pmat, opts)
+def transform_forward(opts: torch.Tensor, T:Union[SE3, LieGroupParameter]):
+    opts_tr = T * opts.permute(0, 2, 1)
+    return opts_tr.permute(0, 2, 1)
+
+
+def transform_backward(grad_out, out, opts_grad, T):
+    # custom backward function to enable double backward
+    n = grad_out.shape[0]
+    grad_out = grad_out.movedim(1, -1).reshape(-1, 1,3)
+    out = out.movedim(1, -1).reshape(-1, 3)
+    if T.requires_grad:
+        # (I | -out_x) \in R^(3x6)
+        eye = torch.eye(3, device=out.device, dtype=out.dtype).repeat(grad_out.shape[0], 1, 1)
+        grad_T = torch.bmm(grad_out,torch.cat((eye, skewmat(-out)), dim=-1))
+        grad_T = grad_T.reshape(n, -1, 6)
+    else:
+        grad_T = None
+    if opts_grad:
+        # 3x3 rot matrix
+        if isinstance(T, LieGroupParameter):
+            T = T.group
+        m = grad_out.shape[0]//n//T.shape[1]
+
+        grad_opts = torch.bmm(grad_out,T.matrix().repeat(1,m,1,1).view(-1,4,4)[:, :3, :3])
+        grad_opts = grad_opts.reshape(n, -1, 3).permute(0, 2, 1)
+    else:
+        grad_opts = None
+    return grad_opts, grad_T
+
+
+class Transform(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, opts, T):
+        with torch.no_grad():
+            out = transform_forward(opts, T)
+        ctx.save_for_backward(opts, T, out)
+        return out
+
+    @staticmethod
+    def backward(ctx, grad_out):
+        opts, T, out = ctx.saved_tensors
+        return transform_backward(grad_out, out, opts.requires_grad, T)
+
+
+def transform(opts: torch.Tensor, T:Union[SE3, LieGroupParameter], double_backward:bool=False):
+    if double_backward:
+        return Transform.apply(opts, T)
+    else:
+        return transform_forward(opts, T)
 
 
 def reproject(depth: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.Tensor):
@@ -45,27 +87,27 @@ def reproject(depth: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.T
     return opts
 
 
-def project(opts: torch.Tensor, pmat:torch.tensor, intrinsics:torch.tensor):
-    p = intrinsics @ pmat[:, :3]
+def project(opts: torch.Tensor, T:Union[SE3, LieGroupParameter], intrinsics:torch.tensor, double_backward:bool=False):
     # pinhole projection
-    if opts.shape[1] == 3:
-        opts = homogeneous(opts)
-    ipts = torch.bmm(p, opts)
+    opts = transform(opts, T, double_backward=double_backward)
+    ipts = torch.bmm(intrinsics, opts)
     # inhomogenization
-    ipts = ipts[:, :3] / torch.clamp(ipts[:, -1], 1e-12, None).unsqueeze(1)
-    return ipts[:, :2]
+    depth = torch.clamp(ipts[:, -1], 1e-12, None).unsqueeze(1)
+    ipts = torch.cat((ipts[:,:2], torch.ones_like(ipts[:,None,2])), dim=1)
+    ipts = ipts / depth
+    return ipts
 
 
 def project2image(
         opts: torch.Tensor,
         intrinsics: torch.Tensor,
         img_shape: Tuple,
-        pmat: torch.Tensor = None
+        T:Union[SE3, LieGroupParameter] = None
                     ):
     assert len(img_shape) == 2
-    if pmat is None:
-        pmat = torch.eye(4, device=opts.device, dtype=opts.dtype).unsqueeze(0)
-    ipts = project(opts, pmat, intrinsics)
+    if T is None:
+        T = SE3.Identity(1)
+    ipts = project(opts, T, intrinsics)
     # filter points that are not in the image
     valid = (ipts[:, 1] < img_shape[0]) & (ipts[:, 0] < img_shape[1]) & (ipts[:, 1] >= 0) & (ipts[:, 0] >= 0)
     return ipts, valid

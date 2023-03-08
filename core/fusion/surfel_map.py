@@ -1,5 +1,6 @@
 import torch
 from torch.nn.functional import max_pool2d
+from lietorch import SE3
 from typing import Union, Tuple
 import numpy as np
 import warnings
@@ -70,12 +71,11 @@ class SurfelMap(object):
         self.t_created = torch.zeros(1,self.opts.shape[1]).to(self.device)
 
     def fuse(self, *args):
-        frame, pmat = args[:2]
-        assert pmat.shape == (4,4)
+        frame, pose = args[:2]
 
         # prepare parameters
         self.img_shape = frame.shape
-        pmat_inv = torch.linalg.inv(pmat)
+        pose_inv = pose.inv()
         kmat = self.kmat.clone()
 
         rgb = frame.img
@@ -94,13 +94,13 @@ class SurfelMap(object):
 
         # project depth to 3d-points in world coordinates
         opts = reproject(img_coords=ipts, intrinsics=self.kmat, depth=depth)
-        opts = transform(opts, pmat.unsqueeze(0)).squeeze()[:3]
+        opts = transform(opts, pose.unsqueeze(0)).squeeze()[:3]
 
         # consider masked surfels and enforce channel x samples shape
         rgb = rgb.view(3, -1)
 
         # project all surfels to current image frame
-        global_ipts = project(self.opts.unsqueeze(0), intrinsics=kmat.unsqueeze(0), pmat=pmat_inv.unsqueeze(0)).squeeze()
+        global_ipts = project(self.opts.unsqueeze(0), intrinsics=kmat.unsqueeze(0), T=pose_inv.unsqueeze(0)).squeeze()
         bidx = (global_ipts[0, :] >= 0) & (global_ipts[1, :] >= 0) & (global_ipts[0, :] < self.img_shape[1]*self.upscale-1) & (global_ipts[1, :] < self.img_shape[0]*self.upscale-1)
 
         # get correspondence by assigning projected points to image coordinates
@@ -184,7 +184,7 @@ class SurfelMap(object):
         midx: torch.Tensor,
         vidx: torch.Tensor = None,
         d_thresh: float = 0.05,
-        ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         filter correspondences by depth and normal angle
         """
@@ -202,21 +202,19 @@ class SurfelMap(object):
 
         return vidx, midx
 
-    def transform(self, transform:torch.tensor):
+    def transform(self, transform:SE3):
         """
         transform surfels (3d points and normals) inplace
-        :param transform: 4x4 homogenous transform
+        :param transform: lietorch SE3 transform
         """
-        assert transform.shape == (4,4)
-        self.opts = transform[:3,:3]@self.opts + transform[:3,3,None]
+        self.opts = transform(self.opts.unsqueeze(0), transform.unsqueeze(0)).squeeze()
 
     def transform_cpy(self, transform:torch.tensor):
         """
         transform surfels (3d points and normals) and return a copy
-        :param transform: 4x4 homogenous transform
+        :param transform: lietorch SE3 transform
         """
-        assert transform.shape == (4, 4)
-        opts = transform[:3,:3]@self.opts + transform[:3,3,None]
+        opts = transform(self.opts.unsqueeze(0), transform.unsqueeze(0)).squeeze()
         return self._constructor(opts=opts, kmat=self.kmat, rgb=self.rgb, img_shape=self.img_shape,
                          depth_scale=self.depth_scale, conf=self.conf).to(self.device)
 
@@ -229,7 +227,7 @@ class SurfelMap(object):
     def confidence(self):
         return self.conf.view(-1)
 
-    def render(self, intrinsics: torch.tensor=None, extrinsics: torch.tensor=None):
+    def render(self, intrinsics: torch.tensor=None, extrinsics: SE3=None):
         """
         render frame (image, depth and mask) from surfel-map
         :param intrinsics: camera intrinsics
@@ -243,7 +241,7 @@ class SurfelMap(object):
         # rotate, translate and forward-project points
         sort_idx = torch.argsort(self.conf, dim=1)[0]
         pts_h = torch.vstack([self.opts[:, sort_idx], torch.ones(self.opts.shape[1], dtype=self.opts.dtype, device=self.device)])
-        npts, valid = project2image(pts_h.unsqueeze(0), img_shape=self.img_shape, intrinsics=intrinsics.unsqueeze(0), pmat=extrinsics.unsqueeze(0))
+        npts, valid = project2image(pts_h.unsqueeze(0), img_shape=self.img_shape, intrinsics=intrinsics.unsqueeze(0), T=extrinsics.unsqueeze(0))
         npts = npts.squeeze()
         valid = valid.squeeze()
         # generate sparse img maps and interpolate missing values

@@ -21,7 +21,7 @@ class InferenceLogger:
         log_dict = {'frame': step,
                     'surfels/total': surfels_total,
                     'surfels/stable': surfels_stable}
-        pose = pose.cpu().numpy()
+        pose = pose.matrix().squeeze().cpu().numpy()
         if self.gt_trajectory is not None:
             if len(self.gt_trajectory) > step:
                 tr_err = self.gt_trajectory[step][:3, 3] - pose[:3, 3]
@@ -40,7 +40,7 @@ class InferenceLogger:
         wandb.log(log_dict, step=step)
 
     def set_gt(self, gt_trajectory):
-        self.gt_trajectory = gt_trajectory
+        self.gt_trajectory = gt_trajectory.matrix()
 
 
 class TrainLogger:
