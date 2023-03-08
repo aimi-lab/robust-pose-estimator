@@ -27,9 +27,9 @@ class PoseNet(nn.Module):
     def forward(self, image1l, image2l, intrinsics, baseline, image1r, image2r, mask1=None, mask2=None, ret_confmap=False):
         """ estimate optical flow from stereo pair to get disparity map"""
         depth1, stereo_flow1, valid1 = self.flow2depth(image1l, image1r, baseline)
-        mask1 = mask1[:,:,::8, ::8] & valid1 if mask1 is not None else valid1
+        mask1 = mask1[:,:,3::8, 3::8] & valid1 if mask1 is not None else valid1
         depth2, stereo_flow2, valid2 = self.flow2depth(image2l, image2r, baseline)
-        mask2 = mask2[:,:,::8, ::8] & valid2 if mask2 is not None else valid2
+        mask2 = mask2[:,:,3::8, 3::8] & valid2 if mask2 is not None else valid2
 
         # avoid computing unnecessary gradients
         mask1.requires_grad = False
@@ -74,8 +74,8 @@ class PoseNet(nn.Module):
             valid = (depth2 > 0) & (depth2 <= 1.0)
             depth2[~valid] = 1.0
             depth2 = depth2.unsqueeze(1)
-            mask2 = mask2[:, :, ::8, ::8] & valid.unsqueeze(1)
-            mask1 = mask1[:, :, ::8, ::8]
+            mask2 = mask2[:, :, 3::8, 3::8] & valid.unsqueeze(1)
+            mask1 = mask1[:, :, 3::8, 3::8]
             intrinsics = intrinsics.clone()
             intrinsics[:, :2, :2] /= 8.0
             pcl1 = self.proj(depth1, intrinsics)
@@ -109,9 +109,9 @@ class PoseNet(nn.Module):
         mask2, valid_mapping = remap_from_flow_nearest(mask2, time_flow)
         mask2 = valid_mapping & mask2.to(bool)
         if self.use_weights:
-            inp1 = torch.nn.functional.interpolate(torch.cat((stereo_flow1, image1l, pcl1), dim=1),
+            inp1 = torch.nn.functional.interpolate(torch.cat((stereo_flow1, image1l[:,:,3::8, 3::8], pcl1), dim=1),
                                                    scale_factor=0.125, mode='bilinear')
-            inp2 = torch.nn.functional.interpolate(torch.cat((stereo_flow2, image2l, pcl2), dim=1),
+            inp2 = torch.nn.functional.interpolate(torch.cat((stereo_flow2, image2l[:,:,3::8, 3::8], pcl2), dim=1),
                                                    scale_factor=0.125, mode='bilinear')
             conf1 = self.weight_head_2d(torch.cat((inp1, gru_hidden_state, context), dim=1))
             conf2 = self.weight_head_3d(torch.cat((inp1, inp2, gru_hidden_state, context), dim=1))
