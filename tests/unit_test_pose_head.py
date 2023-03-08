@@ -2,7 +2,7 @@ import unittest
 import torch
 from lietorch import SE3
 from core.geometry.pinhole_transforms import transform, project, project2image, reproject, create_img_coords_t
-from core.pose.pose_head import DeclarativePoseHead3DNode, DeclarativeLayerLie
+from core.pose.pose_head_comb import DeclarativePoseHead3DNode, DeclarativeLayerLie
 
 
 class PoseHeadTester(unittest.TestCase):

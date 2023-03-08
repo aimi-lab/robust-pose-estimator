@@ -21,7 +21,8 @@ class PoseNet(nn.Module):
         self.flow = RAFT(config)
         self.flow.freeze_bn()
         self.pose_head = DeclarativeLayerLie(DPoseSE3Head(self.img_coords, config['lbgfs_iters'], dbg=config['dbg']))
-        self.weight_head = nn.Sequential(TinyUNet(in_channels=128 + 128 + 8 + 8, output_size=(H//8, W//8)), nn.Sigmoid())
+        self.weight_head_2d = nn.Sequential(TinyUNet(in_channels=128 + 128 + 8, output_size=(H, W)), nn.Sigmoid())
+        self.weight_head_3d = nn.Sequential(TinyUNet(in_channels=128 + 128 + 8 + 8, output_size=(H, W)), nn.Sigmoid())
 
     def forward(self, image1l, image2l, intrinsics, baseline, image1r, image2r, mask1=None, mask2=None, ret_confmap=False):
         """ estimate optical flow from stereo pair to get disparity map"""
@@ -108,12 +109,16 @@ class PoseNet(nn.Module):
         mask2, valid_mapping = remap_from_flow_nearest(mask2, time_flow)
         mask2 = valid_mapping & mask2.to(bool)
         if self.use_weights:
-            image1l = torch.nn.functional.interpolate(image1l, scale_factor=0.125, mode='bilinear')
-            weights = self.weight_head(torch.cat((stereo_flow1, image1l, pcl1, stereo_flow2, image2l, pcl2,
-                                                   gru_hidden_state, context), dim=1))
+            inp1 = torch.nn.functional.interpolate(torch.cat((stereo_flow1, image1l, pcl1), dim=1),
+                                                   scale_factor=0.125, mode='bilinear')
+            inp2 = torch.nn.functional.interpolate(torch.cat((stereo_flow2, image2l, pcl2), dim=1),
+                                                   scale_factor=0.125, mode='bilinear')
+            conf1 = self.weight_head_2d(torch.cat((inp1, gru_hidden_state, context), dim=1))
+            conf2 = self.weight_head_3d(torch.cat((inp1, inp2, gru_hidden_state, context), dim=1))
         else:
-            weights = torch.ones_like(mask2, dtype=torch.float32)
-        return weights, pcl2, mask2
+            conf1 = torch.ones_like(mask2, dtype=torch.float32)
+            conf2 = torch.ones_like(mask2, dtype=torch.float32)
+        return conf1, conf2, pcl2,
 
     def proj(self, depth, intrinsics):
         n = depth.shape[0]

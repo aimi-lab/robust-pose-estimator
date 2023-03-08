@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from collections import OrderedDict
 import numpy as np
 from dataset.dataset_utils import get_data
-from core.pose.pose_net import PoseNet
+from core.pose.pose_net_comb import PoseNetCombined
 
 
 def main(args):
@@ -20,7 +20,7 @@ def main(args):
     checkp['config']['model']['image_shape'] = (640, 512)
     checkp['config']['model']['amp'] = True if args.amp else False
     checkp['config']['model']['lbgfs_iters'] = 20
-    model = PoseNet(checkp['config']['model'])
+    model = PoseNetCombined(checkp['config']['model'])
     new_state_dict = OrderedDict()
     state_dict = checkp['state_dict']
     for k, v in state_dict.items():
