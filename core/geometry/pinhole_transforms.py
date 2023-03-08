@@ -87,9 +87,10 @@ def reproject(depth: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.T
     return opts
 
 
-def project(opts: torch.Tensor, T:Union[SE3, LieGroupParameter], intrinsics:torch.tensor, double_backward:bool=False):
+def project(opts: torch.Tensor, intrinsics:torch.tensor, T:Union[SE3, LieGroupParameter]=None, double_backward:bool=False):
     # pinhole projection
-    opts = transform(opts, T, double_backward=double_backward)
+    if T is not None:
+        opts = transform(opts, T, double_backward=double_backward)
     ipts = torch.bmm(intrinsics, opts)
     # inhomogenization
     depth = torch.clamp(ipts[:, -1], 1e-12, None).unsqueeze(1)
@@ -107,7 +108,7 @@ def project2image(
     assert len(img_shape) == 2
     if T is None:
         T = SE3.Identity(1)
-    ipts = project(opts, T, intrinsics)
+    ipts = project(opts, intrinsics, T)
     # filter points that are not in the image
     valid = (ipts[:, 1] < img_shape[0]) & (ipts[:, 0] < img_shape[1]) & (ipts[:, 1] >= 0) & (ipts[:, 0] >= 0)
     return ipts, valid

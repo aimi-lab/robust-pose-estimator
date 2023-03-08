@@ -6,6 +6,7 @@ model:
   pose_scale: 1.0
   lbgfs_iters: 100
   use_weights: True
+  dbg: False
 
 data:
   train:

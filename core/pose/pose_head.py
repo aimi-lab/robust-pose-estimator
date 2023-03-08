@@ -10,7 +10,7 @@ class DPoseSE3Head(DeclarativeNodeLie):
         self.losses = []
 
     def objective(self, *xs, y, backward=False):
-        flow, pcl1, pcl2, weights, mask1, mask2, intrinsics= xs
+        flow, pcl1, pcl2, weights, mask1, mask2, intrinsics, _= xs
 
         n, _, h, w = flow.shape
         # project 3D-pcl to image plane

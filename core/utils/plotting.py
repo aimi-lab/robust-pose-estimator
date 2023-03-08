@@ -10,7 +10,7 @@ from core.geometry.pinhole_transforms import create_img_coords_t, reproject, pro
 def _get_warpfield(depth: torch.Tensor, T: torch.Tensor, intrinsics: torch.Tensor, img_coords: torch.Tensor):
     # transform and project using pinhole camera model
     opts = reproject(depth, intrinsics, img_coords)
-    return project(opts[:, :3], T, intrinsics)[:, :2]
+    return project(opts[:, :3], intrinsics, T)[:, :2]
 
 
 def warp_frame(src_frame, depth, T, intrinsics):

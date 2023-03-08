@@ -27,7 +27,7 @@ class PoseHeadTester(unittest.TestCase):
         torch.random.manual_seed(12345)
         self.poses = SE3.Random(n,1, sigma=0.01)
         # compute induced flow
-        flow_off = project(self.pcl.view(n,3,-1), self.poses, intrinsics=self.kmat)[:,:2].reshape(n,2,180,180)
+        flow_off = project(self.pcl.view(n,3,-1),self.kmat, self.poses)[:,:2].reshape(n,2,180,180)
         self.valid = (flow_off[:,0] >= 0) & (flow_off[:,0] < 180) & (flow_off[:,1] >= 0) & (flow_off[:,1] < 180)
         self.valid = self.valid.unsqueeze(1)
         self.flow = flow_off - create_img_coords_t(180,180)[:2].reshape(1,2, 180, 180)
