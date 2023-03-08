@@ -51,9 +51,10 @@ class DPoseSE3Head(DeclarativeNodeLie):
         return torch.mean(residuals, dim=-1)
 
     def objective(self, *xs, y, backward=False):
+        pose = y[0]
         flow, pcl1, pcl2, weights1, weights2, mask1, mask2, loss_weight, intrinsics= xs
-        loss3d = self.depth_objective(pcl1, pcl2, weights2, mask1, mask2, y, backward)
-        loss2d = self.reprojection_objective(flow, pcl1, weights1,mask1, intrinsics, y, backward)
+        loss3d = self.depth_objective(pcl1, pcl2, weights2, mask1, mask2, pose, backward)
+        loss2d = self.reprojection_objective(flow, pcl1, weights1,mask1, intrinsics, pose, backward)
         return loss_weight[:, 1]*loss2d + loss_weight[:, 0]*loss3d
 
     def solve(self, *xs):
