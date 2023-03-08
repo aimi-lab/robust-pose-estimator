@@ -14,7 +14,7 @@ class PoseNet(nn.Module):
     def __init__(self, config):
         super(PoseNet, self).__init__()
         self.config = config
-        self.loss_weight = torch.tensor([1.0])
+        self.loss_weight = nn.Parameter(torch.tensor([1.0, 1.0]))
         H, W = config["image_shape"]
         self.register_buffer("img_coords", create_img_coords_t(y=H//8, x=W//8), persistent=False)
         self.use_weights = config["use_weights"]
@@ -116,7 +116,7 @@ class PoseNet(nn.Module):
         else:
             conf1 = torch.ones_like(mask2, dtype=torch.float32)
             conf2 = torch.ones_like(mask2, dtype=torch.float32)
-        return conf1, conf2, pcl2,
+        return conf1, conf2, pcl2, mask2
 
     def proj(self, depth, intrinsics):
         n = depth.shape[0]

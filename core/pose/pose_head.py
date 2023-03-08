@@ -15,7 +15,7 @@ class DPoseSE3Head(DeclarativeNodeLie):
         """
         n, _, h, w = flow.shape
         # project 3D-pcl to image plane
-        warped_pts = project(pcl1.view(n,3,-1), y, intrinsics, double_backward=backward)
+        warped_pts = project(pcl1.view(n,3,-1), intrinsics, y, double_backward=backward)[:,:2]
         flow_off = self.img_coordinates[None, :2] + flow.view(n, 2, -1)
         # compute residuals
         residuals = torch.sum((flow_off - warped_pts)**2, dim=1)
@@ -52,7 +52,7 @@ class DPoseSE3Head(DeclarativeNodeLie):
 
     def objective(self, *xs, y, backward=False):
         pose = y[0]
-        flow, pcl1, pcl2, weights1, weights2, mask1, mask2, loss_weight, intrinsics= xs
+        flow, pcl1, pcl2, weights1, weights2, mask1, mask2, intrinsics, loss_weight = xs
         loss3d = self.depth_objective(pcl1, pcl2, weights2, mask1, mask2, pose, backward)
         loss2d = self.reprojection_objective(flow, pcl1, weights1,mask1, intrinsics, pose, backward)
         return loss_weight[:, 1]*loss2d + loss_weight[:, 0]*loss3d
