@@ -58,11 +58,7 @@ runs_df.method = runs_df.method.cat.set_categories(METHODS)
 runs_df.sort_values(['method'], inplace=True)
 runs_df.to_csv("project.csv")
 runs_df['dataset'] = [k[:9] for k in runs_df['keyframe']]
-runs_df["ATE/RMSE"] *= 1.0e3 #m to mm
-runs_df["RPE/trans"] *= 1.0e3 #m to mm
 runs_df["RPE/rot"] *= 180/np.pi # rad to deg
-
-
 
 
 # Group into methods and datasets
