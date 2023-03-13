@@ -20,7 +20,7 @@ class StereoDataset(Dataset):
     def __init__(self, input_folder:str, img_size:Tuple):
         super().__init__()
         self.imgs = sorted(glob.glob(os.path.join(input_folder, 'video_frames*', '*l.png')))
-        self.mask = sorted(glob.glob(os.path.join(input_folder, 'tool_masks*', '*l.png')))
+        self.mask = sorted(glob.glob(os.path.join(input_folder, 'masks*', '*l.png')))
         assert len(self.imgs) == len(self.mask)
         assert len(self.imgs) > 0
 
