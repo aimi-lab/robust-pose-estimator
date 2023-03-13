@@ -13,17 +13,17 @@ data:
     type: Intuitive
     basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_human
     sequences:
-      - dataset_1_0
-      - dataset_1_1
-      - dataset_1_2
-      - dataset_1_3
-      - dataset_1_4
-      - dataset_1_5
-      - dataset_1_6
-      - dataset_3_0
-      - dataset_3_1
-      - dataset_3_2
-      - dataset_3_3
+      - H1_0
+      - H1_1
+      - H1_2
+      - H1_3
+      - H1_4
+      - H1_5
+      - H1_6
+      - P1_0
+      - P1_1
+      - P1_2
+      - P1_3
       - scared_dataset_1
       - scared_dataset_2
       - scared_dataset_3
