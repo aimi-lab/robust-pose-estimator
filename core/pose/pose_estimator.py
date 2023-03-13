@@ -26,6 +26,7 @@ class PoseEstimator(torch.nn.Module):
         checkp = torch.load(checkpoint, map_location='cpu')
         checkp['config']['model']['image_shape'] = (img_shape[1], img_shape[0])
         checkp['config']['model']['lbgfs_iters'] = config['lbgfs_iters']
+        checkp['config']['model']['use_weights'] = config['conf_weighing']
         model = PoseNet(checkp['config']['model'])
         new_state_dict = OrderedDict()
         state_dict = checkp['state_dict']
