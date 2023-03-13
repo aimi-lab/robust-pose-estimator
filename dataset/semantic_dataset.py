@@ -37,7 +37,7 @@ class StereoDataset(Dataset):
         # to torch tensor
         img_l = torch.tensor(img_l).permute(2, 0, 1).float()
         img_r = torch.tensor(img_r).permute(2, 0, 1).float()
-        mask = torch.tensor(mask).unsqueeze(0).unsqueeze(0)
+        mask = torch.tensor(mask).unsqueeze(0)
 
         data = self.transform(img_l, img_r, mask)
         return (*data, img_number)
