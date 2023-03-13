@@ -1,67 +1,54 @@
 import sys
 sys.path.append('../')
-from core.pose.pose_estimator import PoseEstimator
 import os
 import torch
 import numpy as np
 from tqdm import tqdm
 from dataset.dataset_utils import get_data, StereoVideoDataset
-import warnings
 from torch.utils.data import DataLoader
 import wandb
 import cv2
-from core.utils.pfm_handler import save_pfm
 
 
-def main(input_path, output_path, device_sel, step, log, rect_mode):
-    device = torch.device('cpu')
-    if device_sel == 'gpu':
-        if torch.cuda.is_available():
-            device = torch.device('cuda')
-        else:
-            warnings.warn('No GPU available, fallback to CPU')
+def _check_valid(valid_list, n):
+    if valid_list is None:
+        return True
+    valid = False
+    for v in valid_list:
+        if (n >= v[0]) & (n < v[1]):
+            valid = True
+    return valid
 
+
+def main(input_path, output_path, step, log, rect_mode):
+    # only extract valid frames for training
+    if os.path.isfile(os.path.join(input_path, 'split.csv')):
+        valid_list = np.genfromtxt(os.path.join(input_path, 'valid.csv'), header=1, delimiter=',')
+    else:
+        valid_list = None
     if log is not None:
         wandb.init(project='data extraction', group=log)
 
     dataset, calib = get_data(input_path, (1280, 1024), sample_video=step, rect_mode=rect_mode)
-    config={"frame2frame": True,
-            "dist_thr": 0.05, # relative distance threshold for data association
-            "depth_clipping":[1,250], # in mm
-            "debug": False,
-            "mask_specularities": True,
-            "conf_weighing": True,
-            "compensate_illumination": False,  # do not use this with noisy depth estimates
-            "average_pts": False,
-            "fuse_mode": "projective",
-            "fuse_step": 1,
-            "img_size": (1280, 1024)}
-    pose_estimator = PoseEstimator(config, torch.tensor(calib['intrinsics']['left']).to(device),
-                                   baseline=calib['bf'],
-                                   checkpoint=args.checkpoint,
-                                   img_shape=config['img_size']).to(device)
     assert isinstance(dataset, StereoVideoDataset)
 
-    loader = DataLoader(dataset, num_workers=1, pin_memory=True)
+    loader = DataLoader(dataset, num_workers=1)
 
     os.makedirs(os.path.join(output_path, 'video_frames'), exist_ok=True)
-    os.makedirs(os.path.join(output_path, 'depth'), exist_ok=True)
 
     with torch.inference_mode():
         for i, data in enumerate(tqdm(loader, total=len(dataset))):
             limg, rimg, pose_kinematics, img_number = data
-            depth, flow, _ = pose_estimator.flow2depth(limg.to(device), rimg.to(device), pose_estimator.baseline)
-            depth = depth.squeeze().cpu().numpy()
 
-            # store images and depth and mask
-            if torch.is_tensor(img_number):
-                img_name = f'{img_number.item():06d}'
-            else:
-                img_name = f'{int(img_number[0]):06d}'
-            cv2.imwrite(os.path.join(output_path, 'video_frames', img_name+'l.png'), cv2.cvtColor(255.0*limg.squeeze().permute(1,2,0).cpu().numpy(), cv2.COLOR_RGB2BGR).astype(np.uint8))
-            cv2.imwrite(os.path.join(output_path, 'video_frames', img_name + 'r.png'),
-                        cv2.cvtColor(255.0*rimg.squeeze().permute(1,2,0).cpu().numpy(), cv2.COLOR_RGB2BGR).astype(np.uint8))
-            save_pfm(depth, os.path.join(output_path,'depth', f'{img_number[0]}l.pfm'))
+            if _check_valid(valid_list, int(img_number[0])):
+                # store images and depth and mask
+                if torch.is_tensor(img_number):
+                    img_name = f'{img_number.item():06d}'
+                else:
+                    img_name = f'{int(img_number[0]):06d}'
+                cv2.imwrite(os.path.join(output_path, 'video_frames', img_name+'l.png'), cv2.cvtColor(255.0*limg.squeeze().permute(1,2,0).cpu().numpy(), cv2.COLOR_RGB2BGR).astype(np.uint8))
+                cv2.imwrite(os.path.join(output_path, 'video_frames', img_name + 'r.png'),
+                            cv2.cvtColor(255.0*rimg.squeeze().permute(1,2,0).cpu().numpy(), cv2.COLOR_RGB2BGR).astype(np.uint8))
         print('finished')
 
 
@@ -79,17 +66,11 @@ if __name__ == '__main__':
         type=str,
         help='Path to output folder. If not provided use input path instead.'
     )
-    parser.add_argument(
-        '--device',
-        choices=['cpu', 'gpu'],
-        default='cpu',
-        help='select cpu or gpu to run slam.'
-    )
 
     parser.add_argument(
         '--step',
         type=int,
-        default=1,
+        default=2,
         help='sub sampling interval.'
     )
     parser.add_argument(
@@ -108,4 +89,4 @@ if __name__ == '__main__':
     if args.outpath is None:
         args.outpath = args.input
 
-    main(args.input, args.outpath, args.device, args.step, args.log, args.rect_mode)
+    main(args.input, args.outpath, args.step, args.log, args.rect_mode)
