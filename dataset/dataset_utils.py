@@ -21,22 +21,23 @@ def get_data(input_path: str, img_size: Tuple, sample_video: int=1, rect_mode: s
         calib_file = os.path.join(input_path, 'StereoCalibration.ini')
     elif os.path.isfile(os.path.join(input_path, 'endoscope_calibration.yaml')):
         calib_file = os.path.join(input_path, 'endoscope_calibration.yaml')
+    else:
+        raise RuntimeError(f'no valid calibration file found in {input_path}')
 
-    if calib_file is not None:
-        rect = StereoRectifier(calib_file, img_size_new=img_size, mode=rect_mode)
-        calib = rect.get_rectified_calib()
+    rect = StereoRectifier(calib_file, img_size_new=img_size, mode=rect_mode)
+    calib = rect.get_rectified_calib()
+    try:
+        dataset = StereoDataset(input_path, img_size=calib['img_size'])
+        print(" Stereo Dataset")
+    except AssertionError:
         try:
-            dataset = StereoDataset(input_path, img_size=calib['img_size'])
-            print(" Stereo Dataset")
+            dataset = ScaredDataset(input_path, img_size=calib['img_size'])
+            print(" SCARED Dataset")
         except AssertionError:
-            try:
-                dataset = ScaredDataset(input_path, img_size=calib['img_size'])
-                print(" SCARED Dataset")
-            except AssertionError:
-                video_file = glob.glob(os.path.join(input_path, '*.mp4'))[0]
-                pose_file = os.path.join(input_path, 'groundtruth.txt')
-                dataset = StereoVideoDataset(video_file, pose_file, img_size=calib['img_size'], sample=sample_video, rectify=rect)
-                print(" Stereo Video Dataset")
+            video_file = glob.glob(os.path.join(input_path, '*.mp4'))[0]
+            pose_file = os.path.join(input_path, 'groundtruth.txt')
+            dataset = StereoVideoDataset(video_file, pose_file, img_size=calib['img_size'], sample=sample_video, rectify=rect)
+            print(" Stereo Video Dataset")
     return dataset, calib
 
 
