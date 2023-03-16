@@ -26,7 +26,7 @@ def main(input_path, output_path, step, rect_mode):
     else:
         valid_list = None
 
-    dataset, calib = get_data(input_path, (1280, 1024), sample_video=step, rect_mode=rect_mode)
+    dataset, calib = get_data(input_path, (640, 512), sample_video=step, rect_mode=rect_mode)
     assert isinstance(dataset, StereoVideoDataset)
 
     loader = DataLoader(dataset, num_workers=1)
@@ -35,7 +35,7 @@ def main(input_path, output_path, step, rect_mode):
 
     with torch.inference_mode():
         for i, data in enumerate(tqdm(loader, total=len(dataset))):
-            limg, rimg, pose_kinematics, img_number = data
+            limg, rimg, *_, img_number = data
 
             if _check_valid(valid_list, int(img_number[0])):
                 # store images and depth and mask
@@ -43,9 +43,10 @@ def main(input_path, output_path, step, rect_mode):
                     img_name = f'{img_number.item():06d}'
                 else:
                     img_name = f'{int(img_number[0]):06d}'
-                cv2.imwrite(os.path.join(output_path, 'video_frames', img_name+'l.png'), cv2.cvtColor(255.0*limg.squeeze().permute(1,2,0).cpu().numpy(), cv2.COLOR_RGB2BGR).astype(np.uint8))
+                cv2.imwrite(os.path.join(output_path, 'video_frames', img_name+'l.png'),
+                            cv2.cvtColor(limg.squeeze().permute(1,2,0).cpu().numpy(), cv2.COLOR_RGB2BGR).astype(np.uint8))
                 cv2.imwrite(os.path.join(output_path, 'video_frames', img_name + 'r.png'),
-                            cv2.cvtColor(255.0*rimg.squeeze().permute(1,2,0).cpu().numpy(), cv2.COLOR_RGB2BGR).astype(np.uint8))
+                            cv2.cvtColor(rimg.squeeze().permute(1,2,0).cpu().numpy(), cv2.COLOR_RGB2BGR).astype(np.uint8))
         print('finished')
 
 
