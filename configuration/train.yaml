@@ -11,20 +11,10 @@ model:
 data:
   train:
     type: Intuitive
-    basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_human
+    basepath: ../data/StereoMIS
     sequences:
-      - H1_0
-      - H1_1
-      - H1_2
-      - H1_3
-      - H1_4
-      - H1_5
-      - H1_6
-      - P1_0
-      - P1_1
-      - P1_2
-      - P1_3
-      - scared_dataset_1
+      - H1
+      - P1
       - scared_dataset_2
       - scared_dataset_3
       - scared_dataset_6
@@ -35,25 +25,14 @@ data:
 
   val:
     type: Intuitive
-    basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/intuitive_human
+    basepath: ../data/StereoMIS
     sequences:
-      - scared_dataset_7
-      - scared_dataset_8
-      - scared_dataset_9
+      - scared_dataset_2
+      - scared_dataset_3
+      - scared_dataset_6
     step: 1
-    samples: 40
+    samples: 80
 
-  val2:
-    type: Intuitive
-    basepath: /storage/workspaces/artorg_aimi/ws_00000/innosuisse_surgical_robot/01_Datasets/05_slam/slam_benchmark_data
-    sequences:
-      - case_B
-      - case_C
-      - case_D
-      - case_F
-      - case_G
-    step: 1
-    samples: 40
 
 train:
   batch_size: 8
