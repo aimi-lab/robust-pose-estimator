@@ -6,7 +6,6 @@ import numpy as np
 from tqdm import tqdm
 from dataset.dataset_utils import get_data, StereoVideoDataset
 from torch.utils.data import DataLoader
-import wandb
 import cv2
 
 
@@ -20,14 +19,12 @@ def _check_valid(valid_list, n):
     return valid
 
 
-def main(input_path, output_path, step, log, rect_mode):
+def main(input_path, output_path, step, rect_mode):
     # only extract valid frames for training
-    if os.path.isfile(os.path.join(input_path, 'split.csv')):
-        valid_list = np.genfromtxt(os.path.join(input_path, 'valid.csv'), header=1, delimiter=',')
+    if os.path.isfile(os.path.join(input_path, 'train_split.csv')):
+        valid_list = np.genfromtxt(os.path.join(input_path, 'train_split.csv'), skip_header=1, delimiter=',')
     else:
         valid_list = None
-    if log is not None:
-        wandb.init(project='data extraction', group=log)
 
     dataset, calib = get_data(input_path, (1280, 1024), sample_video=step, rect_mode=rect_mode)
     assert isinstance(dataset, StereoVideoDataset)
@@ -66,18 +63,6 @@ if __name__ == '__main__':
         type=str,
         help='Path to output folder. If not provided use input path instead.'
     )
-
-    parser.add_argument(
-        '--step',
-        type=int,
-        default=2,
-        help='sub sampling interval.'
-    )
-    parser.add_argument(
-        '--log',
-        default=None,
-        help='wandb group logging name. No logging if none set'
-    )
     parser.add_argument(
         '--rect_mode',
         type=str,
@@ -88,5 +73,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.outpath is None:
         args.outpath = args.input
-
-    main(args.input, args.outpath, args.step, args.log, args.rect_mode)
+    datasets = np.genfromtxt(os.path.join(args.input, 'sequences.txt'), skip_header=1, delimiter=',', dtype=str)
+    for d in datasets:
+        print(f'extract {d[0]}')
+        main(os.path.join(args.input, d[0]), os.path.join(args.outpath, d[0]), int(d[1]), args.rect_mode)
