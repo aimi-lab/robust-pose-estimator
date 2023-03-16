@@ -11,7 +11,7 @@ Michel Hayoz, Christopher Hahne, Mathias Gallardo, Daniel Candinas, Thomas Kurma
 title={Robust Camera Pose Estimation for Endoscopic Videos},
 author={Michel Hayoz, Christopher Hahne, Mathias Gallardo, Daniel Candinas, Thomas Kurmann, Max Allan, Raphael Sznitman},
 journal={International Journal of Computer Assisted Radiology and Surgery}
-year={2023}
+year={2023}}
 ```
 
 ![Alt text](./system_overview.png)
