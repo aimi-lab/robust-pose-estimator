@@ -2,16 +2,16 @@
 # Robust Camera Pose Estimation for Endoscopic Videos
 
 Visual Odometry for stereo endoscopic videos with breathing and tool deformations. For more details, please see our paper:
-#ToDo: Fix Link, check paper once accepted
-[Robust Camera Pose Estimation for Endoscopic Videos](link/to/paper) 
-Michel Hayoz, Christopher Hahne, Mathias Gallardo, Daniel Candinas, Thomas Kurmann, Max Allan, Raphael Sznitman, IJCARS 2023
+[Robust Camera Pose Estimation for Endoscopic Videos](https://arxiv.org/abs/2304.08023v1) 
+
+Please cite us if you use our code for your research:
 
 ```
 @article{hayoz2023pose,
 title={Robust Camera Pose Estimation for Endoscopic Videos},
 author={Michel Hayoz, Christopher Hahne, Mathias Gallardo, Daniel Candinas, Thomas Kurmann, Max Allan, Raphael Sznitman},
-journal={International Journal of Computer Assisted Radiology and Surgery}
-year={2023}}
+journal={International Journal of Computer Assisted Radiology and Surgery (forthcoming)}
+}
 ```
 
 ![Alt text](./system_overview.png)
