@@ -7,12 +7,12 @@ import os
 api = wandb.Api()
 import argparse
 
-parser = argparse.ArgumentParser(description='Inspect WandB results')
+parser = argparse.ArgumentParser(description='Inspect WandB results of scenario benchmarking')
 parser.add_argument(
-    '--project',
+    'project',
     type=str,
     default="hayoz/Alley-OOP",
-    help='Path to input folder.'
+    help='Path to input folder <entity/project-name>'
 )
 
 parser.add_argument(
@@ -20,7 +20,7 @@ parser.add_argument(
     nargs='+',
     type=str,
     default=['orbslam2_raftdepth', 'scared_efusion', 'scared_new_code'],
-    help='Path to input folder.'
+    help='methods to inspect, use WandB group tag'
 )
 args = parser.parse_args()
 METHODS = args.methods

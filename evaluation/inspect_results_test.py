@@ -8,12 +8,12 @@ import numpy as np
 api = wandb.Api()
 import argparse
 
-parser = argparse.ArgumentParser(description='Inspect WandB results')
+parser = argparse.ArgumentParser(description='Inspect WandB results of test set benchmarking')
 parser.add_argument(
-    '--project',
+    'project',
     type=str,
     default="hayoz/Alley-OOP",
-    help='Path to input folder.'
+    help='WandB project name <entity/project-name>.'
 )
 
 parser.add_argument(
@@ -21,7 +21,7 @@ parser.add_argument(
     nargs='+',
     type=str,
     default=['test_orbslam2', 'test_efusion', 'test_ours'],
-    help='Path to input folder.'
+    help='methods to inspect, use WandB group tag'
 )
 args = parser.parse_args()
 METHODS = args.methods
@@ -72,7 +72,7 @@ for method in METHODS:
     df = pd.DataFrame({'mean': df.groupby('dataset').mean()['ATE/RMSE'], 'std':df.groupby('dataset').std()['ATE/RMSE']})
     print(df)
     print('macro average:', df.mean()['mean'],'+/-', df.std()['mean'])
-    #print('micro average:', runs_df[runs_df.method.eq(method)]['ATE/RMSE'].mean(), '+/-', runs_df[runs_df.method.eq(method)]['ATE/RMSE'].std())
+
 print('\n------------')
 print('RPE-trans in mm')
 for method in METHODS:
@@ -84,8 +84,7 @@ for method in METHODS:
         {'mean': df.groupby('dataset').mean()['RPE/trans'], 'std': df.groupby('dataset').std()['RPE/trans']})
     print(df)
     print('macro average:', df.mean()['mean'], '+/-', df.std()['mean'])
-    #print('micro average:', runs_df[runs_df.method.eq(method)]['RPE/trans'].mean(), '+/-',
-    #      runs_df[runs_df.method.eq(method)]['RPE/trans'].std())
+
 print('\n------------')
 print('RPE-rot in deg')
 for method in METHODS:
@@ -96,20 +95,3 @@ for method in METHODS:
     df = pd.DataFrame({'mean': df.groupby('dataset').mean()['RPE/rot'], 'std':df.groupby('dataset').std()['RPE/rot']})
     print(df)
     print('macro average:', df.mean()['mean'],'+/-', df.std()['mean'])
-    #print('micro average:', runs_df[runs_df.method.eq(method)]['RPE/rot'].mean(), '+/-', runs_df[runs_df.method.eq(method)]['RPE/rot'].std())
-
-
-# # Per Run info
-# print('\n------------')
-# print('ATE-RMSE in mm')
-# for run in runs_df.dataset.unique():
-#
-#     df = runs_df[runs_df.dataset.eq(run)]
-#     for kf in df.keyframe.unique():
-#         print('\n------------')
-#         print(run, kf)
-#         df1 = df[df.keyframe.eq(kf)]
-#         print(df1[['method', 'ATE/RMSE']])
-#
-# snb.violinplot(y='ATE/RMSE', x='dataset', hue='method', data=runs_df)
-# plt.show()
