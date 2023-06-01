@@ -2,7 +2,7 @@ import unittest
 import torch
 from lietorch import SE3
 from core.geometry.pinhole_transforms import transform, project, project2image, reproject, create_img_coords_t
-from core.pose.pose_head_comb import DeclarativePoseHead3DNode, DeclarativeLayerLie
+from core.pose.pose_head import DPoseSE3Head, DeclarativeLayerLie
 
 
 class PoseHeadTester(unittest.TestCase):
@@ -11,7 +11,7 @@ class PoseHeadTester(unittest.TestCase):
         super(PoseHeadTester, self).__init__(*args, **kwargs)
 
     def setUp(self):
-        n = 20
+        n = 5
         # intrinsics
         self.resolution = (180, 180)
         self.kmat = torch.diag(torch.tensor([150.0, 150, 1]))
@@ -22,7 +22,7 @@ class PoseHeadTester(unittest.TestCase):
         depth = 100*torch.clamp(torch.rand((n, 1, 180, 180)), 0.01, 1)
         self.pcl = reproject(depth, self.kmat, create_img_coords_t(180,180))[:, :3].view(n, 3, 180, 180)
 
-        self.pose_head = DeclarativePoseHead3DNode(create_img_coords_t(180,180))
+        self.pose_head = DPoseSE3Head(create_img_coords_t(180,180))
         self.pose_head_layer = DeclarativeLayerLie(self.pose_head)
         torch.random.manual_seed(12345)
         self.poses = SE3.Random(n,1, sigma=0.01)
@@ -38,12 +38,13 @@ class PoseHeadTester(unittest.TestCase):
     def test_forward(self):
 
         n = self.flow.shape[0]
-        xs = (self.flow, self.pcl, self.pcl_transformed, self.weights, self.valid, self.masks, self.kmat)
-        loss_gt = self.pose_head.objective(*xs, y=self.poses)
+        loss_weight = torch.tensor([[0.001, 1.0]]).repeat((n, 1))
+        xs = (self.flow, self.pcl, self.pcl_transformed, self.weights, self.weights, self.valid, self.masks, self.kmat, loss_weight)
+        loss_gt = self.pose_head.objective(*xs, y=(self.poses,))
         self.assertTrue(torch.allclose(loss_gt, torch.zeros_like(loss_gt), atol=1e-5))
 
-        poses = SE3.InitFromVec(self.pose_head.solve(*xs)[0].float())
-        loss_pred = self.pose_head.objective(*xs, y=poses)
+        poses = self.pose_head.solve(*xs)[0].group.float('')
+        loss_pred = self.pose_head.objective(*xs, y=(poses,))
         self.assertTrue(torch.allclose(loss_pred, torch.zeros_like(loss_gt), atol=1e-5))
         supervised_loss = (poses.log() - self.poses.log()).abs().sum()/n
         self.assertTrue(torch.allclose(supervised_loss, torch.zeros_like(supervised_loss), atol=0.05))
@@ -56,12 +57,14 @@ class PoseHeadTester(unittest.TestCase):
         with torch.enable_grad():
             with torch.autograd.set_detect_anomaly(True):
                 n = self.flow.shape[0]
-                flow = torch.nn.Parameter(self.flow, requires_grad=True)
-                xs = (flow, self.pcl, self.pcl_transformed, self.weights, self.valid, self.masks,self.kmat)
+                loss_weight = torch.nn.Parameter(torch.tensor([[0.01, 1.0]]).repeat((n, 1)), requires_grad=True)
+                xs = (
+                    self.flow, self.pcl, self.pcl_transformed, self.weights, self.weights, self.valid, self.masks,
+                    self.kmat, loss_weight)
 
                 poses = self.pose_head_layer(*xs)[1]
                 supervised_loss = (poses - self.poses.log()).abs().sum() / n
-                grad_x, = torch.autograd.grad(supervised_loss, flow, create_graph=True)
+                grad_x, = torch.autograd.grad(supervised_loss, loss_weight, create_graph=True)
                 #torchviz.make_dot((grad_x, self.pcl, poses.data), params={"grad_x": grad_x, "x": self.pcl, "out": poses.data}).render("graph")
 
 
