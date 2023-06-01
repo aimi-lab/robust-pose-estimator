@@ -10,7 +10,8 @@ Please cite us if you use our code for your research:
 @article{hayoz2023pose,
 title={Robust Camera Pose Estimation for Endoscopic Videos},
 author={Michel Hayoz, Christopher Hahne, Mathias Gallardo, Daniel Candinas, Thomas Kurmann, Max Allan, Raphael Sznitman},
-journal={International Journal of Computer Assisted Radiology and Surgery (forthcoming)}
+journal={International Journal of Computer Assisted Radiology and Surgery 2023}
+doi={https://doi.org/10.1007/s11548-023-02919-w}
 }
 ```
 
