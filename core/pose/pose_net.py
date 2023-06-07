@@ -91,6 +91,7 @@ class PoseNet(nn.Module):
 
     def forward_out(self, pose_head_ret, depth1, depth2, maps, ret_confmap=False):
         *_, pose_tan = pose_head_ret
+        pose_tan = pose_tan.squeeze(1)
         if ret_confmap:
             return pose_tan, depth1, depth2, maps
         return pose_tan, depth1, depth2

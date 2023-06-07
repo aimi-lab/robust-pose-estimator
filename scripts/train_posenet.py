@@ -21,6 +21,7 @@ VAL_FREQ = 1000
 
 
 def supervised_pose_loss(pose_pred, pose_gt):
+    assert pose_pred.shape == pose_gt.tangent_shape
     l1 = (pose_pred - pose_gt.log()).abs()
     return l1
 
