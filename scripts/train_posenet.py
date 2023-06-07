@@ -43,9 +43,9 @@ def val(model, dataloader, device, logger, key):
             loss_pose = supervised_pose_loss(pose_predictions, gt_pose)
             loss = torch.nanmean(loss_pose)
             loss_cpu = loss_pose.detach().cpu()
-            metrics = {f"{key}/loss_rot": loss_cpu[:, 3:].nanmean().item(),
-                       f"{key}/loss_trans": loss_cpu[:, :3].nanmean().item(),
-                       f"{key}/loss_total": loss_cpu.nanmean().item()}
+            metrics = {f"{key}/loss_rot": loss_cpu[:, 3:].sum(dim=-1).nanmean().item(),
+                       f"{key}/loss_trans": loss_cpu[:, :3].sum(dim=-1).nanmean().item(),
+                       f"{key}/loss_total": loss_cpu.sum(dim=-1).nanmean().item()}
             logger.push(metrics, len(dataloader))
         logger.flush()
     model.train()
@@ -119,16 +119,18 @@ def main(args, config, force_cpu):
             scaler.unscale_(optimizer)                
             torch.nn.utils.clip_grad_norm_(model.parameters(), config['train']['grad_clip'])
             loss_cpu = loss_pose.detach().cpu()
+            loss_tran = loss_cpu[:, :3].sum(dim=-1).mean().item()
+            loss_rot = loss_cpu[:, 3:].sum(dim=-1).mean().item()
             # debug
             if args.dbg & (i_batch % SUM_FREQ == 0):
                 print("\n se3 pose")
                 print(f"gt_pose: {gt_pose[0].detach().cpu().numpy()}\npred_pose: {pose_predictions[0].detach().cpu().numpy()}")
-                print(" trans loss: ", loss_cpu[:, :3].mean().item())
-                print(" rot loss: ", loss_cpu[:, 3:].mean().item())
+                print(" trans loss: ", loss_tran)
+                print(" rot loss: ", loss_rot)
 
-            metrics = {"train/loss_rot": loss_cpu[:,3:].mean().item(),
-                      "train/loss_trans": loss_cpu[:, :3].mean().item(),
-                      "train/loss_total": loss_cpu.mean().item()}
+            metrics = {"train/loss_rot": loss_rot,
+                      "train/loss_trans": loss_tran,
+                      "train/loss_total": loss_cpu.sum(dim=-1).mean().item()}
 
             scaler.step(optimizer)
             scaler.update()
