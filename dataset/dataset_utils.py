@@ -1,8 +1,7 @@
 import os
 import glob
-from dataset.scared_dataset import ScaredDataset
 from dataset.video_dataset import StereoVideoDataset
-from dataset.semantic_dataset import StereoDataset
+from dataset.stereo_dataset import StereoDataset
 from dataset.rectification import StereoRectifier
 from typing import Tuple
 from torch.utils.data import Sampler
@@ -12,7 +11,6 @@ def get_data(input_path: str, img_size: Tuple, sample_video: int=1, rect_mode: s
 
     # check the format of the calibration file
     img_size = tuple(img_size)
-    calib_file = None
     if os.path.isfile(os.path.join(input_path, 'camcal.json')):
         calib_file = os.path.join(input_path, 'camcal.json')
     elif os.path.isfile(os.path.join(input_path, 'camera_calibration.json')):
@@ -30,14 +28,10 @@ def get_data(input_path: str, img_size: Tuple, sample_video: int=1, rect_mode: s
         dataset = StereoDataset(input_path, img_size=calib['img_size'])
         print(" Stereo Dataset")
     except AssertionError:
-        try:
-            dataset = ScaredDataset(input_path, img_size=calib['img_size'])
-            print(" SCARED Dataset")
-        except AssertionError:
-            video_file = glob.glob(os.path.join(input_path, '*.mp4'))[0]
-            pose_file = os.path.join(input_path, 'groundtruth.txt')
-            dataset = StereoVideoDataset(video_file, pose_file, img_size=calib['img_size'], sample=sample_video, rectify=rect)
-            print(" Stereo Video Dataset")
+        video_file = glob.glob(os.path.join(input_path, '*.mp4'))[0]
+        pose_file = os.path.join(input_path, 'groundtruth.txt')
+        dataset = StereoVideoDataset(video_file, pose_file, img_size=calib['img_size'], sample=sample_video, rectify=rect)
+        print(" Stereo Video Dataset")
     return dataset, calib
 
 

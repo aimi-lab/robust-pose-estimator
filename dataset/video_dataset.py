@@ -7,7 +7,7 @@ from typing import Tuple, Callable
 import numpy as np
 import torch
 from core.utils.trajectory import read_freiburg
-from dataset.semantic_dataset import mask_specularities
+from dataset.stereo_dataset import mask_specularities
 from lietorch import SE3
 
 
