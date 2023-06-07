@@ -13,7 +13,6 @@ import wandb
 
 from core.pose.pose_net import PoseNet
 from core.utils.logging import TrainLogger as Logger
-from core.utils.plotting import plot_res
 import dataset.train_datasets as datasets
 
 
@@ -60,11 +59,9 @@ def main(args, config, force_cpu):
     # get data
     data_train = datasets.get_data(config['data']['train'], config['image_shape'], config['depth_scale'])
     data_val = datasets.get_data(config['data']['val'], config['image_shape'], config['depth_scale'])
-    data_val2 = datasets.get_data(config['data']['val2'], config['image_shape'], config['depth_scale'])
     print(f"train: {len(data_train)} samples, val: {len(data_val)} samples")
     train_loader = DataLoader(data_train, num_workers=4, pin_memory=True, batch_size=config['train']['batch_size'], shuffle=True)
     val_loader = DataLoader(data_val, num_workers=4, pin_memory=True, batch_size=config['val']['batch_size'])
-    val2_loader = DataLoader(data_val2, num_workers=4, pin_memory=True, batch_size=config['val']['batch_size'])
 
     # get model
     model = PoseNet(config['model'])
@@ -141,8 +138,6 @@ def main(args, config, force_cpu):
 
             if (total_steps % VAL_FREQ) == 0:
                 val_loss = val(model, val_loader, device, logger, 'val')
-                val_loss2 = val(model, val2_loader, device, logger, 'val2')
-                val_loss += val_loss2
                 if torch.isnan(torch.tensor(val_loss)):
                     should_keep_training = False
                     break
