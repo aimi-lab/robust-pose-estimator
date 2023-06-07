@@ -1,20 +1,18 @@
 import numpy as np
 import torch
 import torch.utils.data as data
-from lietorch import SE3
-
+from torch.utils.data import Dataset
+from torchvision.transforms import Resize, InterpolationMode
 import os
 from glob import glob
 from typing import Tuple
 import cv2
+
 from core.utils.trajectory import read_freiburg
-from torchvision.transforms import Resize, InterpolationMode
-from torch.utils.data import Dataset
 from dataset.rectification import StereoRectifier
-import warnings
 
 
-def get_data(config, img_size: Tuple, depth_cutoff: float):
+def get_data(config: dict, img_size: Tuple, depth_cutoff: float):
     # check the format of the calibration file
     torch.manual_seed(1234)
     np.random.seed(1234)
@@ -39,9 +37,25 @@ def get_data(config, img_size: Tuple, depth_cutoff: float):
         calib = rect.get_rectified_calib()
         baseline.append(calib['bf'].astype(np.float32))
         intrinsics.append(calib['intrinsics']['left'].astype(np.float32))
-    dataset = MultiSeqPoseDataset(root=config['basepath'], seqs=config['sequences'], baseline=baseline, intrinsics=intrinsics,conf_thr=0.0, step=config['step'],
-                              img_size=img_size, depth_cutoff=depth_cutoff, samples=config['samples'])
 
+    # glob data
+    # for nested scared dataset
+    ds = [sorted(glob(os.path.join(config['basepath'], s, 'keyframe_*'))) for s in config['sequences']]
+    # others
+    if len(ds[0]) == 0:
+        ds = [[os.path.join(config['basepath'], s)] for s in config['sequences']]
+
+    # generate multi-sequence dataset
+    subsets = []
+    for i, s in enumerate(config['sequences']):
+        for d in ds[i]:
+            if os.path.isfile(os.path.join(d, 'groundtruth.txt')):
+                try:
+                    subsets.append(PoseDataset(d, baseline[i], intrinsics[i], depth_cutoff, 0.0, config['step'],
+                                               img_size, config['samples']))
+                except AssertionError: # do not append if something went wrong
+                    pass
+    dataset = data.ConcatDataset(subsets)
     return dataset
 
 
@@ -121,73 +135,3 @@ class PoseDataset(Dataset):
         else:
             sample_list = np.arange(total_samples - step[1])
         return sample_list
-
-
-class StratifiedPoseDataset(PoseDataset):
-    """
-        Stratified sampling based on tool presence and camera motion (and their combinations)
-    """
-    def __init__(self, root, baseline, intrinsics, depth_cutoff=300.0,conf_thr=0.0, step=(1,10), img_size=(512, 640), samples=-1):
-        #assert os.path.isfile(os.path.join(root, 'annotions.csv'))
-        if os.path.isfile(os.path.join(root, 'annotions.csv')):
-            with open(os.path.join(root, 'annotions.csv'), 'r') as f:
-                annotations = f.readlines()[1:]
-            annotations = np.genfromtxt(annotations, delimiter=',', dtype=bool).astype(int)
-            annotations[:, 1] *= 2
-            annotations = np.sum(annotations, axis=1)  # class 0, 1, 2, 3
-            probs = 1/(np.bincount(annotations, minlength=4) +1)
-            probs = probs/np.sum(probs)
-            self.probs = np.zeros_like(annotations, dtype=float)
-            for i, p in enumerate(probs):
-                self.probs[annotations == i] = p
-        else:
-            self.probs = np.ones(len(glob(os.path.join(root, 'video_frames', '*l.png'))))
-        super(StratifiedPoseDataset, self).__init__(root, baseline, intrinsics, depth_cutoff,conf_thr, step, img_size, samples)
-
-    def _random_sample(self, step, samples, total_samples):
-        if isinstance(step, int):
-            step = (step, step)
-            # randomly sample n-frames
-        if (samples > 0) & (samples < total_samples):
-            ids = np.arange(total_samples - step[1])
-            probs = self.probs[:len(ids)] / np.sum(self.probs[:len(ids)])
-            sample_list = sorted(np.random.choice(ids, size=(samples,), replace=False, p=probs))
-        else:
-            sample_list = np.arange(total_samples - step[1])
-        return sample_list
-
-
-class MultiSeqPoseDataset(StratifiedPoseDataset):
-    def __init__(self, root, seqs, baseline, intrinsics, depth_cutoff=300.0, conf_thr=0.0, step=1, img_size=(512, 640), samples=-1):
-        # for nested scared dataset
-        datasets = [sorted(glob(os.path.join(root, s, 'keyframe_*'))) for s in seqs]
-        # others
-        if len(datasets[0]) == 0:
-            datasets = [[os.path.join(root, s)] for s in seqs]
-        image_list1 = []
-        rel_pose_list1 = []
-        image_list_r1 = []
-        intrinsics_list = []
-        baseline_list = []
-        mask_list = []
-        for i,s in enumerate(seqs):
-            b = baseline[i]
-            intr = intrinsics[i]
-            for d in datasets[i]:
-                if os.path.isfile(os.path.join(d, 'groundtruth.txt')):
-                    try:
-                        super().__init__(d, b, intr, depth_cutoff, conf_thr, step, img_size, samples)
-                        image_list1 += self.image_list
-                        image_list_r1 += self.image_list_r
-                        mask_list += self.mask_list
-                        rel_pose_list1 += self.rel_pose_list
-                        intrinsics_list += self.intrinsics
-                        baseline_list += self.baseline
-                    except AssertionError:
-                        pass
-        self.image_list = image_list1
-        self.image_list_r = image_list_r1
-        self.mask_list = mask_list
-        self.rel_pose_list = rel_pose_list1
-        self.baseline = baseline_list
-        self.intrinsics = intrinsics_list
