@@ -77,4 +77,7 @@ if __name__ == '__main__':
     datasets = np.genfromtxt(os.path.join(args.input, 'sequences.txt'), skip_header=1, delimiter=',', dtype=str)
     for d in datasets:
         print(f'extract {d[0]}')
-        main(os.path.join(args.input, d[0]), os.path.join(args.outpath, d[0]), int(d[1]), args.rect_mode)
+        try:
+            main(os.path.join(args.input, d[0]), os.path.join(args.outpath, d[0]), int(d[1]), args.rect_mode)
+        except IndexError:
+            pass
