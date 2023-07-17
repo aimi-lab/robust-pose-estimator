@@ -20,8 +20,6 @@ class StereoDataset(Dataset):
     def __init__(self, input_folder:str, img_size:Tuple):
         super().__init__()
         self.imgs = sorted(glob.glob(os.path.join(input_folder, 'video_frames*', '*l.png')))
-        self.mask = sorted(glob.glob(os.path.join(input_folder, 'masks*', '*l.png')))
-        assert len(self.imgs) == len(self.mask)
         assert len(self.imgs) > 0
 
         self.transform = ResizeStereo(img_size)
@@ -30,7 +28,7 @@ class StereoDataset(Dataset):
         img_l = cv2.cvtColor(cv2.imread(self.imgs[item]), cv2.COLOR_BGR2RGB)
         img_r = cv2.cvtColor(cv2.imread(self.imgs[item].replace('l.png', 'r.png')), cv2.COLOR_BGR2RGB)
         img_number = os.path.basename(self.imgs[item]).split('l.png')[0]
-        mask = cv2.imread(self.mask[item], cv2.IMREAD_GRAYSCALE)
+        mask = cv2.resize(cv2.imread(self.imgs[item].replace('video_frames', 'masks'), cv2.IMREAD_GRAYSCALE), dsize=(img_l.shape[1], img_l.shape[0]), interpolation=cv2.INTER_NEAREST)
         mask = mask > 0
         # mask specularities
         mask = mask_specularities(img_l, mask)
