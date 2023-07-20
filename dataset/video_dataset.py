@@ -52,7 +52,10 @@ class StereoVideoDataset(IterableDataset):
                 break
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             img_left, img_right = self._split_stereo_img(img)
-            pose = self.poses[counter-1] if self.poses is not None else SE3.Identity()
+            if len(self.poses) > (counter -1):
+                pose = self.poses[counter-1] if self.poses is not None else SE3.Identity()
+            else:
+                break
             mask = torch.tensor(mask_specularities(img_left)).unsqueeze(0)
             img_left = torch.tensor(img_left).permute(2, 0, 1).float()
             img_right = torch.tensor(img_right).permute(2, 0, 1).float()
