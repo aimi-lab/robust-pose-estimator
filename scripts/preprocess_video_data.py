@@ -78,6 +78,6 @@ if __name__ == '__main__':
     for d in datasets:
         print(f'extract {d[0]}')
         try:
-            main(os.path.join(args.input, d[0]), os.path.join(args.outpath, d[0]), int(d[1]), args.rect_mode)
+            main(os.path.join(args.input, d[0]), os.path.join(args.outpath, d[0]), 1, args.rect_mode)
         except IndexError:
             pass
