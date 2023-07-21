@@ -27,6 +27,8 @@ class InferenceLogger:
                 tr_err = self.gt_trajectory[step][:3, 3] - pose[:3, 3]
                 rot_err = (self.gt_trajectory[step][:3, :3].T @ pose[:3, :3])
                 rot_err_deg = np.linalg.norm(R.from_matrix(rot_err).as_rotvec(degrees=True), ord=2)
+                euler_pred = R.from_matrix(pose[:3, :3]).as_euler('zxy',degrees=True)
+                euler_gt = R.from_matrix(self.gt_trajectory[step][:3, :3]).as_euler('zxy',degrees=True)
                 log_dict.update({'error/x': tr_err[0],
                                  'error/y': tr_err[1],
                                  'error/z': tr_err[2],
@@ -34,9 +36,16 @@ class InferenceLogger:
                                  'error/x_pred': pose[0, 3],
                                  'error/y_pred': pose[1, 3],
                                  'error/z_pred': pose[2, 3],
+                                 'error/alpha_pred': euler_pred[0],
+                                 'error/beta_pred': euler_pred[1],
+                                 'error/gamma_pred': euler_pred[2],
                                  'error/x_gt': self.gt_trajectory[step][0, 3],
                                  'error/y_gt': self.gt_trajectory[step][1, 3],
-                                 'error/z_gt': self.gt_trajectory[step][2, 3]})
+                                 'error/z_gt': self.gt_trajectory[step][2, 3],
+                                 'error/alpha_gt': euler_gt[0],
+                                 'error/beta_gt': euler_gt[1],
+                                 'error/gamma_gt': euler_gt[2],
+                                 })
         wandb.log(log_dict, step=step)
 
     def set_gt(self, gt_trajectory):
