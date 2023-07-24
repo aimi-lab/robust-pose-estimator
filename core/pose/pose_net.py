@@ -79,7 +79,7 @@ class PoseNet(nn.Module):
             mask2 = mask2[:, :, 3::8, 3::8] & valid.unsqueeze(1)
             mask1 = mask1[:, :, 3::8, 3::8]
             intrinsics = intrinsics.clone()
-            intrinsics[:, :2, :2] /= 8.0
+            intrinsics[:, :2, :] /= 8.0
             pcl1 = self.proj(depth1, intrinsics)
             pcl2 = self.proj(depth2, intrinsics)
 
