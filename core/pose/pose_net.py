@@ -16,37 +16,35 @@ class PoseNet(nn.Module):
         self.config = config
         self.loss_weight = nn.Parameter(torch.tensor([1.0, 1.0]))
         H, W = config["image_shape"]
-        self.register_buffer("img_coords", create_img_coords_t(y=H//8, x=W//8), persistent=False)
+        self.register_buffer("img_coords", create_img_coords_t(y=H, x=W), persistent=False)
         self.use_weights = config["use_weights"]
         self.flow = RAFT(config)
         self.flow.freeze_bn()
         self.pose_head = DeclarativeLayerLie(DPoseSE3Head(self.img_coords, config['lbgfs_iters']))
-        self.weight_head_2d = nn.Sequential(TinyUNet(in_channels=128 + 128 + 8, output_size=(H // 8, W // 8)),
+        self.weight_head_2d = nn.Sequential(TinyUNet(in_channels=128 + 128 + 8, output_size=(H, W)),
                                             nn.Sigmoid())
-        self.weight_head_3d = nn.Sequential(TinyUNet(in_channels=128 + 128 + 8 + 8, output_size=(H // 8, W // 8)),
+        self.weight_head_3d = nn.Sequential(TinyUNet(in_channels=128 + 128 + 8 + 8, output_size=(H, W)),
                                             nn.Sigmoid())
 
     def forward(self, image1l, image2l, intrinsics, baseline, image1r, image2r, mask1=None, mask2=None, ret_confmap=False):
         """ estimate optical flow from stereo pair to get disparity map"""
         depth1, stereo_flow1, valid1 = self.flow2depth(image1l, image1r, baseline)
-        mask1 = mask1[:,:,3::8, 3::8] & valid1 if mask1 is not None else valid1
+        mask1 = mask1 & valid1 if mask1 is not None else valid1
         depth2, stereo_flow2, valid2 = self.flow2depth(image2l, image2r, baseline)
-        mask2 = mask2[:,:,3::8, 3::8] & valid2 if mask2 is not None else valid2
+        mask2 = mask2 & valid2 if mask2 is not None else valid2
 
         # avoid computing unnecessary gradients
         mask1.requires_grad = False
         mask2.requires_grad = False
         intrinsics.requires_grad = False
         baseline.requires_grad = False
-        intrinsics = intrinsics.clone()
-        intrinsics[:, :2,:] /= 8.0
         # reproject depth to 3D
         pcl1 = self.proj(depth1, intrinsics)
         pcl2 = self.proj(depth2, intrinsics)
 
         """ Estimate optical flow and rigid pose between pair of frames """
 
-        time_flow, gru_hidden_state, context = self.flow(image1l, image2l, upsample=False)
+        time_flow, gru_hidden_state, context = self.flow(image1l, image2l, upsample=True)
         time_flow = time_flow[-1]
 
         """ Infer weight maps """
@@ -64,7 +62,7 @@ class PoseNet(nn.Module):
             """ infer depth and flow in one go using batch dimension """
             ref_imgs = torch.cat((image1l, image2l), dim=0)
             trg_imgs = torch.cat((image2l, image2r), dim=0)
-            flow_predictions, gru_hidden_state, context = self.flow(ref_imgs, trg_imgs, upsample=False)
+            flow_predictions, gru_hidden_state, context = self.flow(ref_imgs, trg_imgs, upsample=True)
             time_flow = flow_predictions[-1][0].unsqueeze(0)
             stereo_flow2 = flow_predictions[-1][1].unsqueeze(0)
             gru_hidden_state = gru_hidden_state[0].unsqueeze(0)
@@ -72,14 +70,11 @@ class PoseNet(nn.Module):
 
             # depth from flow
             n, _, h, w = image1l.shape
-            depth2 = baseline[:, None, None] / -stereo_flow2[:, 0] / 8.0
+            depth2 = baseline[:, None, None] / -stereo_flow2[:, 0]
             valid = (depth2 > 0) & (depth2 <= 1.0)
             depth2[~valid] = 1.0
             depth2 = depth2.unsqueeze(1)
-            mask2 = mask2[:, :, 3::8, 3::8] & valid.unsqueeze(1)
-            mask1 = mask1[:, :, 3::8, 3::8]
-            intrinsics = intrinsics.clone()
-            intrinsics[:, :2, :] /= 8.0
+            mask2 &= valid.unsqueeze(1)
             pcl1 = self.proj(depth1, intrinsics)
             pcl2 = self.proj(depth2, intrinsics)
 
@@ -107,13 +102,15 @@ class PoseNet(nn.Module):
     def get_weight_maps(self, pcl1, pcl2, image1l, image2l, mask2, time_flow, stereo_flow1, stereo_flow2, gru_hidden_state, context):
         # warp reference frame using flow
         pcl2, _ = remap_from_flow(pcl2, time_flow)
-        image2l, _ = remap_from_flow(image2l, 8*time_flow)  # compensate different resolutions
+        image2l, _ = remap_from_flow(image2l, time_flow)
         stereo_flow2, _ = remap_from_flow(stereo_flow2, time_flow)
         mask2, valid_mapping = remap_from_flow_nearest(mask2, time_flow)
         mask2 = valid_mapping & mask2.to(bool)
         if self.use_weights:
-            inp1 = torch.cat((stereo_flow1, image1l[:,:,3::8, 3::8], pcl1), dim=1)
-            inp2 = torch.cat((stereo_flow2, image2l, pcl2), dim=1)
+            inp1 = torch.nn.functional.interpolate(torch.cat((stereo_flow1, image1l, pcl1), dim=1),
+                                                   scale_factor=0.125, mode='bilinear')
+            inp2 = torch.nn.functional.interpolate(torch.cat((stereo_flow2, image2l, pcl2), dim=1),
+                                                   scale_factor=0.125, mode='bilinear')
             conf1 = self.weight_head_2d(torch.cat((inp1, gru_hidden_state, context), dim=1))
             conf2 = self.weight_head_3d(torch.cat((inp1, inp2, gru_hidden_state, context), dim=1))
         else:
@@ -127,7 +124,7 @@ class PoseNet(nn.Module):
         opts = depth.view(n, 1, -1) * repr
         return opts.view(n,3,*depth.shape[-2:])
 
-    def flow2depth(self, imagel, imager, baseline, upsample=False):
+    def flow2depth(self, imagel, imager, baseline, upsample=True):
         n, _, h, w = imagel.shape
         flow = self.flow(imagel, imager, upsample=upsample)[0][-1]
         depth = baseline[:, None, None] / -flow[:, 0]
