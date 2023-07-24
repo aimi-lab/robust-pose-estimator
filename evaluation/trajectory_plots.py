@@ -48,8 +48,7 @@ if __name__ == '__main__':
                 pose_arrs = np.linalg.inv(pose_arrs[0])[None, ...] @ pose_arrs
         else:
             assert os.path.isfile(freiburg_paths[meth]), f'{meth} does not exist'
-            ate_rmse, rpe_trans, rpe_rot, error, *_ , T, gt_poses= eval(freiburg_paths['ground truth'], freiburg_paths[meth], offset=-4, ret_align_T=True)
-
+            ate_rmse, rpe_trans, rpe_rot, error, *_ , T, gt_poses, _= eval(freiburg_paths['ground truth'], freiburg_paths[meth], offset=-4, ret_align_T=True)
             print('ATE-RMSE: ',ate_rmse, ' mm')
             print('RPE-trans: ', rpe_trans, ' mm')
             print('RPE_rot: ', rpe_rot)
