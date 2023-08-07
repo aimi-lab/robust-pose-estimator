@@ -82,7 +82,7 @@ class PoseDataset(Dataset):
         for i in sample_list:
             s = np.random.randint(*step) if step[0] < step[1] else step[0]  # select a random step in given range
             self.image_list.append([images_l[i], images_l[i+s]])
-            self.rel_pose_list.append(poses[i+s].inv().mul(poses[i]))
+            self.rel_pose_list.append(poses[i].inv().mul(poses[i+s]))
             self.image_list_r.append([images_r[i], images_r[i+s]])
             if len(masks) == 0:
                 self.mask_list.append([None, None])
@@ -102,13 +102,14 @@ class PoseDataset(Dataset):
         img2_r = self._read_img(self.image_list_r[index][1])
 
         pose = self.rel_pose_list[index]
-        pose = pose.scale(torch.tensor(1/self.depth_cutoff))  # normalize translation
+        pose = pose.scale(torch.tensor(1/self.depth_cutoff))  # scale translation for normalized depth
+        baseline = float(self.baseline[index]/self.depth_cutoff) # scale stereo-baseline for normalized depth
 
         # generate mask
         mask1 = self._read_mask(self.mask_list[index][0])
         mask2 = self._read_mask(self.mask_list[index][1])
 
-        return img1, img2, img1_r, img2_r, mask1, mask2, pose.vec(), self.intrinsics[index], float(self.baseline[index]/self.depth_cutoff)
+        return img1, img2, img1_r, img2_r, mask1, mask2, pose.vec(), self.intrinsics[index], baseline
 
     def _read_img(self, path):
         img = torch.from_numpy(cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)).permute(2, 0, 1).float()
