@@ -75,9 +75,12 @@ if __name__ == '__main__':
     if args.outpath is None:
         args.outpath = args.input
     datasets = np.genfromtxt(os.path.join(args.input, 'sequences.txt'), skip_header=1, delimiter=',', dtype=str)
+    datasets = datasets[None, ...] if datasets.shape == (2,) else datasets
     for d in datasets:
         print(f'extract {d[0]}')
         try:
             main(os.path.join(args.input, d[0]), os.path.join(args.outpath, d[0]), 1, args.rect_mode)
         except IndexError:
             pass
+        except AssertionError:
+            print(f"skip {d[0]}, already extracted")
