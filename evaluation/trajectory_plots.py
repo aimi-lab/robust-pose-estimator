@@ -20,7 +20,7 @@ if __name__ == '__main__':
         '--methods',
         type=str,
         nargs='+',
-        default=[ 'orbslam2', 'ours', 'ground truth'],
+        default=[ 'orbslam2', 'ours', 'ground-truth'],
         help='Folder containing predictions.'
     )
     parser.add_argument(
@@ -31,7 +31,7 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
     
-    colors = {'ground truth': ['k', 2.5, 'dashed'], 'orbslam2': ['b', 1, 'dashdot'], 'efusion': ['m', 0.5, 'solid'], 'ours': ['goldenrod', 2.5, 'solid']}
+    colors = {'ground-truth': ['k', 2.5, 'dashed'], 'orbslam2': ['b', 1, 'dashdot'], 'efusion': ['m', 0.5, 'solid'], 'ours': ['goldenrod', 2.5, 'solid']}
     d_idx = 1
 
     keyframe = os.path.basename(args.base_path)
@@ -39,16 +39,16 @@ if __name__ == '__main__':
     pose_plotter = TrajectoryAnalyzer(title=dataset + '/' + keyframe)
 
     freiburg_paths = {m: os.path.join(args.base_path, 'data', m, 'trajectory.freiburg') for m in args.methods}
-    freiburg_paths.update({'ground truth': os.path.join(args.base_path, 'groundtruth.txt')})
+    freiburg_paths.update({'ground-truth': os.path.join(args.base_path, 'groundtruth.txt')})
     for k, meth in enumerate(freiburg_paths):
         print(meth)
-        if meth == 'ground truth':
+        if meth == 'ground-truth':
             pose_arrs = gt_poses.copy()
             if not args.prealign:
                 pose_arrs = np.linalg.inv(pose_arrs[0])[None, ...] @ pose_arrs
         else:
             assert os.path.isfile(freiburg_paths[meth]), f'{meth} does not exist'
-            ate_rmse, rpe_trans, rpe_rot, error, *_ , T, gt_poses, _= eval(freiburg_paths['ground truth'], freiburg_paths[meth], offset=-4, ret_align_T=True)
+            ate_rmse, rpe_trans, rpe_rot, error, *_ , T, gt_poses, _= eval(freiburg_paths['ground-truth'], freiburg_paths[meth], offset=-4, ret_align_T=True)
             print('ATE-RMSE: ',ate_rmse, ' mm')
             print('RPE-trans: ', rpe_trans, ' mm')
             print('RPE_rot: ', rpe_rot)
