@@ -8,11 +8,11 @@ slam:
   debug: False
   conf_weighing: True
   average_pts: False
-  lbgfs_iters: 20
+  lbgfs_iters: 100
 
 img_size:
   - 640
   - 512
 
-rect_mode: conventional
+rect_mode: pseudo
 

@@ -143,10 +143,10 @@ class PoseEstimator(torch.nn.Module):
                                                                               stereo_flow1=model_frame.flow,
                                                                               ret_details=True)
         # assign values for visualization purpose
-        self.frame.confidence = weights
+        self.frame.confidence = weights[0]
         self.frame.depth = depth2/self.scale
         self.frame.flow = stereo_flow
-        model_frame.confidence = weights
+        model_frame.confidence = weights[0]
         return rel_pose_se3, model_frame, flow
 
     @property

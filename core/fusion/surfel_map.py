@@ -18,7 +18,7 @@ class SurfelMap(object):
         http://thomaswhelan.ie/Whelan16ijrr.pdf
         """
         super().__init__()
-        self.pmat = kwargs['pmat'] if 'pmat' in kwargs else torch.eye(4)  # extrinsics
+        self.pmat = kwargs['pmat'] if 'pmat' in kwargs else SE3.Identity(1)  # extrinsics
         self.conf_thr = kwargs['conf_thr'] if 'conf_thr' in kwargs else 7
         self.t_max = kwargs['t_max'] if 't_max' in kwargs else 15
         self.upscale = kwargs['upscale'] if 'upscale' in kwargs else 1
@@ -58,7 +58,7 @@ class SurfelMap(object):
             ipts = create_img_coords_t(y=self.img_shape[-2], x=self.img_shape[-1]).to(self.device).to(dtype)
 
             opts = reproject(img_coords=ipts, intrinsics=self.kmat.to(self.device).to(dtype), depth=frame.depth)
-            self.opts = transform(opts, self.pmat.to(self.device).to(dtype).unsqueeze(0)).squeeze()[:3, mask.view(-1)]
+            self.opts = transform(opts, self.pmat.to(self.device).to(dtype)[None,...]).squeeze()[:3, mask.view(-1)]
 
             self.rgb = frame.img.view(3, -1)[:, mask.view(-1)]
             self.conf = frame.confidence[mask].view(1, -1) / self.conf_thr  # normalize confidence
@@ -94,13 +94,13 @@ class SurfelMap(object):
 
         # project depth to 3d-points in world coordinates
         opts = reproject(img_coords=ipts, intrinsics=self.kmat, depth=depth)
-        opts = transform(opts, pose.unsqueeze(0)).squeeze()[:3]
+        opts = transform(opts, pose[None,...]).squeeze()[:3]
 
         # consider masked surfels and enforce channel x samples shape
         rgb = rgb.view(3, -1)
 
         # project all surfels to current image frame
-        global_ipts = project(self.opts.unsqueeze(0), intrinsics=kmat.unsqueeze(0), T=pose_inv.unsqueeze(0)).squeeze()
+        global_ipts = project(self.opts.unsqueeze(0), intrinsics=kmat.unsqueeze(0), T=pose_inv[None,...]).squeeze()
         bidx = (global_ipts[0, :] >= 0) & (global_ipts[1, :] >= 0) & (global_ipts[0, :] < self.img_shape[1]*self.upscale-1) & (global_ipts[1, :] < self.img_shape[0]*self.upscale-1)
 
         # get correspondence by assigning projected points to image coordinates
@@ -202,19 +202,19 @@ class SurfelMap(object):
 
         return vidx, midx
 
-    def transform(self, transform:SE3):
+    def transform(self, tr:SE3):
         """
         transform surfels (3d points and normals) inplace
         :param transform: lietorch SE3 transform
         """
-        self.opts = transform(self.opts.unsqueeze(0), transform.unsqueeze(0)).squeeze()
+        self.opts = transform(self.opts.unsqueeze(0), tr[None,...]).squeeze()
 
-    def transform_cpy(self, transform:torch.tensor):
+    def transform_cpy(self, tr:torch.tensor):
         """
         transform surfels (3d points and normals) and return a copy
         :param transform: lietorch SE3 transform
         """
-        opts = transform(self.opts.unsqueeze(0), transform.unsqueeze(0)).squeeze()
+        opts = transform(self.opts.unsqueeze(0), tr[None,...]).squeeze()
         return self._constructor(opts=opts, kmat=self.kmat, rgb=self.rgb, img_shape=self.img_shape,
                          depth_scale=self.depth_scale, conf=self.conf).to(self.device)
 
@@ -240,8 +240,8 @@ class SurfelMap(object):
 
         # rotate, translate and forward-project points
         sort_idx = torch.argsort(self.conf, dim=1)[0]
-        pts_h = torch.vstack([self.opts[:, sort_idx], torch.ones(self.opts.shape[1], dtype=self.opts.dtype, device=self.device)])
-        npts, valid = project2image(pts_h.unsqueeze(0), img_shape=self.img_shape, intrinsics=intrinsics.unsqueeze(0), T=extrinsics.unsqueeze(0))
+        pts_h = self.opts[:, sort_idx]
+        npts, valid = project2image(pts_h.unsqueeze(0), img_shape=self.img_shape, intrinsics=intrinsics.unsqueeze(0), T=extrinsics[None,...])
         npts = npts.squeeze()
         valid = valid.squeeze()
         # generate sparse img maps and interpolate missing values
