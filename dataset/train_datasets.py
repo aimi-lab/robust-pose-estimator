@@ -81,13 +81,16 @@ class PoseDataset(Dataset):
             step = (step, step)
         for i in sample_list:
             s = np.random.randint(*step) if step[0] < step[1] else step[0]  # select a random step in given range
+            img_number1 = int(os.path.basename(images_l[i]).split('l.png')[0])
+            img_number2 = int(os.path.basename(images_l[i+s]).split('l.png')[0])
             self.image_list.append([images_l[i], images_l[i+s]])
-            self.rel_pose_list.append(poses[i].inv().mul(poses[i+s]))
-            self.image_list_r.append([images_r[i], images_r[i+s]])
+            self.rel_pose_list.append(poses[img_number1].inv().mul(poses[img_number2]))
+            self.image_list_r.append([images_l[i].replace('l.png', 'r.png'), images_l[i+s].replace('l.png', 'r.png')])
             if len(masks) == 0:
                 self.mask_list.append([None, None])
             else:
-                self.mask_list.append([masks[i], masks[i+s]])
+                self.mask_list.append([images_l[i].replace('video_frames', 'masks'),
+                                       images_l[i+s].replace('video_frames', 'masks')])
         self.resize = Resize(img_size)
         self.resize_msk = Resize(img_size, interpolation=InterpolationMode.NEAREST)
         self.scale = float(img_size[0])/float(cv2.imread(images_l[0]).shape[1])
