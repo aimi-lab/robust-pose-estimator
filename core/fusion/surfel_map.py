@@ -114,7 +114,7 @@ class SurfelMap(object):
         midx = midx[frame.mask.view(-1)[(midx/self.upscale**2).long()]]
 
         # pre-select confidence elements
-        conf = torch.ones_like(frame.confidence.view(1, -1)) / self.conf_thr
+        conf = torch.ones_like(depth.view(1, -1)) / self.conf_thr
         ccor = conf[:, midx]
         conf_idx = self.conf[:, vidx]
 

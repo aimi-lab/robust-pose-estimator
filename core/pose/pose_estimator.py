@@ -48,7 +48,7 @@ class PoseEstimator(torch.nn.Module):
         self.config = config
 
     def forward(self, limg: torch.Tensor, rimg: torch.Tensor, mask: torch.Tensor) \
-            -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+            -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, Tuple[torch.Tensor]]:
         """
             estimate camera pose
 
@@ -63,7 +63,7 @@ class PoseEstimator(torch.nn.Module):
         self.frame = Frame(limg, rimg, mask=mask)
 
         if self.frame2frame:
-            rel_pose, ret_frame, flow = self.get_pose_f2f()
+            rel_pose, ret_frame, flow, weights = self.get_pose_f2f()
         else:
             if self.scene is None:
                 # initialize scene with first frame
@@ -75,7 +75,7 @@ class PoseEstimator(torch.nn.Module):
                 self.scene = SurfelMap(frame=self.frame, kmat=self.intrinsics.squeeze(), upscale=1,
                                        d_thresh=self.config['dist_thr'],
                                        pmat=self.last_pose, average_pts=self.config['average_pts']).to(self.device)
-            rel_pose, ret_frame, flow = self.get_pose_f2m()
+            rel_pose, ret_frame, flow, weights = self.get_pose_f2m()
 
         # check if pose is valid
         if (torch.isnan(rel_pose.vec()).any()) | (torch.abs(rel_pose.log()) > 1.0e-1).any():
@@ -93,7 +93,7 @@ class PoseEstimator(torch.nn.Module):
         # update scene model
         if success & (flow is not None) & (self.scene is not None):
             self.scene.fuse(self.frame, self.last_pose)
-        return self.last_pose, self.scene, flow
+        return self.last_pose, self.scene, flow, weights
 
     def get_pose_f2f(self):
         """
@@ -107,6 +107,7 @@ class PoseEstimator(torch.nn.Module):
             self.frame.depth = depth/self.scale
             self.frame.flow = stereo_flow
             ret_frame = None
+            weights = None
         else:
             # get pose
             rel_pose_se3, depth1, depth2, weights, flow, stereo_flow = self.model.infer(self.last_frame.img, self.frame.img,
@@ -117,12 +118,11 @@ class PoseEstimator(torch.nn.Module):
                                                                  stereo_flow1=self.last_frame.flow,
                                                                  ret_details=True)
             # assign values for visualization purpose
-            self.frame.confidence = weights
             self.frame.depth = depth2/self.scale
             self.frame.flow = stereo_flow
             ret_frame = self.last_frame
 
-        return rel_pose_se3, ret_frame, flow
+        return rel_pose_se3, ret_frame, flow, weights
 
     def get_pose_f2m(self):
         """
@@ -143,11 +143,10 @@ class PoseEstimator(torch.nn.Module):
                                                                               stereo_flow1=model_frame.flow,
                                                                               ret_details=True)
         # assign values for visualization purpose
-        self.frame.confidence = weights[0]
         self.frame.depth = depth2/self.scale
         self.frame.flow = stereo_flow
         model_frame.confidence = weights[0]
-        return rel_pose_se3, model_frame, flow
+        return rel_pose_se3, model_frame, flow, weights
 
     @property
     def device(self):

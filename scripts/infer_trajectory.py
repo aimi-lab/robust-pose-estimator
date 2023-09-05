@@ -74,7 +74,7 @@ def main(args, config):
             else:
                 limg, rimg, mask, img_number = data
 
-            pose, scene, flow = pose_estimator(limg.to(device), rimg.to(device), mask.to(device))
+            pose, scene, flow, weights = pose_estimator(limg.to(device), rimg.to(device), mask.to(device))
 
             # visualization
             if isinstance(viewer, Viewer3D) & (i > 0):
@@ -84,7 +84,7 @@ def main(args, config):
                 canonical_scene = scene.pcl2open3d(stable=False)
                 viewer(pose.cpu(), canonical_scene, add_pcd=curr_pcl)
             elif isinstance(viewer, Viewer2D) & (i > 0):
-                viewer(pose_estimator.get_frame(), pose_estimator.get_last_frame(), flow, i*args.step)
+                viewer(pose_estimator.get_frame(), weights, flow, i*args.step)
             elif isinstance(viewer, ViewRenderer) & (i > 0):
                 canonical_scene = scene.pcl2open3d(stable=True)
                 viewer(pose.cpu(), canonical_scene)
