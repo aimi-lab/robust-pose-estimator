@@ -69,7 +69,8 @@ class PoseDataset(Dataset):
         poses = read_freiburg(gt_file)
         assert len(images_l) == len(images_r)
         assert len(images_l) > 0 , f'no images in {root}'
-        sample_list = self._random_sample(step, samples, len(images_l))
+        n_list = images_l if len(masks) == 0 else masks
+        sample_list = self._random_sample(step, samples, len(n_list))
 
         self.conf_thr = conf_thr
         self.depth_cutoff = depth_cutoff
@@ -81,16 +82,19 @@ class PoseDataset(Dataset):
             step = (step, step)
         for i in sample_list:
             s = np.random.randint(*step) if step[0] < step[1] else step[0]  # select a random step in given range
-            img_number1 = int(os.path.basename(images_l[i]).split('l.png')[0])
-            img_number2 = int(os.path.basename(images_l[i+s]).split('l.png')[0])
-            self.image_list.append([images_l[i], images_l[i+s]])
-            self.rel_pose_list.append(poses[img_number1].inv().mul(poses[img_number2]))
-            self.image_list_r.append([images_l[i].replace('l.png', 'r.png'), images_l[i+s].replace('l.png', 'r.png')])
+
+            img_number1 = int(os.path.basename(n_list[i]).split('l.png')[0])
+            img_number2 = int(os.path.basename(n_list[i+s]).split('l.png')[0])
+            self.image_list.append([n_list[i].replace('masks', 'video_frames'),
+                                    n_list[i+s].replace('masks', 'video_frames')])
+            self.rel_pose_list.append(poses[img_number1-1].inv().mul(poses[img_number2-1]))
+            self.image_list_r.append([n_list[i].replace('masks', 'video_frames').replace('l.png', 'r.png'),
+                                      n_list[i+s].replace('masks', 'video_frames').replace('l.png', 'r.png')])
             if len(masks) == 0:
                 self.mask_list.append([None, None])
             else:
-                self.mask_list.append([images_l[i].replace('video_frames', 'masks'),
-                                       images_l[i+s].replace('video_frames', 'masks')])
+                self.mask_list.append([n_list[i].replace('video_frames', 'masks'),
+                                       n_list[i+s].replace('video_frames', 'masks')])
         self.resize = Resize(img_size)
         self.resize_msk = Resize(img_size, interpolation=InterpolationMode.NEAREST)
         self.scale = float(img_size[0])/float(cv2.imread(images_l[0]).shape[1])
