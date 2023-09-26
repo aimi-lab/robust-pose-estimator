@@ -46,8 +46,8 @@ def val(model, dataloader, device, logger, key):
             metrics = {f"{key}/loss_rot": loss_cpu[:, 3:].sum(dim=-1).nanmean().item(),
                        f"{key}/loss_trans": loss_cpu[:, :3].sum(dim=-1).nanmean().item(),
                        f"{key}/loss_total": loss_cpu.sum(dim=-1).nanmean().item()}
-            logger.push(metrics, len(dataloader))
-        logger.flush()
+            logger.push(metrics, len(dataloader), 'val')
+        logger.flush('val')
     model.train()
     return loss.detach().mean().cpu().item()
 

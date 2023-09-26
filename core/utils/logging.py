@@ -56,49 +56,49 @@ class TrainLogger:
     def __init__(self, model, config, project_name, log):
         self.model = model
         self.total_steps = 0
-        self.running_loss = {}
+        self.running_loss = {'train': {}, 'val': {}}
         self.log = log
         if log:
             wandb.init(project=project_name, config=config)
         self.header = False
 
     def _print_header(self):
-        metrics_data = [k for k in sorted(self.running_loss.keys())]
+        metrics_data = [k for k in sorted(self.running_loss['train'].keys())]
         metrics_str = ("{:<15}, " * len(metrics_data)).format(*metrics_data)
 
         # print the training status
         print(metrics_str)
 
-    def _print_training_status(self):
+    def _print_training_status(self, mode):
         if not self.header:
             self.header = True
             self._print_header()
-        metrics_data = [self.running_loss[k] for k in sorted(self.running_loss.keys())]
+        metrics_data = [self.running_loss[mode][k] for k in sorted(self.running_loss[mode].keys())]
         metrics_str = ("{:10.4f}, " * len(metrics_data)).format(*metrics_data)
 
         # print the training status
         print(metrics_str)
 
-        for k in self.running_loss:
-            self.running_loss[k] = 0.0
+        for k in self.running_loss[mode]:
+            self.running_loss[mode][k] = 0.0
 
-    def push(self, metrics, freq):
+    def push(self, metrics, freq, mode='train'):
         self.total_steps += 1
 
         for key in metrics:
-            if key not in self.running_loss:
-                self.running_loss[key] = 0.0
+            if key not in self.running_loss[mode]:
+                self.running_loss[mode][key] = 0.0
 
-            self.running_loss[key] += metrics[key] / freq
+            self.running_loss[mode][key] += metrics[key] / freq
 
     def write_dict(self, results):
         wandb.log(results)
 
-    def flush(self):
+    def flush(self, mode='train'):
         if self.log:
-            self.write_dict(self.running_loss)
-        self._print_training_status()
-        self.running_loss = {}
+            self.write_dict(self.running_loss[mode])
+        self._print_training_status(mode)
+        self.running_loss[mode] = {}
 
     def close(self):
         wandb.finish()
