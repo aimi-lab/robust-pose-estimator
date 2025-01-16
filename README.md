@@ -37,7 +37,7 @@ checkout thirdparty code with
 ``` $ pip install git+https://github.com/princeton-vl/lietorch.git ```
 
 ## Prepare the data
-1. Download the *StereoMIS* dataset from [here]([https://doi.org/10.5281/zenodo.7727691]) and unzip it in the data folder.
+1. Download the *StereoMIS* dataset from [here](https://doi.org/10.5281/zenodo.7727691) and unzip it in the data folder.
 Note, only provide the porcine sequences of *StereMIS* are public. Each sequence contains a stereo video file, 
 camera calibration and camera poses.
 2. For training and (fast) inference you need to unpack and pre-process the stereo video files with:
